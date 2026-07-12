@@ -12,6 +12,8 @@ Exposes the library as a terminal tool with four sub-commands:
   ref-malo) and print its id; missing transcripts come from ``vocal-helper``.
 * ``eval`` — evaluate the engine against a dataset and gate on versioned
   thresholds (exit code ``0`` pass / ``1`` fail); see :mod:`speaker_helper.eval`.
+* ``speak-from`` — re-voice audio from a YouTube URL, podcast feed, or the
+  microphone (speech-to-speech); see :mod:`speaker_helper.sources`.
 * ``serve`` — run the REST API server (see :mod:`speaker_helper.api`).
 
 The ``--clone`` family of flags works with any command: ``speaker-helper --clone
@@ -99,6 +101,18 @@ def _build_parser() -> argparse.ArgumentParser:
                         help="Thresholds YAML (default: built-in bar).")
     p_eval.add_argument("--json", dest="json_out", type=Path, default=None,
                         help="Write the full JSON report to this path.")
+
+    p_from = sub.add_parser(
+        "speak-from",
+        help="Re-voice audio from a source (youtube / podcast / microphone).")
+    p_from.add_argument("--source", choices=["youtube", "podcast", "mic"], required=True,
+                        help="Where the audio comes from.")
+    p_from.add_argument("--url", default=None,
+                        help="YouTube video URL or podcast feed URL.")
+    p_from.add_argument("--seconds", type=float, default=5.0,
+                        help="Microphone capture duration (mic source).")
+    p_from.add_argument("-o", "--out", type=Path, default=Path("out.wav"),
+                        help="Output WAV path (default: out.wav).")
 
     # Distinct dests so the server's *bind* address never collides with the
     # top-level *Voicebox* --host/--port in the shared argparse namespace.
@@ -212,6 +226,35 @@ def _cmd_clone(args: argparse.Namespace, settings: Settings) -> int:
     return asyncio.run(run())
 
 
+def _cmd_speak_from(args: argparse.Namespace, settings: Settings) -> int:
+    """Handle ``speak-from``: transcribe a source and re-voice it to a WAV file."""
+    from speaker_helper.sources import (
+        from_microphone,
+        from_podcast,
+        from_youtube,
+        revoice,
+    )
+
+    async def run() -> int:
+        if args.source in ("youtube", "podcast") and not args.url:
+            osh.error("--url is required for the %s source", args.source)
+            return 2
+        if args.source == "youtube":
+            src = from_youtube(args.url)
+        elif args.source == "podcast":
+            src = from_podcast(args.url)
+        else:
+            src = await from_microphone(args.seconds)
+        async with Speaker(settings) as spk:
+            result = await revoice(src, spk)
+            Path(args.out).write_bytes(result.wav_bytes)
+            osh.info("re-voiced %s -> %s (%.2fs audio, RTF %.2f)",
+                     src.origin, args.out, result.duration_s, result.rtf)
+        return 0
+
+    return asyncio.run(run())
+
+
 def _cmd_eval(args: argparse.Namespace, settings: Settings) -> int:
     """Handle the ``eval`` sub-command; return 0 if the gate passes, 1 if not."""
     import json
@@ -290,6 +333,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_clone(args, settings)
     if args.command == "eval":
         return _cmd_eval(args, settings)
+    if args.command == "speak-from":
+        return _cmd_speak_from(args, settings)
     if args.command == "serve":
         return _cmd_serve(args, settings)
     parser.error(f"unknown command {args.command!r}")

@@ -192,6 +192,38 @@ re-transcrit pour que l'audio et le texte restent alignés.
 
 ---
 
+## Speech-to-speech (re-voicing)
+
+Importez de l'audio depuis les paquets sources de l'écosystème AI Helpers et
+re-voicez-le — transcrit avec
+[`vocal-helper`](https://github.com/warith-harchaoui) puis re-synthétisé
+(éventuellement dans une voix clonée ou une autre langue) :
+
+```python
+import asyncio
+from speaker_helper import Speaker, Settings
+from speaker_helper.sources import from_youtube, revoice
+
+async def main() -> None:
+    src = from_youtube("https://youtu.be/…")                 # extra : youtube
+    async with Speaker(Settings.from_mapping({"voicebox": {"port": 17600}})) as spk:
+        out = await revoice(src, spk)                        # transcrit + re-parle
+    open("revoiced.wav", "wb").write(out.wav_bytes)
+
+asyncio.run(main())
+```
+
+```bash
+speaker-helper --port 17600 speak-from --source youtube --url https://youtu.be/… -o out.wav
+speaker-helper --port 17600 speak-from --source podcast --url https://feed/rss   -o out.wav
+speaker-helper --port 17600 --clone speak-from --source mic --seconds 5          -o out.wav
+```
+
+Les sources sont des extras optionnels : `youtube` (`youtube-helper`), `podcast`
+(`podcast-helper`), `mic` (`capture-helper`).
+
+---
+
 ## Évaluation (pas de « vibe checks »)
 
 La qualité est verrouillée, pas devinée. `speaker-helper eval` exécute le moteur
@@ -212,6 +244,11 @@ speaker-helper --port 17600 --engine kokoro eval --json report.json
 L'évaluation cible le `Speaker` agnostique du moteur, donc la même passerelle
 évalue le backend `mock` en CI ou un vrai moteur en local — seul `--backend`
 change.
+
+Pour les équipes qui standardisent sur un framework, l'extra `eval` ajoute un
+pont [DeepEval](https://github.com/confident-ai/deepeval)
+(`RealTimeFactorMetric`, `AudioIntegrityMetric`) qui rapporte les mêmes mesures
+comme métriques DeepEval — déterministe et hors-ligne.
 
 ---
 

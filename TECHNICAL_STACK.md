@@ -74,7 +74,8 @@ flowchart TB
 | API | `api.py` | FastAPI — offline, SSE streaming, cloning upload |
 | Cloning | `cloning.py` | clone defaults (ref-malo), trim + transcript preparation |
 | Transcription | `transcription.py` | `vocal-helper` adapter (clone transcript + eval round-trip) |
-| Evaluation | `eval/` | dataset, metrics, priors/Pareto, thresholds, runner |
+| Sources | `sources.py` | speech-to-speech in: youtube / podcast / microphone → `revoice` |
+| Evaluation | `eval/` | dataset, metrics, priors/Pareto, thresholds, runner, DeepEval metrics |
 
 ---
 
@@ -102,9 +103,10 @@ flowchart TB
 ## Ecosystem
 
 speaker-helper is the **text → speech** node of the AI Helpers graph, the
-inverse of `vocal-helper` (speech → text). Planned for a future release: consume
-speech-to-speech sources directly from `youtube-helper`, `podcast-helper`, and
-`capture-helper` (live microphone).
+inverse of `vocal-helper` (speech → text). Since v0.4.0 it also closes the
+**speech-to-speech** loop: `speaker_helper.sources` pulls audio from
+`youtube-helper`, `podcast-helper`, or `capture-helper` (live microphone),
+transcribes it with `vocal-helper`, and re-voices it.
 
 ```mermaid
 flowchart LR

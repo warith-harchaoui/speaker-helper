@@ -4,6 +4,18 @@ All notable changes to speaker-helper are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project aims to adhere
 to [Semantic Versioning](https://semver.org/).
 
+## [0.4.0] — 2026-07-12
+
+### Added
+- **Speech-to-speech sources** (`speaker_helper.sources`): bring audio in and
+  re-voice it. `from_youtube` (extra `youtube`), `from_podcast` (extra
+  `podcast`), `from_microphone` (extra `mic`), and `revoice()` — transcribe with
+  `vocal-helper`, then speak the transcript (cloned voice / new language).
+- CLI `speak-from --source youtube|podcast|mic` for one-shot re-voicing.
+- **DeepEval integration** (`speaker_helper.eval.deepeval_metrics`, extra
+  `eval`): `RealTimeFactorMetric` and `AudioIntegrityMetric` adapt the native
+  measurements as DeepEval custom metrics — deterministic and offline.
+
 ## [0.3.0] — 2026-07-12
 
 ### Added

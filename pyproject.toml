@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "speaker-helper"
-version = "0.3.0"
+version = "0.4.0"
 description = "Speaker Helper — professional text-to-speech (offline + streaming) over a local TTS engine (Voicebox by default). The inverse of vocal-helper: text in, speech out. Library + CLI + REST API, with voice cloning and a built-in AI evaluation gate; runnable locally (conda + pip) or as a Docker server."
 readme = "README.md"
 requires-python = ">=3.10,<3.14"
@@ -65,6 +65,20 @@ server = [
 # explicit transcript and speed/anomaly evaluation work without it.
 stt = [
     "vocal-helper @ git+https://github.com/warith-harchaoui/vocal-helper.git@v0.3.1",
+]
+# Speech-to-speech sources (speaker_helper.sources): bring in audio to re-voice.
+youtube = [
+    "youtube-helper @ git+https://github.com/warith-harchaoui/youtube-helper.git@v1.3.3",
+]
+podcast = [
+    "podcast-helper @ git+https://github.com/warith-harchaoui/podcast-helper.git@v0.3.3",
+]
+mic = [
+    "capture-helper @ git+https://github.com/warith-harchaoui/capture-helper.git@v0.2.2",
+]
+# A dedicated evaluation framework (DeepEval) wrapping the native metrics.
+eval = [
+    "deepeval>=3",
 ]
 dev = [
     "pytest>=8",

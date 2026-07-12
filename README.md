@@ -191,6 +191,37 @@ re-transcribed so audio and text stay aligned.
 
 ---
 
+## Speech-to-speech (re-voicing)
+
+Bring audio in from the AI Helpers source packages and re-voice it — transcribed
+with [`vocal-helper`](https://github.com/warith-harchaoui) and spoken back
+(optionally in a cloned voice or another language):
+
+```python
+import asyncio
+from speaker_helper import Speaker, Settings
+from speaker_helper.sources import from_youtube, revoice
+
+async def main() -> None:
+    src = from_youtube("https://youtu.be/…")                 # extra: youtube
+    async with Speaker(Settings.from_mapping({"voicebox": {"port": 17600}})) as spk:
+        out = await revoice(src, spk)                        # transcribe + re-speak
+    open("revoiced.wav", "wb").write(out.wav_bytes)
+
+asyncio.run(main())
+```
+
+```bash
+speaker-helper --port 17600 speak-from --source youtube --url https://youtu.be/… -o out.wav
+speaker-helper --port 17600 speak-from --source podcast --url https://feed/rss   -o out.wav
+speaker-helper --port 17600 --clone speak-from --source mic --seconds 5          -o out.wav
+```
+
+Sources are optional extras: `youtube` (`youtube-helper`), `podcast`
+(`podcast-helper`), `mic` (`capture-helper`).
+
+---
+
 ## Evaluation (no vibe checks)
 
 Quality is gated, not guessed. `speaker-helper eval` runs the engine over a
@@ -209,6 +240,11 @@ speaker-helper --port 17600 --engine kokoro eval --json report.json
 
 The evaluation targets the engine-agnostic `Speaker`, so the same gate grades
 the `mock` backend in CI or a real engine locally — only `--backend` differs.
+
+For teams standardising on a framework, the `eval` extra adds a
+[DeepEval](https://github.com/confident-ai/deepeval) binding
+(`RealTimeFactorMetric`, `AudioIntegrityMetric`) that reports the same
+measurements as DeepEval custom metrics — deterministic and offline.
 
 ---
 
