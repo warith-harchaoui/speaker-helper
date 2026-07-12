@@ -29,3 +29,6 @@ htmlcov/
 !*config.json.example
 settings.yaml
 !settings.yaml.example
+
+# Private living working file (handoff notes), like ~/speak/todo.md.
+/todo.md
