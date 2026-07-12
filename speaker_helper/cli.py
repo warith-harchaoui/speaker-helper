@@ -3,11 +3,13 @@ Command-line interface for speaker-helper.
 
 Module summary
 --------------
-Exposes the library as a terminal tool with three sub-commands:
+Exposes the library as a terminal tool with four sub-commands:
 
 * ``synth`` — synthesise text (or stdin) to a ``.wav`` file, offline or
   streaming, printing the measured duration and real-time factor.
 * ``voices`` — list the preset voices of an engine.
+* ``eval`` — evaluate the engine against a dataset and gate on versioned
+  thresholds (exit code ``0`` pass / ``1`` fail); see :mod:`speaker_helper.eval`.
 * ``serve`` — run the REST API server (see :mod:`speaker_helper.api`).
 
 Argument parsing uses the standard-library :mod:`argparse` so the CLI has no
@@ -45,13 +47,15 @@ def _build_parser() -> argparse.ArgumentParser:
     """Construct the top-level argument parser and its sub-commands."""
     parser = argparse.ArgumentParser(
         prog="speaker-helper",
-        description="Text-to-speech (offline + streaming) over a local Voicebox engine.",
+        description="Text-to-speech (offline + streaming) over a local TTS engine.",
     )
     parser.add_argument("--config", type=Path, default=None,
                         help="Path to settings.yaml (default: ./settings.yaml if present).")
+    parser.add_argument("--backend", default=None,
+                        help="TTS backend: voicebox (default) or mock.")
     parser.add_argument("--host", default=None, help="Voicebox host override.")
     parser.add_argument("--port", type=int, default=None, help="Voicebox port override.")
-    parser.add_argument("--engine", default=None, help="Voicebox engine (e.g. kokoro).")
+    parser.add_argument("--engine", default=None, help="Engine/model id (e.g. kokoro).")
     parser.add_argument("--voice", default=None, help="Preset voice id (default: auto).")
     parser.add_argument("--language", default=None, help="Target language (e.g. fr).")
 
@@ -68,6 +72,15 @@ def _build_parser() -> argparse.ArgumentParser:
     p_voices = sub.add_parser("voices", help="List preset voices for an engine.")
     p_voices.add_argument("--engine", default=None, help="Engine id (default: configured).")
 
+    p_eval = sub.add_parser(
+        "eval", help="Evaluate the engine against a dataset and gate on thresholds.")
+    p_eval.add_argument("--dataset", type=Path, default=None,
+                        help="JSONL dataset (default: built-in French set).")
+    p_eval.add_argument("--thresholds", type=Path, default=None,
+                        help="Thresholds YAML (default: built-in bar).")
+    p_eval.add_argument("--json", dest="json_out", type=Path, default=None,
+                        help="Write the full JSON report to this path.")
+
     # Distinct dests so the server's *bind* address never collides with the
     # top-level *Voicebox* --host/--port in the shared argparse namespace.
     p_serve = sub.add_parser("serve", help="Run the REST API server.")
@@ -80,6 +93,8 @@ def _build_parser() -> argparse.ArgumentParser:
 def _settings_from_args(args: argparse.Namespace) -> Settings:
     """Load settings from ``--config`` and apply CLI overrides."""
     settings = Settings.load(args.config)
+    if getattr(args, "backend", None):
+        settings.backend = args.backend
     if getattr(args, "host", None):
         settings.voicebox.host = args.host
     if getattr(args, "port", None):
@@ -149,6 +164,37 @@ def _cmd_serve(args: argparse.Namespace, settings: Settings) -> int:
     return 0
 
 
+def _cmd_eval(args: argparse.Namespace, settings: Settings) -> int:
+    """Handle the ``eval`` sub-command; return 0 if the gate passes, 1 if not."""
+    import json
+
+    from speaker_helper.eval import Thresholds, load_dataset, run_eval
+
+    cases = load_dataset(args.dataset)
+    thresholds = Thresholds.load(args.thresholds)
+
+    async def run() -> int:
+        async with Speaker(settings) as spk:
+            report = await run_eval(spk, cases, thresholds=thresholds)
+        if args.json_out is not None:
+            args.json_out.write_text(
+                json.dumps(report.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8")
+            log.info("wrote JSON report to %s", args.json_out)
+        # User-facing verdict on stdout so it is greppable / pipeable.
+        sys.stdout.write(
+            f"backend={report.backend} engine={settings.engine} cases={report.n_cases}\n"
+            f"mean_rtf={report.mean_rtf} p95_rtf={report.p95_rtf} "
+            f"anomaly_rate={report.anomaly_rate} "
+            f"quality={report.quality} ({report.quality_source})\n"
+            f"{'PASS' if report.passed else 'FAIL'}"
+            + ("" if report.passed else ": " + "; ".join(report.failures))
+            + "\n"
+        )
+        return 0 if report.passed else 1
+
+    return asyncio.run(run())
+
+
 def _concat_wavs(buffers: list[bytes], out: Path) -> None:
     """Concatenate WAV payloads into one file (re-encoding via soundfile)."""
     import io
@@ -185,6 +231,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_synth(args, settings)
     if args.command == "voices":
         return _cmd_voices(args, settings)
+    if args.command == "eval":
+        return _cmd_eval(args, settings)
     if args.command == "serve":
         return _cmd_serve(args, settings)
     parser.error(f"unknown command {args.command!r}")

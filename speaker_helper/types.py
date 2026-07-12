@@ -130,6 +130,44 @@ class StreamChunk:
 
 
 @dataclass
+class VoiceSample:
+    """One reference recording used to clone a voice.
+
+    Parameters
+    ----------
+    audio : bytes or str
+        The reference audio: raw bytes, or a filesystem path to an audio file.
+    reference_text : str
+        A transcript of exactly what is said in ``audio``. Cloning engines align
+        the audio to this text, so it must match the recording.
+
+    Notes
+    -----
+    Keep samples short and clean (a few seconds of clear speech). Provide several
+    for a more robust clone.
+    """
+
+    audio: bytes | str
+    reference_text: str
+
+    def read_bytes(self) -> bytes:
+        """Return the audio as bytes, reading from disk if a path was given."""
+        if isinstance(self.audio, bytes):
+            return self.audio
+        from pathlib import Path
+
+        return Path(self.audio).read_bytes()
+
+    def filename(self) -> str:
+        """Return a filename to send with the upload (from the path, or a default)."""
+        if isinstance(self.audio, str):
+            from pathlib import Path
+
+            return Path(self.audio).name
+        return "sample.wav"
+
+
+@dataclass
 class VoiceList:
     """Voices available for an engine.
 

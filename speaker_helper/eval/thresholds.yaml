@@ -1,0 +1,15 @@
+# Versioned pass/fail bar for `speaker-helper eval` (see thresholds.py).
+# Review changes here in code review — this is the contract CI enforces.
+
+# Speed: synthesis must be faster than real time, tail included.
+max_mean_rtf: 1.0
+max_p95_rtf: 1.0
+
+# Signal integrity: no audio anomaly tolerated (empty / clipped / aberrant
+# duration / bad sample rate).
+max_anomaly_rate: 0.0
+
+# Fidelity round-trip (only gated when a transcriber, e.g. vocal-helper, is
+# wired in — see runner.py). null = not gated.
+max_mean_wer: null
+min_mean_chrf: null

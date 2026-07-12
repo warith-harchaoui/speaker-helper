@@ -43,6 +43,7 @@ import asyncio
 import io
 import json
 import time
+from collections.abc import Awaitable, Callable
 from types import TracebackType
 from typing import TYPE_CHECKING
 
@@ -94,6 +95,53 @@ class VoiceboxClient:
             self._client = httpx.AsyncClient(timeout=self.settings.voicebox.timeout_s)
         return self._client
 
+    async def _send(self, make_request: Callable[[], Awaitable[httpx.Response]]) -> httpx.Response:
+        """Send an HTTP request with retries on transient failures.
+
+        Retries on transport errors (connection reset, timeout, …) and on 5xx
+        responses, backing off exponentially. Client errors (4xx) are returned
+        as-is on the first try so callers keep their special-case handling
+        (e.g. the "model not downloaded" 400).
+
+        Parameters
+        ----------
+        make_request : callable
+            A zero-argument coroutine factory that performs one HTTP attempt.
+            It must be safe to call more than once (idempotent request).
+
+        Returns
+        -------
+        httpx.Response
+            The first non-5xx response, or the last response/raise after
+            exhausting retries.
+
+        Raises
+        ------
+        VoiceboxError
+            If every attempt fails with a transport error.
+        """
+        import httpx
+
+        attempts = self.settings.voicebox.max_retries + 1
+        last_exc: Exception | None = None
+        for attempt in range(1, attempts + 1):
+            try:
+                resp = await make_request()
+            except httpx.TransportError as exc:
+                last_exc = exc
+                if attempt == attempts:
+                    break
+            else:
+                # Retry only server-side (5xx) failures; 4xx are the caller's.
+                if resp.status_code < 500 or attempt == attempts:
+                    return resp
+                log.warning("engine %d on attempt %d/%d; retrying",
+                            resp.status_code, attempt, attempts)
+            await asyncio.sleep(self.settings.voicebox.retry_backoff_s * 2 ** (attempt - 1))
+        raise VoiceboxError(
+            f"request to {self.base} failed after {attempts} attempt(s): {last_exc}"
+        ) from last_exc
+
     async def aclose(self) -> None:
         """Close the underlying HTTP client and release its connections."""
         if self._client is not None:
@@ -126,7 +174,7 @@ class VoiceboxClient:
         VoiceboxError
             If the server is unreachable or returns a non-2xx status.
         """
-        resp = await self._http().get(f"{self.base}/health")
+        resp = await self._send(lambda: self._http().get(f"{self.base}/health"))
         _raise_for_status(resp)
         return resp.json()
 
@@ -144,7 +192,7 @@ class VoiceboxClient:
             The engine and its preset voices (possibly empty).
         """
         engine = engine or self.settings.engine
-        resp = await self._http().get(f"{self.base}/profiles/presets/{engine}")
+        resp = await self._send(lambda: self._http().get(f"{self.base}/profiles/presets/{engine}"))
         _raise_for_status(resp)
         raw = resp.json().get("voices", [])
         voices = [
@@ -280,7 +328,8 @@ class VoiceboxClient:
             "normalize": self.settings.normalize,
         }
         t0 = time.perf_counter()
-        resp = await self._http().post(f"{self.base}/generate/stream", json=payload)
+        resp = await self._send(
+            lambda: self._http().post(f"{self.base}/generate/stream", json=payload))
         if resp.status_code == 400 and "not downloaded" in resp.text.lower():
             log.info("engine model not present; downloading via async /generate")
             wav_bytes = await self._generate_async(payload)

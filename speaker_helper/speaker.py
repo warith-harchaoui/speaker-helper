@@ -4,7 +4,7 @@ High-level speaker-helper API: text in, speech out.
 Module summary
 --------------
 :class:`Speaker` is the façade most applications use. It wraps a
-:class:`~speaker_helper.client.VoiceboxClient` and offers two modes:
+:class:`~speaker_helper.engine.TTSEngine` backend and offers two modes:
 
 * **offline** — :meth:`Speaker.say` synthesises the whole text into one
   :class:`~speaker_helper.types.AudioResult`, optimising throughput/quality.
@@ -35,8 +35,8 @@ import time
 from collections.abc import AsyncIterator
 from pathlib import Path
 
-from speaker_helper.client import VoiceboxClient
 from speaker_helper.config import Settings
+from speaker_helper.engine import TTSEngine, create_engine
 from speaker_helper.logging_utils import get_logger
 from speaker_helper.text import chunk_for_streaming
 from speaker_helper.types import AudioResult, StreamChunk, VoiceList
@@ -45,13 +45,22 @@ log = get_logger(__name__)
 
 
 class Speaker:
-    """Turn text into speech via a Voicebox engine, offline or streaming.
+    """Turn text into speech via a pluggable TTS engine, offline or streaming.
+
+    The concrete engine (Voicebox, mock, …) is selected by
+    ``settings.backend`` and reached only through the
+    :class:`~speaker_helper.engine.TTSEngine` protocol, so :class:`Speaker`
+    never depends on a specific backend.
 
     Parameters
     ----------
     settings : Settings or None
         Configuration; when ``None``, :meth:`Settings.load` is used (reads
         ``./settings.yaml`` if present, then ``SPEAKER_HELPER_*`` env vars).
+    engine : TTSEngine or None
+        Inject a ready backend instance (e.g. a mock in tests). When ``None``
+        (default), one is built from ``settings`` via
+        :func:`~speaker_helper.engine.create_engine`.
     stream_concurrency : int
         Maximum number of chunks synthesised in parallel in streaming mode.
         The default of ``1`` (a strict pipeline) gives the lowest time to
@@ -72,15 +81,40 @@ class Speaker:
         self,
         settings: Settings | None = None,
         *,
+        engine: TTSEngine | None = None,
         stream_concurrency: int = 1,
     ) -> None:
         self.settings = settings or Settings.load()
         self.stream_concurrency = max(1, stream_concurrency)
-        self.client = VoiceboxClient(self.settings)
+        self.engine: TTSEngine = engine or create_engine(self.settings)
+
+    @property
+    def client(self) -> TTSEngine:
+        """Backward-compatible alias for :attr:`engine`.
+
+        Earlier releases exposed the backend as ``speaker.client`` (it was
+        always a Voicebox client). It is now any :class:`TTSEngine`; this alias
+        keeps old call sites working.
+        """
+        return self.engine
 
     async def aclose(self) -> None:
-        """Close the underlying HTTP client."""
-        await self.client.aclose()
+        """Release the underlying engine's resources."""
+        await self.engine.aclose()
+
+    async def warmup(self) -> None:
+        """Prime the engine so the first real request is not the slow one.
+
+        Synthesises a tiny throwaway utterance, which forces backend-specific
+        one-time costs (profile bootstrap, model download / load) to happen now
+        rather than on a user's first call. Failures are logged and swallowed —
+        warm-up is best-effort and must never break startup.
+        """
+        try:
+            await self.engine.synthesize(".", language=self.settings.language)
+            log.info("engine warm-up complete (backend=%s)", self.settings.backend)
+        except Exception as exc:  # noqa: BLE001 - warm-up is best-effort
+            log.warning("engine warm-up failed (continuing): %s", exc)
 
     async def __aenter__(self) -> Speaker:
         return self
@@ -92,7 +126,7 @@ class Speaker:
 
     async def voices(self, engine: str | None = None) -> VoiceList:
         """List preset voices for an engine (defaults to the configured one)."""
-        return await self.client.list_voices(engine)
+        return await self.engine.list_voices(engine)
 
     # ----- offline --------------------------------------------------------
 
@@ -111,7 +145,7 @@ class Speaker:
         AudioResult
             The synthesised audio and its metadata.
         """
-        return await self.client.synthesize(text, language=language)
+        return await self.engine.synthesize(text, language=language)
 
     # ----- streaming ------------------------------------------------------
 
@@ -147,7 +181,7 @@ class Speaker:
 
         async def _synth(chunk_text: str) -> AudioResult:
             async with sem:
-                return await self.client.synthesize(chunk_text, language=language)
+                return await self.engine.synthesize(chunk_text, language=language)
 
         tasks = [asyncio.create_task(_synth(c)) for c in chunks]
         try:

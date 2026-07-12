@@ -1,9 +1,19 @@
-# speaker-helper
+# Speaker Helper
+
+[🇫🇷](LISEZMOI.md) · [🇬🇧](README.md)
+
+
+`Speaker Helper` belongs to a collection of libraries called `AI Helpers` developed for building Artificial Intelligence.
+
+[🌍 AI Helpers](https://harchaoui.org/warith/ai-helpers)
+
+[![logo](assets/logo.png)](https://harchaoui.org/warith/ai-helpers)
+
 
 **Professional text-to-speech — offline and streaming — over a local
 [Voicebox](https://github.com/jamiepine/voicebox) engine.**
 
-speaker-helper is the inverse of
+speaker-helper is the counterpart of
 [`vocal-helper`](https://github.com/warith-harchaoui): where vocal-helper turns
 *speech into text*, speaker-helper turns **text into speech**. It gives you a
 small, typed Python API, a CLI, and a REST API — runnable locally (conda + pip)

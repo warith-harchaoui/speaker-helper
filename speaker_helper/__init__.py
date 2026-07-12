@@ -30,6 +30,13 @@ from __future__ import annotations
 
 from speaker_helper.client import VoiceboxClient, VoiceboxError
 from speaker_helper.config import Settings, VoiceboxConfig
+from speaker_helper.engine import (
+    MockEngine,
+    TTSEngine,
+    available_backends,
+    create_engine,
+    register_backend,
+)
 from speaker_helper.speaker import Speaker
 from speaker_helper.text import chunk_for_streaming, split_sentences
 from speaker_helper.types import AudioResult, Mode, StreamChunk, Voice, VoiceList
@@ -39,15 +46,20 @@ __version__ = "0.1.0"
 __all__ = [
     "AudioResult",
     "Mode",
+    "MockEngine",
     "Settings",
     "Speaker",
     "StreamChunk",
+    "TTSEngine",
     "Voice",
     "VoiceList",
     "VoiceboxClient",
     "VoiceboxConfig",
     "VoiceboxError",
     "__version__",
+    "available_backends",
     "chunk_for_streaming",
+    "create_engine",
+    "register_backend",
     "split_sentences",
 ]

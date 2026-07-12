@@ -6,10 +6,14 @@ Module summary
 A thin FastAPI façade over :class:`~speaker_helper.speaker.Speaker`, suitable
 for running as a Docker service. It exposes:
 
-* ``GET  /health`` — liveness plus the upstream Voicebox health.
+* ``GET  /health`` — liveness plus the upstream engine health.
 * ``GET  /voices`` — preset voices for the configured (or requested) engine.
 * ``POST /synth`` — synthesise ``{"text": ..., "language": ...}`` and return a
-  ``audio/wav`` body.
+  ``audio/wav`` body (offline: whole text in one response).
+* ``POST /synth/stream`` — same body, but stream Server-Sent Events, one per
+  sentence-sized chunk, as soon as each is ready (low time-to-first-audio).
+  Each event's ``data`` is JSON with ``seq``, ``duration_s``, ``rtf``,
+  ``ttfa_s`` (first chunk only), ``is_final``, and base64 ``audio`` (WAV).
 
 This module imports FastAPI/pydantic/uvicorn at import time, so it is only ever
 imported behind the ``server`` extra (the CLI imports it lazily, and the core
@@ -31,11 +35,13 @@ Warith HARCHAOUI — https://linkedin.com/in/warith-harchaoui
 
 from __future__ import annotations
 
+import base64
+import json
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 
 from speaker_helper.config import Settings
@@ -80,6 +86,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         # One Speaker (and its pooled HTTP client) for the app's lifetime.
+        # Warm the engine up front so the first client request is not the one
+        # that pays the model download / load.
+        await speaker.warmup()
         yield
         await speaker.aclose()
 
@@ -89,10 +98,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def health() -> dict:
         """Return server liveness and upstream Voicebox health."""
         try:
-            upstream = await speaker.client.health()
+            upstream = await speaker.engine.health()
         except Exception as exc:  # noqa: BLE001 - report upstream failure verbatim
-            return {"status": "degraded", "voicebox_error": str(exc)}
-        return {"status": "ok", "voicebox": upstream}
+            return {"status": "degraded", "backend": settings.backend, "engine_error": str(exc)}
+        return {"status": "ok", "backend": settings.backend, "engine": upstream}
 
     @app.get("/voices")
     async def voices(engine: str | None = Query(None)) -> dict:
@@ -114,6 +123,35 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "X-Audio-RTF": f"{result.rtf:.3f}",
         }
         return Response(content=result.wav_bytes, media_type="audio/wav", headers=headers)
+
+    @app.post("/synth/stream")
+    async def synth_stream(req: SynthRequest) -> StreamingResponse:
+        """Stream synthesis as Server-Sent Events, one per sentence-sized chunk.
+
+        Emits each chunk's audio (base64 WAV) and metadata as soon as it is
+        ready, so a client can start playing before the whole text is
+        synthesised. A terminal ``event: error`` is sent if synthesis fails
+        mid-stream (the HTTP status is already 200 by then).
+        """
+        async def events() -> AsyncIterator[bytes]:
+            try:
+                async for chunk in speaker.stream(req.text, language=req.language):
+                    payload = {
+                        "seq": chunk.seq,
+                        "duration_s": round(chunk.audio.duration_s, 3),
+                        "rtf": round(chunk.audio.rtf, 3),
+                        "ttfa_s": (round(chunk.ttfa_s, 3) if chunk.ttfa_s is not None else None),
+                        "is_final": chunk.is_final,
+                        "audio": base64.b64encode(chunk.audio.wav_bytes).decode("ascii"),
+                    }
+                    yield f"data: {json.dumps(payload)}\n\n".encode()
+            except ValueError as exc:
+                yield f"event: error\ndata: {json.dumps({'detail': str(exc)})}\n\n".encode()
+            except Exception as exc:  # noqa: BLE001 - surface engine failures to the client
+                log.warning("stream failed: %s", exc)
+                yield f"event: error\ndata: {json.dumps({'detail': str(exc)})}\n\n".encode()
+
+        return StreamingResponse(events(), media_type="text/event-stream")
 
     return app
 

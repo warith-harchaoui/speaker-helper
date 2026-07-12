@@ -83,11 +83,20 @@ class VoiceboxConfig:
     timeout_s : float
         Per-request timeout in seconds. The first synthesis of a new engine
         pays a model download, so keep this generous.
+    max_retries : int
+        How many times to retry a request that fails on a *transient* error
+        (network/transport error or a 5xx from the engine). ``0`` disables
+        retries. Client errors (4xx) are never retried.
+    retry_backoff_s : float
+        Base delay for exponential backoff between retries: attempt ``k`` waits
+        ``retry_backoff_s * 2**(k-1)`` seconds.
     """
 
     host: str = "127.0.0.1"
     port: int = 17493
     timeout_s: float = 300.0
+    max_retries: int = 2
+    retry_backoff_s: float = 0.5
 
 
 @dataclass
@@ -98,8 +107,15 @@ class Settings:
     ----------
     voicebox : VoiceboxConfig
         Connection details for the Voicebox engine.
+    backend : str
+        Which TTS backend to drive: ``"voicebox"`` (the real engine, default)
+        or ``"mock"`` (deterministic, serverless — used by tests and the
+        evaluation layer). The backend is an implementation detail; the rest of
+        the package talks only to the :class:`~speaker_helper.engine.TTSEngine`
+        protocol. See :func:`speaker_helper.engine.available_backends`.
     engine : str
-        Voicebox engine id. ``kokoro`` is fast enough for real-time on CPU.
+        Backend-specific engine/model id. For Voicebox, ``kokoro`` is fast
+        enough for real-time on CPU.
     voice_id : str
         Preset voice id. Empty (default) means "auto-pick a voice whose
         language matches ``language``".
@@ -119,12 +135,16 @@ class Settings:
     """
 
     voicebox: VoiceboxConfig = field(default_factory=VoiceboxConfig)
+    backend: str = "voicebox"
     engine: str = "kokoro"
     voice_id: str = ""
     language: str = "fr"
     normalize: bool = True
     mode: str = "offline"
     first_chunk_sentences: int = 1
+    # Backend-specific knobs for the ``mock`` engine (rtf, chars_per_sec,
+    # sample_rate, amplitude, frequency_hz). Ignored by other backends.
+    mock: dict[str, Any] = field(default_factory=dict)
 
     @property
     def base_url(self) -> str:
@@ -200,6 +220,8 @@ class Settings:
             self.voicebox.host = env["SPEAKER_HELPER_VOICEBOX_HOST"]
         if "SPEAKER_HELPER_VOICEBOX_PORT" in env:
             self.voicebox.port = int(env["SPEAKER_HELPER_VOICEBOX_PORT"])
+        if "SPEAKER_HELPER_BACKEND" in env:
+            self.backend = env["SPEAKER_HELPER_BACKEND"]
         if "SPEAKER_HELPER_ENGINE" in env:
             self.engine = env["SPEAKER_HELPER_ENGINE"]
         if "SPEAKER_HELPER_VOICE_ID" in env:
