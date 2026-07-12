@@ -2,48 +2,49 @@
 
 Measured with the built-in evaluation gate
 (`speaker-helper eval --languages fr,en,es`), one report per language, voice
-auto-picked per language. Quality is the engine prior (no transcriber in this
-run); anomaly rate is the fraction of clipped / empty / aberrant-duration
-outputs.
+auto-picked per language and warmed up. Quality is the engine prior (no
+transcriber in these runs); anomaly rate is the fraction of clipped / empty /
+aberrant-duration outputs.
 
-> **These numbers are hardware- and load-dependent — read the conditions.** The
-> evaluation is the source of truth; re-run it on your machine.
+> **These numbers are hardware-dependent — read the conditions.** The evaluation
+> is the source of truth; re-run it on your machine.
 
-## Engine: kokoro (Voicebox)
+Hardware: Apple M2 Max. Engine: **kokoro** (Voicebox).
 
-### CPU-Docker (colima), machine under load — warm
+## Native MLX (Apple GPU / Metal) — `:17493` — recommended
+
+| lang | cases | mean RTF | p95 RTF | anomaly | quality | verdict |
+|------|------:|---------:|--------:|--------:|--------:|---------|
+| fr   | 12    | **0.151** | 0.201   | 0.000   | 0.75    | PASS |
+| en   | 10    | **0.133** | 0.150   | 0.000   | 0.75    | PASS |
+| es   | 10    | **0.141** | 0.170   | 0.000   | 0.75    | PASS |
+
+The native Voicebox backend on the **Apple GPU (MPS/Metal)** synthesises **6–8×
+faster than real time** in every language, with zero anomalies. This is
+speaker-helper's default port (`:17493`) — the intended operating point.
+
+## CPU inside Docker (colima) — `:17600`
 
 | lang | cases | mean RTF | p95 RTF | anomaly | quality | verdict |
 |------|------:|---------:|--------:|--------:|--------:|---------|
 | fr   | 12    | 1.341    | 1.723   | 0.000   | 0.75    | FAIL (RTF > 1.0) |
 | en   | 10    | 1.131    | 1.470   | 0.000   | 0.75    | FAIL (RTF > 1.0) |
-| es   | 10    | 1.046    | 1.207   | 0.000   | 0.75    | FAIL (RTF > 1.0) |
+| es   | 10    | 1.287    | 1.678   | 0.000   | 0.75    | FAIL (RTF > 1.0) |
 
-Conditions: Apple M2 Max, kokoro on **CPU inside a Docker VM** (colima on
-`:17600`), host load average ≈ 5–8 (concurrent builds). Zero audio anomalies in
-every language — quality/integrity hold; only speed misses the bar.
+CPU synthesis is **borderline and load-sensitive**: on an idle host French
+measured mean RTF ≈ 0.32–0.37 (passing), but under CPU contention it climbs
+above 1.0 (failing). Docker on macOS has **no GPU/Metal passthrough**, so the
+container cannot use MPS — hence the ~8× gap with native MLX above.
 
-### Same CPU-Docker engine, host idle (reference)
+## Takeaways
 
-Earlier, on the *same* CPU-Docker engine with the host idle, French measured
-**mean RTF ≈ 0.32–0.37** (faster than real time). CPU synthesis is therefore
-**borderline and load-sensitive**: it clears the RTF < 1.0 bar when the machine
-is free and misses it under contention.
-
-## Reading the result
-
-The gate is doing its job: it flags that, under CPU contention, kokoro is *not*
-reliably faster than real time. Two ways to get comfortably below 1.0:
-
-1. **Use the GPU (recommended on Apple Silicon).** Docker on macOS has **no
-   GPU/Metal passthrough**, so the CPU-Docker container cannot use MPS. Run the
-   **native MLX Voicebox** instead (its default port `:17493` is also
-   speaker-helper's default) — it uses the Apple GPU and is markedly faster.
-2. **Give the CPU headroom** — measure on an unloaded host.
-
-speaker-helper is engine- and host-agnostic: point it at whichever engine you
-run (`--port`, `settings.yaml`, or `SPEAKER_HELPER_VOICEBOX_PORT`) and re-run
-`eval --languages …` to get numbers for *your* setup.
+- **On Apple Silicon, run the native MLX Voicebox** (`:17493`) — it is the
+  default and gives a comfortable RTF well below 1.0 across languages.
+- The evaluation gate correctly flags the CPU-under-load case: quality/integrity
+  hold (zero anomalies everywhere), only *speed* misses the bar there.
+- speaker-helper is engine- and host-agnostic: point it at whichever engine you
+  run (`--port`, `settings.yaml`, or `SPEAKER_HELPER_VOICEBOX_PORT`) and re-run
+  `eval --languages …` for numbers on *your* setup.
 
 ---
 

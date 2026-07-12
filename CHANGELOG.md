@@ -4,6 +4,14 @@ All notable changes to speaker-helper are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project aims to adhere
 to [Semantic Versioning](https://semver.org/).
 
+## [0.5.1] — 2026-07-12
+
+### Documentation
+- `BENCHMARKS.md`: added real **native MLX (Apple GPU)** multi-language numbers —
+  kokoro synthesises **6–8× faster than real time** (fr 0.151, en 0.133, es
+  0.141 RTF, all passing), versus CPU-Docker under load (RTF > 1.0). Confirms the
+  native-MLX operating point on Apple Silicon.
+
 ## [0.5.0] — 2026-07-12
 
 ### Added
