@@ -49,7 +49,7 @@ from typing import TYPE_CHECKING
 
 from speaker_helper.config import Settings
 from speaker_helper.logging_utils import get_logger
-from speaker_helper.types import AudioResult, Voice, VoiceList
+from speaker_helper.types import AudioResult, Voice, VoiceList, VoiceSample
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     import httpx
