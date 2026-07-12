@@ -18,6 +18,10 @@ for running as a Docker service. It exposes:
   transcripts) to clone a voice; missing transcripts come from ``vocal-helper``.
   The clone becomes the server's active voice for subsequent ``/synth`` calls.
 
+When ``fastapi-mcp`` is installed, a Model Context Protocol server is also
+mounted at ``/mcp``, exposing these endpoints as MCP tools so an assistant can
+synthesise, stream, clone, and list voices directly.
+
 This module imports FastAPI/pydantic/uvicorn at import time, so it is only ever
 imported behind the ``server`` extra (the CLI imports it lazily, and the core
 package never imports it). Keeping the request model at module scope lets
@@ -68,13 +72,18 @@ class SynthRequest(BaseModel):
     language: str | None = Field(None, description="Override target language.")
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None, *, enable_mcp: bool = True) -> FastAPI:
     """Build the FastAPI application.
 
     Parameters
     ----------
     settings : Settings or None
         Configuration; defaults to :meth:`Settings.load`.
+    enable_mcp : bool
+        When ``True`` (default) and ``fastapi-mcp`` is installed, mount a Model
+        Context Protocol server at ``/mcp`` that exposes the REST endpoints as
+        MCP tools — so an MCP client (an assistant) can synthesise, clone, and
+        list voices directly. Silently skipped if ``fastapi-mcp`` is absent.
 
     Returns
     -------
@@ -96,7 +105,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app = FastAPI(title="speaker-helper", version=_version(), lifespan=lifespan)
 
-    @app.get("/health")
+    @app.get("/health", operation_id="health")
     async def health() -> dict:
         """Return server liveness and upstream Voicebox health."""
         try:
@@ -105,13 +114,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             return {"status": "degraded", "backend": settings.backend, "engine_error": str(exc)}
         return {"status": "ok", "backend": settings.backend, "engine": upstream}
 
-    @app.get("/voices")
+    @app.get("/voices", operation_id="list_voices")
     async def voices(engine: str | None = Query(None)) -> dict:
         """List preset voices for an engine."""
         listing = await speaker.voices(engine)
         return {"engine": listing.engine, "voices": [vars(v) for v in listing.voices]}
 
-    @app.post("/synth")
+    @app.post("/synth", operation_id="synth")
     async def synth(req: SynthRequest) -> Response:
         """Synthesise text and return an ``audio/wav`` body."""
         try:
@@ -126,7 +135,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         }
         return Response(content=result.wav_bytes, media_type="audio/wav", headers=headers)
 
-    @app.post("/synth/stream")
+    @app.post("/synth/stream", operation_id="synth_stream")
     async def synth_stream(req: SynthRequest) -> StreamingResponse:
         """Stream synthesis as Server-Sent Events, one per sentence-sized chunk.
 
@@ -155,7 +164,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         return StreamingResponse(events(), media_type="text/event-stream")
 
-    @app.post("/clone")
+    @app.post("/clone", operation_id="clone_voice")
     async def clone(
         name: str = Form(..., description="Name for the cloned voice profile."),
         files: list[UploadFile] = File(..., description="Reference audio recordings."),
@@ -183,7 +192,33 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
         return {"voice_id": voice_id}
 
+    if enable_mcp:
+        _mount_mcp(app)
+
     return app
+
+
+def _mount_mcp(app: FastAPI) -> None:
+    """Mount an MCP server at ``/mcp`` exposing the REST endpoints as tools.
+
+    Uses ``fastapi-mcp`` to turn each operation (``synth``, ``synth_stream``,
+    ``clone_voice``, ``list_voices``, ``health``) into a Model Context Protocol
+    tool, so an assistant can drive speaker-helper directly. A no-op (with a
+    warning) when ``fastapi-mcp`` is not installed.
+    """
+    try:
+        from fastapi_mcp import FastApiMCP
+    except ImportError:
+        osh.warning("fastapi-mcp not installed; MCP server not mounted "
+                    "(install the 'mcp' extra to enable /mcp)")
+        return
+    mcp = FastApiMCP(
+        app,
+        name="speaker-helper",
+        description="Text-to-speech: synthesise, stream, clone voices, list voices.",
+    )
+    mcp.mount_http()
+    osh.info("MCP server mounted at /mcp")
 
 
 def serve(settings: Settings | None = None, *, host: str = "127.0.0.1", port: int = 8080) -> None:

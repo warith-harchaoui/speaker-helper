@@ -4,6 +4,19 @@ All notable changes to speaker-helper are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project aims to adhere
 to [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] — 2026-07-12
+
+### Added
+- **MCP server.** When `fastapi-mcp` is installed (bundled with the `server`
+  extra), the REST endpoints are exposed as Model Context Protocol tools at
+  `/mcp` — so an assistant can `synth`, `synth_stream`, `clone_voice`,
+  `list_voices`, and `health` directly. `create_app(enable_mcp=False)` opts out.
+- Stable `operation_id`s on every route, used as the MCP tool names.
+
+### Fixed
+- Pinned `os-helper` to `v1.4.1` to match `audio-helper`, resolving a pip
+  dependency conflict that broke a clean install.
+
 ## [0.2.0] — 2026-07-12
 
 ### Added

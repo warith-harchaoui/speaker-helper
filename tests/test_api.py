@@ -60,6 +60,21 @@ def test_synth_rejects_empty_text() -> None:
     assert resp.status_code == 422
 
 
+def test_mcp_server_mounted() -> None:
+    """When fastapi-mcp is installed, an MCP endpoint is mounted at /mcp."""
+    pytest.importorskip("fastapi_mcp")
+    app = create_app(Settings.from_mapping({"backend": "mock"}))
+    paths = {getattr(r, "path", "") for r in app.routes}
+    assert any(p.startswith("/mcp") for p in paths)
+
+
+def test_mcp_can_be_disabled() -> None:
+    """enable_mcp=False builds the app without the MCP mount."""
+    app = create_app(Settings.from_mapping({"backend": "mock"}), enable_mcp=False)
+    paths = {getattr(r, "path", "") for r in app.routes}
+    assert not any(p.startswith("/mcp") for p in paths)
+
+
 def test_synth_stream_emits_ordered_sse_chunks() -> None:
     with _client() as client:
         resp = client.post("/synth/stream", json={"text": "Un. Deux. Trois."})

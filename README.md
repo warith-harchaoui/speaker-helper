@@ -150,6 +150,11 @@ curl -N -X POST localhost:8080/synth/stream -H 'content-type: application/json' 
      -d '{"text": "Une. Deux. Trois."}'
 ```
 
+The server also mounts a **Model Context Protocol** endpoint at `/mcp` (via
+[`fastapi-mcp`](https://github.com/tadata-org/fastapi-mcp), bundled with the
+`server` extra), exposing `synth`, `synth_stream`, `clone_voice`, `list_voices`,
+and `health` as MCP tools an assistant can call directly.
+
 Or with Docker (server points at a Voicebox on the host):
 
 ```bash

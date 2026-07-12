@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "speaker-helper"
-version = "0.2.0"
+version = "0.3.0"
 description = "Speaker Helper — professional text-to-speech (offline + streaming) over a local TTS engine (Voicebox by default). The inverse of vocal-helper: text in, speech out. Library + CLI + REST API, with voice cloning and a built-in AI evaluation gate; runnable locally (conda + pip) or as a Docker server."
 readme = "README.md"
 requires-python = ">=3.10,<3.14"
@@ -57,6 +57,8 @@ server = [
     "uvicorn>=0.29",
     "pydantic>=2.6",
     "python-multipart>=0.0.9",
+    # Model Context Protocol: exposes the REST endpoints as MCP tools at /mcp.
+    "fastapi-mcp>=0.4",
 ]
 # Speech-to-text via vocal-helper: auto-transcribe a voice-clone reference and
 # enable the evaluation round-trip (WER/chrF). Optional — cloning with an
