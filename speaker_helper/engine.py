@@ -43,7 +43,7 @@ from typing import Protocol, runtime_checkable
 
 from speaker_helper.config import Settings
 from speaker_helper.logging_utils import get_logger
-from speaker_helper.types import AudioResult, Voice, VoiceList
+from speaker_helper.types import AudioResult, Voice, VoiceList, VoiceSample
 
 log = get_logger(__name__)
 
@@ -72,6 +72,17 @@ class TTSEngine(Protocol):
 
     async def health(self) -> dict:
         """Return a backend health document (must include a ``status`` key)."""
+        ...
+
+    async def clone_voice(
+        self, name: str, samples: list[VoiceSample], *, language: str | None = None,
+    ) -> str:
+        """Clone a voice from reference ``samples`` and return its id.
+
+        Implementations should be idempotent on ``name`` (reuse an existing
+        clone rather than duplicating). A backend that cannot clone may raise
+        :class:`NotImplementedError`.
+        """
         ...
 
     async def aclose(self) -> None:
@@ -230,6 +241,20 @@ class MockEngine:
                   gender="male", engine=engine),
         ]
         return VoiceList(engine=engine, voices=voices)
+
+    async def clone_voice(
+        self, name: str, samples: list[VoiceSample], *, language: str | None = None,
+    ) -> str:
+        """Pretend to clone a voice; return a deterministic id (no audio model).
+
+        Validates that at least one sample is provided (matching the real
+        engine's contract) but performs no synthesis-model work, so cloning is
+        testable without a server.
+        """
+        if not samples:
+            raise ValueError("cloning needs at least one reference sample")
+        self.settings.voice_id = f"cloned-{name}"
+        return self.settings.voice_id
 
     async def health(self) -> dict:
         """Return a static healthy document identifying the mock backend."""

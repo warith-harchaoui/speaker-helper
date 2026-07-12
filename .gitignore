@@ -20,9 +20,10 @@ htmlcov/
 *.swp
 .DS_Store
 
-# Local scratch audio (keep fixtures tracked)
+# Local scratch audio (keep fixtures + the bundled clone reference tracked)
 *.wav
 !tests/fixtures/*.wav
+!assets/ref-malo.wav
 
 # Real config files — keep only the committed examples.
 *config.json
