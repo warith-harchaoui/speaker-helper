@@ -3,10 +3,10 @@ Dependency-free quality and speed metrics for synthesised speech.
 
 Module summary
 --------------
-This is the measurement machinery reincarnated from the ``speak`` study, recast
-around speaker-helper's :class:`~speaker_helper.types.AudioResult`. It answers
-the study's two questions for every utterance — *is it fast?* and *is it good?* —
-with pure-Python functions that need no model and no network:
+This is speaker-helper's measurement machinery, built around its
+:class:`~speaker_helper.types.AudioResult`. It answers two questions for every
+utterance — *is it fast?* and *is it good?* — with pure-Python functions that
+need no model and no network:
 
 * **Speed.** :func:`percentile` over per-utterance real-time factors (RTF).
 * **Signal anomalies.** :func:`detect_anomalies` flags empty audio, aberrant

@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "speaker-helper"
-version = "0.1.0"
-description = "Speaker Helper — professional text-to-speech (offline + streaming) over a local Voicebox engine. The inverse of vocal-helper: text in, speech out. Library + CLI + REST API, runnable locally (conda + pip) or as a Docker server."
+version = "0.2.0"
+description = "Speaker Helper — professional text-to-speech (offline + streaming) over a local TTS engine (Voicebox by default). The inverse of vocal-helper: text in, speech out. Library + CLI + REST API, with voice cloning and a built-in AI evaluation gate; runnable locally (conda + pip) or as a Docker server."
 readme = "README.md"
 requires-python = ">=3.10,<3.14"
 license = { text = "BSD-3-Clause" }
@@ -31,11 +31,17 @@ classifiers = [
 ]
 
 # Runtime contract:
-# - Talks to a running Voicebox REST engine (native :17493 or the bundled
-#   docker-compose on :17600). See README "Voicebox" for how to start one.
-# - Audio crosses the API as a WAV ``bytes`` payload; soundfile/numpy decode it
-#   to measure duration and to concatenate streaming chunks.
+# - Talks to a running TTS engine over REST (Voicebox by default: native
+#   :17493 or the bundled docker-compose on :17600). See the README for how to
+#   start one. The ``mock`` backend needs no server.
+# - Part of the AI Helpers ecosystem: logging goes through ``os-helper`` and
+#   audio slicing/concatenation through ``audio-helper`` (both git-installed,
+#   like every ``*-helper``).
+# - Audio crosses the engine API as a WAV ``bytes`` payload; soundfile/numpy
+#   decode it to measure duration and to concatenate streaming chunks.
 dependencies = [
+    "os-helper @ git+https://github.com/warith-harchaoui/os-helper.git@v1.4.2",
+    "audio-helper @ git+https://github.com/warith-harchaoui/audio-helper.git@v1.5.5",
     "httpx>=0.27",
     "pyyaml>=6.0",
     "numpy>=1.24",
@@ -48,6 +54,13 @@ server = [
     "fastapi>=0.110",
     "uvicorn>=0.29",
     "pydantic>=2.6",
+    "python-multipart>=0.0.9",
+]
+# Speech-to-text via vocal-helper: auto-transcribe a voice-clone reference and
+# enable the evaluation round-trip (WER/chrF). Optional — cloning with an
+# explicit transcript and speed/anomaly evaluation work without it.
+stt = [
+    "vocal-helper @ git+https://github.com/warith-harchaoui/vocal-helper.git@v0.3.1",
 ]
 dev = [
     "pytest>=8",
@@ -64,8 +77,13 @@ speaker-helper = "speaker_helper.cli:main"
 Homepage = "https://github.com/warith-harchaoui/speaker-helper"
 Issues = "https://github.com/warith-harchaoui/speaker-helper/issues"
 
-[tool.setuptools]
-packages = ["speaker_helper"]
+[tool.setuptools.packages.find]
+include = ["speaker_helper*"]
+
+# Ship the committed evaluation dataset and threshold bar inside the wheel so
+# the eval layer works from an installed package, not only a source checkout.
+[tool.setuptools.package-data]
+speaker_helper = ["eval/data/*.jsonl", "eval/*.yaml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -81,6 +99,20 @@ target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "W"]
+
+# FastAPI's dependency-injection defaults (Form/File/Query/…) are call
+# expressions in argument defaults by design; they are not the mutable-default
+# trap B008 targets.
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = [
+    "fastapi.Body",
+    "fastapi.Depends",
+    "fastapi.File",
+    "fastapi.Form",
+    "fastapi.Header",
+    "fastapi.Path",
+    "fastapi.Query",
+]
 
 [tool.mypy]
 python_version = "3.10"

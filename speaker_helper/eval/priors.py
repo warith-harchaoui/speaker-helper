@@ -1,21 +1,20 @@
 """
-Quality priors and Pareto selection, inherited from the ``speak`` study.
+Quality priors and Pareto selection for choosing an engine.
 
 Module summary
 --------------
-The ``speak`` study established two things speaker-helper reuses directly:
+Two ideas make engine choice operational:
 
 1. **A quality axis even without a reference.** When no transcriber is wired in,
-   fidelity can still be *estimated* from per-engine priors — order-of-magnitude
-   scores in ``[0, 1]``, recalibrate from real runs. This keeps every evaluation
-   reporting *both* speed and quality, which is the whole point of the study.
-2. **Pareto selection.** To choose an engine/voice operationally you want the
-   non-dominated set on the quality↔RTF plane — high quality *and* fast. The
-   :func:`pareto_front` helper (ported from ``speak.experiment``) extracts it.
+   fidelity is *estimated* from per-engine priors — order-of-magnitude scores in
+   ``[0, 1]``, recalibrated from real runs. This keeps every evaluation
+   reporting *both* speed and quality.
+2. **Pareto selection.** To pick an engine/voice you want the non-dominated set
+   on the quality↔RTF plane — high quality *and* fast. :func:`pareto_front`
+   extracts it.
 
 Together these turn a batch of :class:`~speaker_helper.eval.runner.EvalReport`
-(one per engine) into an actionable "which engine should I ship?" answer — the
-operational counterpart of the study's formal Pareto sweep.
+(one per engine) into an actionable "which engine should I ship?" answer.
 
 Usage example
 -------------
@@ -33,9 +32,9 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Protocol
 
-# TTS quality priors in [0, 1], inherited verbatim from ``speak.metrics``.
-# Order-of-magnitude estimates keyed on the engine — recalibrate from measured
-# round-trips (WER/chrF) as real data accumulates. Unknown engines get 0.80.
+# TTS quality priors in [0, 1]: order-of-magnitude estimates keyed on the
+# engine — recalibrate from measured round-trips (WER/chrF) as real data
+# accumulates. Unknown engines get 0.80.
 TTS_QUALITY_PRIORS: dict[str, float] = {
     "kokoro": 0.75,
     "chatterbox_turbo": 0.82,
@@ -79,8 +78,7 @@ def pareto_front(points: Sequence[_ParetoPoint]) -> list[_ParetoPoint]:
     """Return the non-dominated points: maximise quality, minimise RTF.
 
     A point A dominates B if A is at least as good on both axes (higher or equal
-    ``quality``, lower or equal ``mean_rtf``) and strictly better on one. Ported
-    from ``speak.experiment.pareto_front``.
+    ``quality``, lower or equal ``mean_rtf``) and strictly better on one.
 
     Parameters
     ----------

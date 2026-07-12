@@ -8,9 +8,14 @@ Exposes the library as a terminal tool with four sub-commands:
 * ``synth`` — synthesise text (or stdin) to a ``.wav`` file, offline or
   streaming, printing the measured duration and real-time factor.
 * ``voices`` — list the preset voices of an engine.
+* ``clone`` — register a cloned voice from reference audio (default: the bundled
+  ref-malo) and print its id; missing transcripts come from ``vocal-helper``.
 * ``eval`` — evaluate the engine against a dataset and gate on versioned
   thresholds (exit code ``0`` pass / ``1`` fail); see :mod:`speaker_helper.eval`.
 * ``serve`` — run the REST API server (see :mod:`speaker_helper.api`).
+
+The ``--clone`` family of flags works with any command: ``speaker-helper --clone
+synth "Bonjour"`` synthesises in the cloned ref-malo voice.
 
 Argument parsing uses the standard-library :mod:`argparse` so the CLI has no
 third-party dependency of its own.
@@ -36,11 +41,10 @@ import asyncio
 import sys
 from pathlib import Path
 
-from speaker_helper.config import Settings
-from speaker_helper.logging_utils import get_logger
-from speaker_helper.speaker import Speaker
+import os_helper as osh
 
-log = get_logger(__name__)
+from speaker_helper.config import Settings
+from speaker_helper.speaker import Speaker
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -58,6 +62,17 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--engine", default=None, help="Engine/model id (e.g. kokoro).")
     parser.add_argument("--voice", default=None, help="Preset voice id (default: auto).")
     parser.add_argument("--language", default=None, help="Target language (e.g. fr).")
+    # Cloning: enable a cloned voice for any command. --clone alone uses the
+    # bundled ref-malo reference; --clone-audio/--clone-text override it. A
+    # missing transcript is derived automatically with vocal-helper.
+    parser.add_argument("--clone", action="store_true",
+                        help="Use a cloned voice (default reference: bundled ref-malo).")
+    parser.add_argument("--clone-name", default=None,
+                        help="Name for the cloned voice profile (default: ref-malo).")
+    parser.add_argument("--clone-audio", default=None,
+                        help="Reference audio file to clone from.")
+    parser.add_argument("--clone-text", default=None,
+                        help="Transcript of --clone-audio (auto-transcribed if omitted).")
 
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -71,6 +86,10 @@ def _build_parser() -> argparse.ArgumentParser:
 
     p_voices = sub.add_parser("voices", help="List preset voices for an engine.")
     p_voices.add_argument("--engine", default=None, help="Engine id (default: configured).")
+
+    sub.add_parser(
+        "clone",
+        help="Register a cloned voice from reference audio and print its id.")
 
     p_eval = sub.add_parser(
         "eval", help="Evaluate the engine against a dataset and gate on thresholds.")
@@ -105,6 +124,23 @@ def _settings_from_args(args: argparse.Namespace) -> Settings:
         settings.voice_id = args.voice
     if getattr(args, "language", None):
         settings.language = args.language
+
+    # Any --clone* flag (or the `clone` command) enables a cloned voice.
+    clone_requested = (
+        getattr(args, "clone", False)
+        or getattr(args, "clone_audio", None)
+        or getattr(args, "clone_name", None)
+        or args.command == "clone"
+    )
+    if clone_requested:
+        clone: dict[str, object] = dict(settings.clone)
+        if getattr(args, "clone_name", None):
+            clone["name"] = args.clone_name
+        if getattr(args, "clone_audio", None):
+            clone["audio"] = args.clone_audio
+        if getattr(args, "clone_text", None):
+            clone["reference_text"] = args.clone_text
+        settings.clone = clone
     return settings
 
 
@@ -112,7 +148,7 @@ def _cmd_synth(args: argparse.Namespace, settings: Settings) -> int:
     """Handle the ``synth`` sub-command; return a process exit code."""
     text = args.text if args.text is not None else sys.stdin.read()
     if not text or not text.strip():
-        log.error("no text provided (argument or stdin)")
+        osh.error("no text provided (argument or stdin)")
         return 2
 
     async def run() -> int:
@@ -126,15 +162,15 @@ def _cmd_synth(args: argparse.Namespace, settings: Settings) -> int:
                         first_ttfa = chunk.ttfa_s
                     total_audio += chunk.audio.duration_s
                     buffers.append(chunk.audio.wav_bytes)
-                    log.info("chunk %d: %.2fs audio (RTF %.2f)",
+                    osh.info("chunk %d: %.2fs audio (RTF %.2f)",
                              chunk.seq, chunk.audio.duration_s, chunk.audio.rtf)
                 _concat_wavs(buffers, args.out)
-                log.info("streamed %.2fs audio to %s (TTFA %.2fs)",
+                osh.info("streamed %.2fs audio to %s (TTFA %.2fs)",
                          total_audio, args.out, first_ttfa or 0.0)
             else:
                 result = await spk.say(text)
                 Path(args.out).write_bytes(result.wav_bytes)
-                log.info("wrote %s (%.2fs audio, RTF %.2f)",
+                osh.info("wrote %s (%.2fs audio, RTF %.2f)",
                          args.out, result.duration_s, result.rtf)
         return 0
 
@@ -164,6 +200,18 @@ def _cmd_serve(args: argparse.Namespace, settings: Settings) -> int:
     return 0
 
 
+def _cmd_clone(args: argparse.Namespace, settings: Settings) -> int:
+    """Handle the ``clone`` sub-command; register a voice and print its id."""
+    async def run() -> int:
+        async with Speaker(settings) as spk:
+            voice_id = await spk.clone_voice()
+        # User-facing: print the id so it can be captured / reused.
+        sys.stdout.write(voice_id + "\n")
+        return 0
+
+    return asyncio.run(run())
+
+
 def _cmd_eval(args: argparse.Namespace, settings: Settings) -> int:
     """Handle the ``eval`` sub-command; return 0 if the gate passes, 1 if not."""
     import json
@@ -179,7 +227,7 @@ def _cmd_eval(args: argparse.Namespace, settings: Settings) -> int:
         if args.json_out is not None:
             args.json_out.write_text(
                 json.dumps(report.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8")
-            log.info("wrote JSON report to %s", args.json_out)
+            osh.info("wrote JSON report to %s", args.json_out)
         # User-facing verdict on stdout so it is greppable / pipeable.
         sys.stdout.write(
             f"backend={report.backend} engine={settings.engine} cases={report.n_cases}\n"
@@ -196,19 +244,23 @@ def _cmd_eval(args: argparse.Namespace, settings: Settings) -> int:
 
 
 def _concat_wavs(buffers: list[bytes], out: Path) -> None:
-    """Concatenate WAV payloads into one file (re-encoding via soundfile)."""
-    import io
+    """Concatenate streamed WAV chunks into one file via ``audio-helper``.
 
-    import numpy as np
-    import soundfile as sf
+    Each in-memory chunk is written to a temporary file and stitched together
+    with :func:`audio_helper.audio_concatenation`, which handles heterogeneous
+    encodings robustly — the ecosystem's audio path rather than a hand-rolled
+    numpy concat.
+    """
+    import audio_helper as ah
+    import os_helper as osh
 
-    frames: list = []
-    sr = 24000
-    for buf in buffers:
-        data, sr = sf.read(io.BytesIO(buf), dtype="float32", always_2d=False)
-        frames.append(data)
-    audio = np.concatenate(frames) if frames else np.zeros(0, dtype="float32")
-    sf.write(str(out), audio, sr)
+    with osh.temporary_folder() as tmp:
+        parts: list[str] = []
+        for i, buf in enumerate(buffers):
+            part = osh.join(tmp, f"chunk_{i:04d}.wav")
+            Path(part).write_bytes(buf)
+            parts.append(part)
+        ah.audio_concatenation(parts, output_audio_filename=str(out), overwrite=True)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -224,6 +276,9 @@ def main(argv: list[str] | None = None) -> int:
     int
         Process exit code (0 on success).
     """
+    # Configure the ecosystem's logging surface once, at the entry point, so
+    # INFO-level progress is visible to CLI users.
+    osh.init_logging()
     parser = _build_parser()
     args = parser.parse_args(argv)
     settings = _settings_from_args(args)
@@ -231,6 +286,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_synth(args, settings)
     if args.command == "voices":
         return _cmd_voices(args, settings)
+    if args.command == "clone":
+        return _cmd_clone(args, settings)
     if args.command == "eval":
         return _cmd_eval(args, settings)
     if args.command == "serve":

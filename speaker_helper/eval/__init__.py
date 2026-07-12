@@ -3,10 +3,10 @@ speaker-helper evaluation layer — measure speed and quality, gate on threshold
 
 Module summary
 --------------
-The user's coding contract forbids "vibe checks": anything AI must be evaluated
-against a committed dataset with versioned metrics and thresholds. This package
-reincarnates the ``speak`` study's measurement machinery for speaker-helper and
-makes it a first-class, CI-gating layer.
+The project's coding contract forbids "vibe checks": anything AI must be
+evaluated against a committed dataset with versioned metrics and thresholds.
+This package provides speaker-helper's measurement machinery and makes it a
+first-class, CI-gating layer.
 
 It is **engine-agnostic**: everything runs against the
 :class:`~speaker_helper.speaker.Speaker` façade, so the exact same evaluation

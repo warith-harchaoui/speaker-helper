@@ -47,14 +47,14 @@ from collections.abc import Awaitable, Callable
 from types import TracebackType
 from typing import TYPE_CHECKING
 
+import os_helper as osh
+
 from speaker_helper.config import Settings
-from speaker_helper.logging_utils import get_logger
 from speaker_helper.types import AudioResult, Voice, VoiceList, VoiceSample
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     import httpx
 
-log = get_logger(__name__)
 
 
 class VoiceboxError(RuntimeError):
@@ -135,7 +135,7 @@ class VoiceboxClient:
                 # Retry only server-side (5xx) failures; 4xx are the caller's.
                 if resp.status_code < 500 or attempt == attempts:
                     return resp
-                log.warning("engine %d on attempt %d/%d; retrying",
+                osh.warning("engine %d on attempt %d/%d; retrying",
                             resp.status_code, attempt, attempts)
             await asyncio.sleep(self.settings.voicebox.retry_backoff_s * 2 ** (attempt - 1))
         raise VoiceboxError(
@@ -227,7 +227,7 @@ class VoiceboxClient:
 
     async def _find_profile(self, engine: str, voice_id: str, name: str) -> str | None:
         """Return an existing profile id for this preset voice, if any."""
-        resp = await self._http().get(f"{self.base}/profiles")
+        resp = await self._send(lambda: self._http().get(f"{self.base}/profiles"))
         _raise_for_status(resp)
         profiles = resp.json()
         match = next(
@@ -236,6 +236,13 @@ class VoiceboxClient:
              and p.get("preset_voice_id") == voice_id),
             None,
         ) or next((p for p in profiles if p.get("name") == name), None)
+        return match["id"] if match else None
+
+    async def _find_profile_by_name(self, name: str) -> str | None:
+        """Return an existing profile id matching ``name``, if any."""
+        resp = await self._send(lambda: self._http().get(f"{self.base}/profiles"))
+        _raise_for_status(resp)
+        match = next((p for p in resp.json() if p.get("name") == name), None)
         return match["id"] if match else None
 
     async def ensure_profile(self) -> str:
@@ -258,6 +265,11 @@ class VoiceboxClient:
         async with self._profile_lock:
             if self._profile_id:  # another coroutine won the race
                 return self._profile_id
+            # When cloning is configured, the profile is a cloned voice rather
+            # than a preset — this is what makes a custom voice work everywhere
+            # (lib/CLI/API) from a single ``settings.clone`` block.
+            if self.settings.clone:
+                return await self._ensure_cloned_profile()
             engine = self.settings.engine
             voice_id = await self._resolve_voice_id(engine)
             name = f"speaker-helper-{engine}-{voice_id}"
@@ -282,9 +294,108 @@ class VoiceboxClient:
                     return existing
             _raise_for_status(resp)
             self._profile_id = resp.json()["id"]
-            log.info("created Voicebox preset profile %s (%s/%s)",
+            osh.info("created Voicebox preset profile %s (%s/%s)",
                      self._profile_id, engine, voice_id)
             return self._profile_id
+
+    # ----- cloning --------------------------------------------------------
+
+    async def _ensure_cloned_profile(self) -> str:
+        """Resolve/create the cloned profile described by ``settings.clone``.
+
+        Called under the profile lock from :meth:`ensure_profile`. Idempotent on
+        the clone name so repeated startups reuse the same cloned voice.
+        """
+        from speaker_helper.cloning import (
+            clone_name,
+            prepare_samples,
+            resolve_samples,
+        )
+
+        name = clone_name(self.settings.clone)
+        existing = await self._find_profile_by_name(name)
+        if existing:
+            self._profile_id = existing
+            return existing
+        samples = resolve_samples(self.settings.clone)
+        # Transcription (via vocal-helper) is blocking and heavy — off the loop.
+        samples = await asyncio.to_thread(
+            prepare_samples, samples, language=self.settings.language)
+        return await self._create_clone(name, samples, language=self.settings.language)
+
+    async def clone_voice(
+        self, name: str, samples: list[VoiceSample], *, language: str | None = None,
+    ) -> str:
+        """Clone a voice from reference ``samples`` and use it for synthesis.
+
+        Parameters
+        ----------
+        name : str
+            Profile name for the clone (idempotency key). A matching profile is
+            reused rather than duplicated.
+        samples : list of VoiceSample
+            Reference recordings. Any sample without a ``reference_text`` is
+            transcribed with ``vocal-helper`` before upload.
+        language : str or None
+            Language of the cloned voice (defaults to the configured language).
+
+        Returns
+        -------
+        str
+            The cloned profile id (also set as this client's active profile).
+
+        Raises
+        ------
+        VoiceboxError
+            On a Voicebox error.
+        """
+        from speaker_helper.cloning import prepare_samples
+
+        language = language or self.settings.language
+        async with self._profile_lock:
+            existing = await self._find_profile_by_name(name)
+            if existing:
+                self._profile_id = existing
+                return existing
+            samples = await asyncio.to_thread(
+                prepare_samples, samples, language=language)
+            return await self._create_clone(name, samples, language=language)
+
+    async def _create_clone(
+        self, name: str, samples: list[VoiceSample], *, language: str,
+    ) -> str:
+        """Create a cloned profile and upload its reference samples."""
+        if not samples:
+            raise VoiceboxError("cloning needs at least one reference sample")
+        engine = self.settings.engine
+        resp = await self._send(lambda: self._http().post(f"{self.base}/profiles", json={
+            "name": name,
+            "voice_type": "cloned",
+            "language": language,
+            "default_engine": engine,
+        }))
+        if resp.status_code == 400 and "already exists" in resp.text.lower():
+            existing = await self._find_profile_by_name(name)
+            if existing:
+                self._profile_id = existing
+                return existing
+        _raise_for_status(resp)
+        profile_id = resp.json()["id"]
+
+        # Voicebox aligns each recording to its transcript, so samples are
+        # uploaded as multipart form data (file + reference_text).
+        for s in samples:
+            files = {
+                "file": (s.filename(), s.read_bytes()),
+                "reference_text": (None, s.reference_text),
+            }
+            r = await self._http().post(f"{self.base}/profiles/{profile_id}/samples", files=files)
+            _raise_for_status(r)
+
+        self._profile_id = profile_id
+        osh.info("created Voicebox cloned profile %s (%s) from %d sample(s)",
+                 profile_id, name, len(samples))
+        return profile_id
 
     # ----- synthesis ------------------------------------------------------
 
@@ -331,7 +442,7 @@ class VoiceboxClient:
         resp = await self._send(
             lambda: self._http().post(f"{self.base}/generate/stream", json=payload))
         if resp.status_code == 400 and "not downloaded" in resp.text.lower():
-            log.info("engine model not present; downloading via async /generate")
+            osh.info("engine model not present; downloading via async /generate")
             wav_bytes = await self._generate_async(payload)
         else:
             _raise_for_status(resp)

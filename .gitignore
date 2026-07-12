@@ -33,3 +33,6 @@ settings.yaml
 
 # Private living working file (handoff notes), like ~/speak/todo.md.
 /todo.md
+
+# ASR transcript caches (sidecars next to audio)
+*.wav.txt

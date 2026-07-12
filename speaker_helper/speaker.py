@@ -35,13 +35,12 @@ import time
 from collections.abc import AsyncIterator
 from pathlib import Path
 
+import os_helper as osh
+
 from speaker_helper.config import Settings
 from speaker_helper.engine import TTSEngine, create_engine
-from speaker_helper.logging_utils import get_logger
 from speaker_helper.text import chunk_for_streaming
-from speaker_helper.types import AudioResult, StreamChunk, VoiceList
-
-log = get_logger(__name__)
+from speaker_helper.types import AudioResult, StreamChunk, VoiceList, VoiceSample
 
 
 class Speaker:
@@ -112,9 +111,9 @@ class Speaker:
         """
         try:
             await self.engine.synthesize(".", language=self.settings.language)
-            log.info("engine warm-up complete (backend=%s)", self.settings.backend)
+            osh.info("engine warm-up complete (backend=%s)", self.settings.backend)
         except Exception as exc:  # noqa: BLE001 - warm-up is best-effort
-            log.warning("engine warm-up failed (continuing): %s", exc)
+            osh.warning("engine warm-up failed (continuing): %s", exc)
 
     async def __aenter__(self) -> Speaker:
         return self
@@ -127,6 +126,50 @@ class Speaker:
     async def voices(self, engine: str | None = None) -> VoiceList:
         """List preset voices for an engine (defaults to the configured one)."""
         return await self.engine.list_voices(engine)
+
+    # ----- cloning --------------------------------------------------------
+
+    async def clone_voice(
+        self,
+        name: str | None = None,
+        samples: list[VoiceSample] | None = None,
+        *,
+        language: str | None = None,
+    ) -> str:
+        """Clone a voice and make this speaker synthesise with it.
+
+        Parameters
+        ----------
+        name : str or None
+            Profile name for the clone (idempotency key). Defaults to the
+            configured clone name, or ``"ref-malo"``.
+        samples : list of VoiceSample or None
+            Reference recordings. When ``None``, they are resolved from
+            ``settings.clone`` — falling back to the bundled ref-malo reference.
+            A sample without a transcript is transcribed with ``vocal-helper``.
+        language : str or None
+            Language of the cloned voice (defaults to the configured language).
+
+        Returns
+        -------
+        str
+            The cloned voice/profile id.
+
+        Examples
+        --------
+        >>> from speaker_helper import Speaker, Settings, VoiceSample
+        >>> spk = Speaker(Settings.from_mapping({"backend": "mock"}))
+        >>> # give only the audio; the transcript is derived automatically:
+        >>> # await spk.clone_voice("malo", [VoiceSample("ref.wav", "")])
+        """
+        from speaker_helper.cloning import clone_name, resolve_samples
+
+        cfg = self.settings.clone or {}
+        if samples is None:
+            samples = resolve_samples(cfg)
+        if name is None:
+            name = clone_name(cfg)
+        return await self.engine.clone_voice(name, samples, language=language)
 
     # ----- offline --------------------------------------------------------
 
@@ -248,7 +291,7 @@ class Speaker:
         """
         result = self.say_sync(text, language=language)
         Path(path).write_bytes(result.wav_bytes)
-        log.info("wrote %s (%.2fs audio, RTF %.2f)", path, result.duration_s, result.rtf)
+        osh.info("wrote %s (%.2fs audio, RTF %.2f)", path, result.duration_s, result.rtf)
         return result
 
 

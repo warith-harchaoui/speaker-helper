@@ -41,6 +41,8 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Protocol, runtime_checkable
 
+import os_helper as osh
+
 from speaker_helper.eval.dataset import EvalCase, load_dataset
 from speaker_helper.eval.metrics import (
     chrf,
@@ -51,10 +53,7 @@ from speaker_helper.eval.metrics import (
 )
 from speaker_helper.eval.priors import engine_quality_prior
 from speaker_helper.eval.thresholds import Thresholds
-from speaker_helper.logging_utils import get_logger
 from speaker_helper.speaker import Speaker
-
-log = get_logger(__name__)
 
 
 @runtime_checkable
@@ -196,7 +195,7 @@ async def run_eval(
     results: list[CaseResult] = []
     for case in cases:
         results.append(await _run_case(speaker, case, transcriber))
-        log.info("eval %s: rtf=%.3f anomalies=%s", case.id,
+        osh.info("eval %s: rtf=%.3f anomalies=%s", case.id,
                  results[-1].rtf, results[-1].anomalies or "-")
 
     return _aggregate(speaker.settings.backend, speaker.settings.engine, results,
@@ -226,7 +225,7 @@ async def _run_case(
             result.wer = round(word_error_rate(case.reference, hyp), 4)
             result.chrf = round(chrf(case.reference, hyp), 4)
         except Exception as exc:  # noqa: BLE001 - transcription is best-effort
-            log.warning("transcription failed for %s: %s", case.id, exc)
+            osh.warning("transcription failed for %s: %s", case.id, exc)
     return result
 
 
@@ -247,9 +246,9 @@ def _aggregate(
     mean_chrf = round(mean(chrfs), 4) if chrfs else None
 
     # Always report a quality axis: measured chrF when available (from a
-    # round-trip), else the engine's inherited prior — so speed↔quality Pareto
-    # selection works even without a transcriber (the ``speak`` fallback). The
-    # prior keys on the engine model (kokoro, chatterbox, …), not the backend.
+    # round-trip), else the engine's quality prior — so speed↔quality Pareto
+    # selection works even without a transcriber. The prior keys on the engine
+    # model (kokoro, chatterbox, …), not the backend.
     if mean_chrf is not None:
         quality, quality_source = mean_chrf, "measured_chrf"
     else:

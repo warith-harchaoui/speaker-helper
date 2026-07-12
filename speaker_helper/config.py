@@ -145,6 +145,12 @@ class Settings:
     # Backend-specific knobs for the ``mock`` engine (rtf, chars_per_sec,
     # sample_rate, amplitude, frequency_hz). Ignored by other backends.
     mock: dict[str, Any] = field(default_factory=dict)
+    # Voice-cloning configuration. Empty (default) means "use a preset voice".
+    # When non-empty, synthesis uses a cloned voice built from reference audio;
+    # keys: name, audio, reference_text, samples. See
+    # :mod:`speaker_helper.cloning`. A missing transcript is derived with
+    # ``vocal-helper``; an empty ``audio`` falls back to the bundled ref-malo.
+    clone: dict[str, Any] = field(default_factory=dict)
 
     @property
     def base_url(self) -> str:

@@ -39,9 +39,16 @@ from speaker_helper.engine import (
 )
 from speaker_helper.speaker import Speaker
 from speaker_helper.text import chunk_for_streaming, split_sentences
-from speaker_helper.types import AudioResult, Mode, StreamChunk, Voice, VoiceList
+from speaker_helper.types import (
+    AudioResult,
+    Mode,
+    StreamChunk,
+    Voice,
+    VoiceList,
+    VoiceSample,
+)
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     "AudioResult",
@@ -53,6 +60,7 @@ __all__ = [
     "TTSEngine",
     "Voice",
     "VoiceList",
+    "VoiceSample",
     "VoiceboxClient",
     "VoiceboxConfig",
     "VoiceboxError",

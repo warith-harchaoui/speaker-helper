@@ -42,10 +42,7 @@ from collections.abc import Callable
 from typing import Protocol, runtime_checkable
 
 from speaker_helper.config import Settings
-from speaker_helper.logging_utils import get_logger
 from speaker_helper.types import AudioResult, Voice, VoiceList, VoiceSample
-
-log = get_logger(__name__)
 
 
 @runtime_checkable

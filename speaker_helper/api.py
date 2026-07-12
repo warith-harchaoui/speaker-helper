@@ -14,6 +14,9 @@ for running as a Docker service. It exposes:
   sentence-sized chunk, as soon as each is ready (low time-to-first-audio).
   Each event's ``data`` is JSON with ``seq``, ``duration_s``, ``rtf``,
   ``ttfa_s`` (first chunk only), ``is_final``, and base64 ``audio`` (WAV).
+* ``POST /clone`` — multipart upload of reference audio (plus optional
+  transcripts) to clone a voice; missing transcripts come from ``vocal-helper``.
+  The clone becomes the server's active voice for subsequent ``/synth`` calls.
 
 This module imports FastAPI/pydantic/uvicorn at import time, so it is only ever
 imported behind the ``server`` extra (the CLI imports it lazily, and the core
@@ -40,15 +43,14 @@ import json
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Query
+import os_helper as osh
+from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 
 from speaker_helper.config import Settings
-from speaker_helper.logging_utils import get_logger
 from speaker_helper.speaker import Speaker
-
-log = get_logger(__name__)
+from speaker_helper.types import VoiceSample
 
 
 class SynthRequest(BaseModel):
@@ -148,10 +150,38 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             except ValueError as exc:
                 yield f"event: error\ndata: {json.dumps({'detail': str(exc)})}\n\n".encode()
             except Exception as exc:  # noqa: BLE001 - surface engine failures to the client
-                log.warning("stream failed: %s", exc)
+                osh.warning("stream failed: %s", exc)
                 yield f"event: error\ndata: {json.dumps({'detail': str(exc)})}\n\n".encode()
 
         return StreamingResponse(events(), media_type="text/event-stream")
+
+    @app.post("/clone")
+    async def clone(
+        name: str = Form(..., description="Name for the cloned voice profile."),
+        files: list[UploadFile] = File(..., description="Reference audio recordings."),
+        reference_texts: list[str] = Form(
+            default=[], description="Transcripts, one per file (auto-transcribed if omitted)."),
+    ) -> dict:
+        """Clone a voice from uploaded reference audio and return its id.
+
+        Any file without a matching ``reference_texts`` entry is transcribed
+        with ``vocal-helper``. The cloned voice becomes the server's active
+        voice, so subsequent ``/synth`` calls use it.
+        """
+        samples = [
+            VoiceSample(
+                audio=await f.read(),
+                reference_text=(reference_texts[i] if i < len(reference_texts) else ""),
+            )
+            for i, f in enumerate(files)
+        ]
+        try:
+            voice_id = await speaker.clone_voice(name, samples)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except Exception as exc:  # noqa: BLE001 - surface engine/clone failures as 502
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+        return {"voice_id": voice_id}
 
     return app
 
@@ -170,7 +200,7 @@ def serve(settings: Settings | None = None, *, host: str = "127.0.0.1", port: in
     """
     import uvicorn
 
-    log.info("starting speaker-helper API on %s:%d", host, port)
+    osh.info("starting speaker-helper API on %s:%d", host, port)
     uvicorn.run(create_app(settings), host=host, port=port)
 
 

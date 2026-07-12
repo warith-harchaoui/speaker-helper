@@ -26,9 +26,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal
 
-# A synthesis run targets one of two modes, mirroring the ``speak`` study:
-# ``offline`` optimises throughput/quality, ``streaming`` optimises time to
-# first audio by splitting the text and emitting chunks as they are ready.
+# A synthesis run targets one of two modes: ``offline`` optimises
+# throughput/quality, ``streaming`` optimises time to first audio by splitting
+# the text and emitting chunks as they are ready.
 Mode = Literal["offline", "streaming"]
 
 

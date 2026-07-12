@@ -115,44 +115,85 @@ def resolve_samples(clone: dict[str, Any]) -> list[VoiceSample]:
     return [VoiceSample(audio=str(audio), reference_text=str(reference_text))]
 
 
-def fill_missing_transcripts(
-    samples: list[VoiceSample], *, language: str = "fr",
-) -> list[VoiceSample]:
-    """Fill any empty ``reference_text`` by transcribing the audio.
+# Cloning engines cap reference-audio length (Voicebox: 30 s). We trim to a
+# little under that so a longer recording is still usable out of the box.
+DEFAULT_MAX_REFERENCE_SECONDS = 28.0
 
-    This is the canonical "add a voice to clone" path: the caller supplies only
-    a recording, and its transcript is derived with ``vocal-helper`` (cached in a
-    ``.txt`` sidecar for file-backed samples). Samples that already carry a
-    transcript are returned untouched.
+
+def _trim_to_bytes(wav_bytes: bytes, max_seconds: float) -> tuple[bytes, bool]:
+    """Trim audio to ``max_seconds`` if longer, returning ``(bytes, trimmed)``.
+
+    Uses ``audio-helper`` for duration and slicing (the ecosystem's audio path).
+    Because ``audio-helper`` works on files, the in-memory payload is bridged
+    through an ``os-helper`` temporary folder.
+    """
+    import audio_helper as ah
+    import os_helper as osh
+
+    with osh.temporary_folder() as tmp:
+        src = osh.join(tmp, "reference.wav")
+        Path(src).write_bytes(wav_bytes)
+        if ah.get_audio_duration(src) <= max_seconds:
+            return wav_bytes, False
+        clipped = ah.extract_audio_chunk(src, 0.0, max_seconds,
+                                         output_audio_filename=osh.join(tmp, "clip.wav"))
+        return Path(clipped).read_bytes(), True
+
+
+def prepare_samples(
+    samples: list[VoiceSample],
+    *,
+    language: str = "fr",
+    max_seconds: float = DEFAULT_MAX_REFERENCE_SECONDS,
+) -> list[VoiceSample]:
+    """Make samples engine-ready: trim over-long audio and fill transcripts.
+
+    This is the canonical "add a voice to clone" path — supply only a recording
+    and it just works:
+
+    * **Trim.** Audio longer than ``max_seconds`` is trimmed to that length so it
+      clears the engine's reference-length cap. Because trimming changes what is
+      said, the transcript is then re-derived from the trimmed audio.
+    * **Transcribe.** Any sample still lacking a transcript is transcribed with
+      ``vocal-helper`` (cached in a ``.txt`` sidecar for file-backed samples).
 
     Parameters
     ----------
     samples : list of VoiceSample
-        Samples, some possibly without a transcript.
+        Reference samples (audio as bytes or a file path).
     language : str
         ISO-639-1 language hint passed to ASR.
+    max_seconds : float
+        Maximum reference-audio length; longer audio is trimmed.
 
     Returns
     -------
     list of VoiceSample
-        Samples all carrying a non-empty ``reference_text`` (unless ASR itself
-        returned nothing).
+        Samples with in-memory audio (bytes) and a matching, non-empty
+        ``reference_text``.
 
     Notes
     -----
-    Imported lazily so ``vocal-helper`` stays an optional dependency: it is only
-    required when a sample actually lacks a transcript.
+    ``soundfile`` and ``vocal-helper`` are imported lazily so importing this
+    module stays cheap and ``vocal-helper`` is only required when a transcript
+    must actually be derived.
     """
     from speaker_helper.transcription import ensure_transcript, transcribe_bytes
 
-    filled: list[VoiceSample] = []
+    prepared: list[VoiceSample] = []
     for s in samples:
-        if s.reference_text.strip():
-            filled.append(s)
+        raw, trimmed = _trim_to_bytes(s.read_bytes(), max_seconds)
+        if trimmed:
+            # Trimming invalidates any supplied transcript, so re-transcribe the
+            # trimmed segment to keep audio and text aligned.
+            text = transcribe_bytes(raw, language=language)
+            prepared.append(VoiceSample(audio=raw, reference_text=text))
             continue
-        if isinstance(s.audio, str):
-            text = ensure_transcript(s.audio, language=language)
-        else:
-            text = transcribe_bytes(s.audio, language=language)
-        filled.append(VoiceSample(audio=s.audio, reference_text=text))
-    return filled
+        if s.reference_text.strip():
+            prepared.append(VoiceSample(audio=raw, reference_text=s.reference_text))
+            continue
+        # Short audio without a transcript: derive one (cached for file paths).
+        text = (ensure_transcript(s.audio, language=language)
+                if isinstance(s.audio, str) else transcribe_bytes(raw, language=language))
+        prepared.append(VoiceSample(audio=raw, reference_text=text))
+    return prepared

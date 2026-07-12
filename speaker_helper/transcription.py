@@ -34,9 +34,7 @@ import asyncio
 import io
 from pathlib import Path
 
-from speaker_helper.logging_utils import get_logger
-
-log = get_logger(__name__)
+import os_helper as osh
 
 # whisper.cpp consumes 16 kHz mono PCM; we resample/downmix to that.
 _ASR_SAMPLE_RATE = 16000
@@ -138,12 +136,12 @@ def ensure_transcript(audio_path: str | Path, *, language: str = "fr") -> str:
         cached = sidecar.read_text(encoding="utf-8").strip()
         if cached:
             return cached
-    log.info("transcribing %s with vocal-helper (cached to %s)", audio_path, sidecar)
+    osh.info("transcribing %s with vocal-helper (cached to %s)", audio_path, sidecar)
     text = transcribe_file(audio_path, language=language)
     try:
         sidecar.write_text(text + "\n", encoding="utf-8")
     except OSError as exc:  # caching is best-effort
-        log.warning("could not cache transcript to %s: %s", sidecar, exc)
+        osh.warning("could not cache transcript to %s: %s", sidecar, exc)
     return text
 
 
