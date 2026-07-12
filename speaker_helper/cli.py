@@ -101,6 +101,9 @@ def _build_parser() -> argparse.ArgumentParser:
                         help="Thresholds YAML (default: built-in bar).")
     p_eval.add_argument("--json", dest="json_out", type=Path, default=None,
                         help="Write the full JSON report to this path.")
+    p_eval.add_argument("--languages", default=None,
+                        help="Comma-separated language codes to measure "
+                             "(e.g. fr,en,es); prints a per-language matrix.")
 
     p_from = sub.add_parser(
         "speak-from",
@@ -226,6 +229,27 @@ def _cmd_clone(args: argparse.Namespace, settings: Settings) -> int:
     return asyncio.run(run())
 
 
+def _cmd_eval_multilang(args: argparse.Namespace, settings: Settings, thresholds) -> int:
+    """Run the evaluation across ``--languages`` and print a matrix; gate on all."""
+    import json
+
+    from speaker_helper.eval import format_matrix, run_multilang_eval
+
+    languages = [lang.strip() for lang in args.languages.split(",") if lang.strip()]
+
+    async def run() -> int:
+        reports = await run_multilang_eval(settings, languages, thresholds=thresholds)
+        sys.stdout.write(format_matrix(reports) + "\n")
+        if args.json_out is not None:
+            args.json_out.write_text(
+                json.dumps({lang: r.to_dict() for lang, r in reports.items()},
+                           ensure_ascii=False, indent=2), encoding="utf-8")
+            osh.info("wrote JSON matrix to %s", args.json_out)
+        return 0 if all(r.passed for r in reports.values()) else 1
+
+    return asyncio.run(run())
+
+
 def _cmd_speak_from(args: argparse.Namespace, settings: Settings) -> int:
     """Handle ``speak-from``: transcribe a source and re-voice it to a WAV file."""
     from speaker_helper.sources import (
@@ -261,8 +285,12 @@ def _cmd_eval(args: argparse.Namespace, settings: Settings) -> int:
 
     from speaker_helper.eval import Thresholds, load_dataset, run_eval
 
-    cases = load_dataset(args.dataset)
     thresholds = Thresholds.load(args.thresholds)
+
+    if getattr(args, "languages", None):
+        return _cmd_eval_multilang(args, settings, thresholds)
+
+    cases = load_dataset(args.dataset)
 
     async def run() -> int:
         async with Speaker(settings) as spk:

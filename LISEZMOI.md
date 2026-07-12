@@ -102,7 +102,32 @@ automatiquement depuis git
 [`vocal-helper`](https://github.com/warith-harchaoui/vocal-helper) pour
 transcrire les références de clonage et l'aller-retour d'évaluation.
 
+### Installer directement depuis git (pas encore de PyPI)
+
+Comme les autres projets `*-helper`, speaker-helper s'installe depuis git en
+épinglant un tag de release (pas encore de paquet PyPI). Le dépôt est privé,
+utilisez donc SSH (ou un token) :
+
+```bash
+# cœur
+pip install "speaker-helper @ git+ssh://git@github.com/warith-harchaoui/speaker-helper.git@v0.4.0"
+# avec extras (serveur + MCP, et STT pour clonage/aller-retour d'éval) :
+pip install "speaker-helper[server,stt] @ git+ssh://git@github.com/warith-harchaoui/speaker-helper.git@v0.4.0"
+```
+
+Extras disponibles : `server` (API REST + MCP), `stt` (vocal-helper), `youtube`,
+`podcast`, `mic` (sources speech-to-speech), `eval` (DeepEval), `dev`.
+
 ### 3. Un moteur Voicebox
+
+- **Apple Silicon (recommandé) : Voicebox natif MLX sur `:17493`.** Il utilise
+  le **GPU** Apple et est nettement plus rapide (bien sous le temps réel). C'est
+  le port par défaut de speaker-helper — aucun override nécessaire. Note :
+  Docker sur macOS n'a **pas de passthrough GPU/Metal**, seul le build natif
+  bénéficie du GPU.
+- **CPU / Docker sur `:17600`** (portable, sans GPU) : bien pour la
+  fonctionnalité ; le facteur temps réel est à la limite et sensible à la charge
+  sur CPU (voir [`BENCHMARKS.md`](BENCHMARKS.md)).
 
 ```bash
 git clone https://github.com/jamiepine/voicebox && cd voicebox

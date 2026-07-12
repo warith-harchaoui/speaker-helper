@@ -4,6 +4,22 @@ All notable changes to speaker-helper are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project aims to adhere
 to [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] — 2026-07-12
+
+### Added
+- **Multi-language measurement.** Bundled `en` and `es` evaluation datasets
+  (alongside `fr`), `load_dataset(language=…)`, and `run_multilang_eval()` —
+  runs the gate once per language (voice auto-picked per language, warmed up)
+  and returns a report per language. CLI: `eval --languages fr,en,es` prints a
+  matrix and gates on all. Measured against live kokoro (see `BENCHMARKS.md`).
+- **Per-language operating profiles** (`speaker_helper.profiles`):
+  `LanguageProfile` bundles a language's hyperparameters — voice, engine, and
+  the streaming producer/consumer knobs (`first_chunk_sentences`,
+  `stream_concurrency`) — plus its measured RTF/quality. `Speaker.from_profile`,
+  `profile_for`, and `tune_profiles` (measure → profile) tie it together.
+- Git install instructions (no PyPI yet) and a `BENCHMARKS.md` in the README /
+  LISEZMOI.
+
 ## [0.4.0] — 2026-07-12
 
 ### Added

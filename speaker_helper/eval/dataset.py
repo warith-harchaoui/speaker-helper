@@ -30,10 +30,22 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-# The built-in dataset lives next to this module so it is importable from an
-# installed wheel, not just a source checkout.
+# The built-in datasets live next to this module so they are importable from an
+# installed wheel, not just a source checkout. One JSON Lines file per language,
+# named ``<lang>_reference.jsonl``.
 _DATA_DIR = Path(__file__).parent / "data"
-DEFAULT_DATASET = _DATA_DIR / "fr_reference.jsonl"
+DEFAULT_LANGUAGE = "fr"
+DEFAULT_DATASET = _DATA_DIR / f"{DEFAULT_LANGUAGE}_reference.jsonl"
+
+
+def dataset_path_for_language(language: str) -> Path:
+    """Return the bundled dataset path for a language code (e.g. ``"en"``)."""
+    return _DATA_DIR / f"{language}_reference.jsonl"
+
+
+def available_languages() -> list[str]:
+    """Return the sorted language codes that ship a built-in dataset."""
+    return sorted(p.name.split("_", 1)[0] for p in _DATA_DIR.glob("*_reference.jsonl"))
 
 
 @dataclass(frozen=True)
@@ -64,13 +76,18 @@ class EvalCase:
             object.__setattr__(self, "reference", self.text)
 
 
-def load_dataset(path: str | Path | None = None) -> list[EvalCase]:
+def load_dataset(
+    path: str | Path | None = None, *, language: str | None = None,
+) -> list[EvalCase]:
     """Load evaluation cases from a JSON Lines file.
 
     Parameters
     ----------
     path : str or Path or None
-        Dataset file. When ``None``, the built-in French set is loaded.
+        Explicit dataset file. Takes precedence over ``language``.
+    language : str or None
+        When ``path`` is ``None``, load the bundled ``<language>_reference.jsonl``
+        set. When both are ``None``, the default (French) set is loaded.
 
     Returns
     -------
@@ -80,11 +97,21 @@ def load_dataset(path: str | Path | None = None) -> list[EvalCase]:
     Raises
     ------
     FileNotFoundError
-        If ``path`` does not exist.
+        If the resolved dataset does not exist (the error lists the languages
+        that do ship a dataset).
     ValueError
         If a line is not valid JSON or lacks the required ``id``/``text`` keys.
     """
-    path = Path(path) if path is not None else DEFAULT_DATASET
+    if path is not None:
+        path = Path(path)
+    elif language is not None:
+        path = dataset_path_for_language(language)
+        if not path.is_file():
+            raise FileNotFoundError(
+                f"no built-in dataset for language {language!r}; "
+                f"available: {', '.join(available_languages())}")
+    else:
+        path = DEFAULT_DATASET
     if not path.is_file():
         raise FileNotFoundError(f"eval dataset not found: {path}")
     cases: list[EvalCase] = []

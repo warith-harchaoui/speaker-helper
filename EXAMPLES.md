@@ -242,3 +242,45 @@ best = pareto_front(reports)   # non-dominated: high quality AND low RTF
 for r in best:
     print(r.backend, r.mean_rtf, r.quality)
 ```
+
+---
+
+## 11. Measuring across languages
+
+```python
+import asyncio
+from speaker_helper import Settings
+from speaker_helper.eval import run_multilang_eval, format_matrix
+
+async def main() -> None:
+    reports = await run_multilang_eval(
+        Settings.from_mapping({"engine": "kokoro", "voicebox": {"port": 17600}}),
+        ["fr", "en", "es"],
+    )
+    print(format_matrix(reports))
+
+asyncio.run(main())
+```
+
+```bash
+# CLI: one matrix, gates on every language (exit 1 if any fails)
+speaker-helper --port 17600 --engine kokoro eval --languages fr,en,es --json matrix.json
+```
+
+---
+
+## 12. Speech-to-speech: re-voice a YouTube clip
+
+```python
+import asyncio
+from speaker_helper import Speaker, Settings
+from speaker_helper.sources import from_youtube, revoice
+
+async def main() -> None:
+    src = from_youtube("https://youtu.be/…")            # extra: youtube
+    async with Speaker(Settings.from_mapping({"voicebox": {"port": 17600}})) as spk:
+        out = await revoice(src, spk)                   # transcribe (vocal-helper) + re-speak
+    open("revoiced.wav", "wb").write(out.wav_bytes)
+
+asyncio.run(main())
+```

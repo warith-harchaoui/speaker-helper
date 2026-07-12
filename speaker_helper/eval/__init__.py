@@ -29,13 +29,19 @@ Warith HARCHAOUI — https://linkedin.com/in/warith-harchaoui
 
 from __future__ import annotations
 
-from speaker_helper.eval.dataset import DEFAULT_DATASET, EvalCase, load_dataset
+from speaker_helper.eval.dataset import (
+    DEFAULT_DATASET,
+    EvalCase,
+    available_languages,
+    load_dataset,
+)
 from speaker_helper.eval.metrics import (
     chrf,
     detect_anomalies,
     percentile,
     word_error_rate,
 )
+from speaker_helper.eval.multilang import format_matrix, run_multilang_eval
 from speaker_helper.eval.priors import (
     TTS_QUALITY_PRIORS,
     engine_quality_prior,
@@ -57,12 +63,15 @@ __all__ = [
     "EvalReport",
     "Thresholds",
     "Transcriber",
+    "available_languages",
     "chrf",
     "detect_anomalies",
     "engine_quality_prior",
+    "format_matrix",
     "load_dataset",
     "pareto_front",
     "percentile",
     "run_eval",
+    "run_multilang_eval",
     "word_error_rate",
 ]

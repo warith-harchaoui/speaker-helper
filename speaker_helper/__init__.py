@@ -37,6 +37,12 @@ from speaker_helper.engine import (
     create_engine,
     register_backend,
 )
+from speaker_helper.profiles import (
+    DEFAULT_PROFILES,
+    LanguageProfile,
+    profile_for,
+    tune_profiles,
+)
 from speaker_helper.speaker import Speaker
 from speaker_helper.text import chunk_for_streaming, split_sentences
 from speaker_helper.types import (
@@ -48,10 +54,12 @@ from speaker_helper.types import (
     VoiceSample,
 )
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 
 __all__ = [
+    "DEFAULT_PROFILES",
     "AudioResult",
+    "LanguageProfile",
     "Mode",
     "MockEngine",
     "Settings",
@@ -68,6 +76,8 @@ __all__ = [
     "available_backends",
     "chunk_for_streaming",
     "create_engine",
+    "profile_for",
     "register_backend",
     "split_sentences",
+    "tune_profiles",
 ]

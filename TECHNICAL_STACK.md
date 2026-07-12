@@ -68,7 +68,8 @@ flowchart TB
 | Config | `config.py` | YAML + `${VAR}` + `SPEAKER_HELPER_*` overrides; `backend`, `clone`, `mock` |
 | Engine | `engine.py` | `TTSEngine` protocol, backend registry, `MockEngine` |
 | Backend | `client.py` | `VoiceboxClient` — presets, cloning, retries/backoff, async fallback |
-| Façade | `speaker.py` | `Speaker` — `say` / `stream` / `clone_voice` / `warmup` |
+| Façade | `speaker.py` | `Speaker` — `say` / `stream` / `clone_voice` / `warmup` / `from_profile` |
+| Profiles | `profiles.py` | per-language hyperparameters (producer/consumer) + measured RTF/quality |
 | Text | `text.py` | sentence splitting for low time-to-first-audio |
 | CLI | `cli.py` | `synth`, `voices`, `clone`, `eval`, `serve` |
 | API | `api.py` | FastAPI — offline, SSE streaming, cloning upload |

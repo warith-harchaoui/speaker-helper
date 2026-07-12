@@ -87,6 +87,41 @@ class Speaker:
         self.stream_concurrency = max(1, stream_concurrency)
         self.engine: TTSEngine = engine or create_engine(self.settings)
 
+    @classmethod
+    def from_profile(
+        cls,
+        profile: object,
+        settings: Settings | None = None,
+        *,
+        engine: TTSEngine | None = None,
+    ) -> Speaker:
+        """Build a :class:`Speaker` from a per-language operating profile.
+
+        Applies the profile's language/engine/voice/producer settings and its
+        ``stream_concurrency`` (a consumer-parallelism argument, not a
+        :class:`Settings` field).
+
+        Parameters
+        ----------
+        profile : LanguageProfile
+            The profile to apply (see :mod:`speaker_helper.profiles`).
+        settings : Settings or None
+            Base configuration to derive from; ``None`` uses defaults.
+        engine : TTSEngine or None
+            Optional injected backend (e.g. a mock in tests).
+
+        Returns
+        -------
+        Speaker
+            A speaker configured for the profile's language.
+        """
+        applied = profile.apply(settings)  # type: ignore[attr-defined]
+        return cls(
+            applied,
+            engine=engine,
+            stream_concurrency=getattr(profile, "stream_concurrency", 1),
+        )
+
     @property
     def client(self) -> TTSEngine:
         """Backward-compatible alias for :attr:`engine`.

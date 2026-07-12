@@ -158,6 +158,34 @@ def test_run_eval_fails_when_rtf_over_threshold() -> None:
     asyncio.run(go())
 
 
+def test_load_dataset_by_language() -> None:
+    from speaker_helper.eval import available_languages, load_dataset
+
+    langs = available_languages()
+    assert {"fr", "en", "es"} <= set(langs)
+    en = load_dataset(language="en")
+    assert en and all(c.language == "en" for c in en)
+
+
+def test_load_dataset_unknown_language_raises() -> None:
+    with pytest.raises(FileNotFoundError, match="no built-in dataset"):
+        load_dataset(language="xx")
+
+
+def test_run_multilang_eval_mock() -> None:
+    from speaker_helper.eval import format_matrix, run_multilang_eval
+
+    async def go() -> None:
+        reports = await run_multilang_eval(
+            Settings.from_mapping({"backend": "mock"}), ["fr", "en", "es"])
+        assert set(reports) == {"fr", "en", "es"}
+        assert all(r.passed and r.mean_rtf < 1.0 for r in reports.values())
+        matrix = format_matrix(reports)
+        assert "fr" in matrix and "en" in matrix and "verdict" in matrix
+
+    asyncio.run(go())
+
+
 @pytest.mark.slow
 async def test_run_eval_live_kokoro(live_port: int) -> None:
     """The identical gate runs against the real engine when reachable."""
