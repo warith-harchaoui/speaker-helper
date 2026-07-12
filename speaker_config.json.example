@@ -1,0 +1,13 @@
+{
+  "voicebox": {
+    "host": "127.0.0.1",
+    "port": 17493,
+    "timeout_s": 300.0
+  },
+  "engine": "kokoro",
+  "voice_id": "",
+  "language": "fr",
+  "normalize": true,
+  "mode": "offline",
+  "first_chunk_sentences": 1
+}

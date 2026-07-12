@@ -1,0 +1,145 @@
+# speaker-helper — Examples
+
+A runnable cookbook of the most common workflows. Every example assumes a
+Voicebox engine is running (native on `:17493`, or Docker on `:17600`) and that
+you have installed speaker-helper (`pip install -e ".[server]"`).
+
+Set the port once for the shell examples:
+
+```bash
+export SPEAKER_HELPER_VOICEBOX_PORT=17600
+```
+
+---
+
+## 1. Offline synthesis to a file (sync)
+
+The simplest possible call — synthesise a whole string and write a WAV:
+
+```python
+from speaker_helper import Speaker, Settings
+
+spk = Speaker(Settings.from_mapping({"engine": "kokoro", "language": "fr",
+                                     "voicebox": {"port": 17600}}))
+result = spk.save("Bonjour, ceci est speaker-helper.", "hello.wav")
+print(f"{result.duration_s:.2f}s audio at {result.sample_rate} Hz, RTF {result.rtf:.2f}")
+# 3.02s audio at 24000 Hz, RTF 0.43
+```
+
+---
+
+## 2. Offline synthesis (async, in your own event loop)
+
+```python
+import asyncio
+from speaker_helper import Speaker, Settings
+
+async def main() -> None:
+    async with Speaker(Settings.from_mapping({"engine": "kokoro"})) as spk:
+        result = await spk.say("Le temps réel, c'est maintenant.")
+        with open("out.wav", "wb") as f:
+            f.write(result.wav_bytes)
+        print(f"RTF {result.rtf:.2f}")
+        # RTF 0.41
+
+asyncio.run(main())
+```
+
+---
+
+## 3. Streaming with time-to-first-audio
+
+Streaming splits the text into sentences and yields audio as each is ready, so
+you can start playing before the whole paragraph is synthesised:
+
+```python
+import asyncio
+from speaker_helper import Speaker, Settings
+
+async def main() -> None:
+    text = "Premier segment. Deuxième segment. Et voici le troisième."
+    async with Speaker(Settings.from_mapping({"engine": "kokoro"})) as spk:
+        async for chunk in spk.stream(text):
+            if chunk.ttfa_s is not None:
+                print(f"time to first audio: {chunk.ttfa_s:.2f}s")
+            print(f"chunk {chunk.seq}: {chunk.audio.duration_s:.2f}s")
+        # time to first audio: 0.85s
+        # chunk 0: 1.62s
+        # chunk 1: 1.73s
+        # chunk 2: 1.73s
+
+asyncio.run(main())
+```
+
+---
+
+## 4. List available voices
+
+```python
+import asyncio
+from speaker_helper import Speaker, Settings
+
+async def main() -> None:
+    async with Speaker(Settings.from_mapping({"engine": "kokoro"})) as spk:
+        listing = await spk.voices()
+        for v in listing.voices:
+            if v.language.startswith("fr"):
+                print(v.voice_id, v.name)
+        # ff_siwis Siwis
+
+asyncio.run(main())
+```
+
+---
+
+## 5. CLI
+
+```bash
+# list French kokoro voices
+speaker-helper --port 17600 voices --engine kokoro
+
+# offline synthesis
+speaker-helper --port 17600 synth "Bonjour le monde." -o hello.wav
+
+# from stdin
+echo "Texte lu depuis l'entrée standard." | speaker-helper --port 17600 synth -o out.wav
+
+# streaming (reports TTFA + per-chunk cadence)
+speaker-helper --port 17600 synth "Une. Deux. Trois." -o out.wav --stream
+```
+
+---
+
+## 6. REST API server
+
+```bash
+speaker-helper --port 17600 serve --host 0.0.0.0 --port 8080
+```
+
+```bash
+curl -s localhost:8080/health
+# {"status":"ok","voicebox":{"status":"healthy",...}}
+
+curl -s "localhost:8080/voices?engine=kokoro"
+# {"engine":"kokoro","voices":[...]}
+
+curl -s -X POST localhost:8080/synth \
+     -H 'content-type: application/json' \
+     -d '{"text": "Bonjour depuis l'\''API."}' -o out.wav
+# out.wav written; X-Audio-Duration-S / X-Audio-RTF returned as headers
+```
+
+---
+
+## 7. Choosing a specific voice and language
+
+```python
+from speaker_helper import Speaker, Settings
+
+spk = Speaker(Settings.from_mapping({
+    "engine": "kokoro",
+    "voice_id": "ff_siwis",   # explicit French voice
+    "language": "fr",
+}))
+spk.save("Voix choisie explicitement.", "voice.wav")
+```

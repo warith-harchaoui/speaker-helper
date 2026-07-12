@@ -1,0 +1,20 @@
+# speaker-helper — example configuration.
+#
+# Copy to ``settings.yaml`` (gitignored) and adjust. Every value can also be
+# overridden by a ``SPEAKER_HELPER_*`` environment variable, and ``${VAR}``
+# references below are expanded from the environment at load time.
+
+voicebox:
+  # Where the Voicebox engine listens. Native default is 17493; the bundled
+  # docker-compose maps the container to 17600 on the host.
+  host: "127.0.0.1"          # or "${VOICEBOX_HOST}"
+  port: 17493
+  timeout_s: 300.0           # generous: the first synthesis downloads the model
+
+engine: "kokoro"             # kokoro is fast enough for real time on CPU
+voice_id: ""                 # "" → auto-pick a voice matching `language`
+language: "fr"               # ISO-639-1 target language
+normalize: true              # loudness-normalise the output
+
+mode: "offline"              # "offline" | "streaming"
+first_chunk_sentences: 1     # streaming: 1 → lowest time-to-first-audio
