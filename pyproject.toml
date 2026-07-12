@@ -40,7 +40,9 @@ classifiers = [
 # - Audio crosses the engine API as a WAV ``bytes`` payload; soundfile/numpy
 #   decode it to measure duration and to concatenate streaming chunks.
 dependencies = [
-    "os-helper @ git+https://github.com/warith-harchaoui/os-helper.git@v1.4.2",
+    # Pin os-helper to the exact ref audio-helper@v1.5.5 requires (v1.4.1);
+    # a different git ref for the same package is an unsolvable pip conflict.
+    "os-helper @ git+https://github.com/warith-harchaoui/os-helper.git@v1.4.1",
     "audio-helper @ git+https://github.com/warith-harchaoui/audio-helper.git@v1.5.5",
     "httpx>=0.27",
     "pyyaml>=6.0",
