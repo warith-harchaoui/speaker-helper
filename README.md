@@ -34,8 +34,10 @@ or as a Docker server.
   speed/anomaly/fidelity metrics gate quality in CI — no vibe checks.
 - **Batteries included.** Library, CLI, REST API, Docker.
 
-See [`EXAMPLES.md`](EXAMPLES.md) for a runnable cookbook, and
-[`LISEZMOI.md`](LISEZMOI.md) for the French version.
+See [`EXAMPLES.md`](EXAMPLES.md) for a runnable cookbook,
+[`docs/tech-report.en.md`](docs/tech-report.en.md) for the technical report
+([FR](docs/tech-report.fr.md)), and [`LISEZMOI.md`](LISEZMOI.md) for the French
+readme.
 
 ---
 

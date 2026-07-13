@@ -37,8 +37,10 @@ en local (conda + pip) ou comme serveur Docker.
   pas de « vibe checks ».
 - **Tout inclus.** Bibliothèque, CLI, API REST, Docker.
 
-Voir [`EXAMPLES.md`](EXAMPLES.md) pour un recueil d'exemples exécutables, et
-[`README.md`](README.md) pour la version anglaise.
+Voir [`EXAMPLES.md`](EXAMPLES.md) pour un recueil d'exemples exécutables,
+[`docs/tech-report.fr.md`](docs/tech-report.fr.md) pour le rapport technique
+([EN](docs/tech-report.en.md)), et [`README.md`](README.md) pour la version
+anglaise.
 
 ---
 

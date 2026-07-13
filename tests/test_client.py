@@ -2,7 +2,7 @@
 Tests for :mod:`speaker_helper.client` and the :class:`Speaker` façade.
 
 Pure units run everywhere; the live synthesis test skips unless a Voicebox
-engine is reachable (mirroring the ``speak`` project's live-test discipline).
+engine is reachable.
 
 Author
 ------

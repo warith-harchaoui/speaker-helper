@@ -4,6 +4,17 @@ All notable changes to speaker-helper are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project aims to adhere
 to [Semantic Versioning](https://semver.org/).
 
+## [0.6.0] — 2026-07-13
+
+### Added
+- **Technical report** (`docs/tech-report.en.md` + `docs/tech-report.fr.md`,
+  bilingual, sharing `docs/refs.bib`): architecture, the producer/consumer
+  streaming pipeline, cloning, speech-to-speech sources, the evaluation
+  methodology, and the multi-language native-MLX vs CPU measurements.
+- **Measured default profiles**: `DEFAULT_PROFILES` now carry reference
+  native-MLX operating points (fr/en/es RTF ~0.15–0.19, quality prior),
+  obtained with `tune_profiles`; recalibrate per host.
+
 ## [0.5.1] — 2026-07-12
 
 ### Documentation

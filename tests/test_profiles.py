@@ -22,6 +22,16 @@ def test_profile_for_known_and_unknown() -> None:
     assert profile_for("xx").language == "xx"
 
 
+def test_default_profiles_carry_measured_reference() -> None:
+    # fr/en/es ship a reference GPU-MLX operating point (< real time)
+    for lang in ("fr", "en", "es"):
+        p = profile_for(lang)
+        assert p.measured_rtf is not None and 0.0 < p.measured_rtf < 1.0
+        assert p.measured_quality == 0.75
+    # an untuned language has no measurement
+    assert profile_for("it").measured_rtf is None
+
+
 def test_profile_apply_sets_settings_fields() -> None:
     p = LanguageProfile(language="en", voice_id="am_adam", first_chunk_sentences=2)
     s = p.apply(Settings.from_mapping({"backend": "mock"}))

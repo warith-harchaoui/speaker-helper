@@ -31,7 +31,7 @@ htmlcov/
 settings.yaml
 !settings.yaml.example
 
-# Private living working file (handoff notes), like ~/speak/todo.md.
+# Private living working file (handoff notes, kept out of the repo).
 /todo.md
 
 # ASR transcript caches (sidecars next to audio)

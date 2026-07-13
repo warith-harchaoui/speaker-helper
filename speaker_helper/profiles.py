@@ -128,9 +128,25 @@ class LanguageProfile:
 
 # Sensible defaults per language. Voice is left to auto-pick (empty) so the
 # engine chooses one matching the language; the streaming knobs favour low
-# time-to-first-audio. Recalibrate the measured fields from real runs.
+# time-to-first-audio.
+#
+# ``measured_rtf`` / ``measured_quality`` are *reference* operating points for
+# kokoro on the native MLX Voicebox (Apple GPU / Metal, M2 Max), obtained with
+# ``tune_profiles`` — recalibrate for your host with the same call. Quality is
+# the engine prior (no transcriber). Languages without a measurement here ship
+# their hyperparameters only (measured fields ``None``).
+_MEASURED_KOKORO_MLX: dict[str, tuple[float, float]] = {
+    # language: (mean RTF, quality)   — native MLX, M2 Max, kokoro
+    "fr": (0.162, 0.75),
+    "en": (0.159, 0.75),
+    "es": (0.185, 0.75),
+}
 DEFAULT_PROFILES: dict[str, LanguageProfile] = {
-    lang: LanguageProfile(language=lang)
+    lang: LanguageProfile(
+        language=lang,
+        measured_rtf=_MEASURED_KOKORO_MLX.get(lang, (None, None))[0],
+        measured_quality=_MEASURED_KOKORO_MLX.get(lang, (None, None))[1],
+    )
     for lang in ("fr", "en", "es", "it", "pt", "de")
 }
 
