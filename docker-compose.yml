@@ -1,0 +1,27 @@
+# speaker-helper REST API server.
+#
+# This wraps the speaker-helper API around an existing Voicebox engine. Start
+# Voicebox separately (native on :17493, or its own docker-compose on :17600),
+# then:
+#
+#   docker compose up --build
+#   curl -s -X POST localhost:8080/synth -H 'content-type: application/json' \
+#        -d '{"text": "Bonjour."}' -o out.wav
+
+services:
+  speaker-helper:
+    build: .
+    container_name: speaker-helper
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      # Reach a Voicebox engine running on the Docker host.
+      - SPEAKER_HELPER_VOICEBOX_HOST=host.docker.internal
+      - SPEAKER_HELPER_VOICEBOX_PORT=17600
+      - SPEAKER_HELPER_ENGINE=kokoro
+      - SPEAKER_HELPER_LANGUAGE=fr
+      - LOG_LEVEL=info
+    extra_hosts:
+      # Lets the container resolve the host on Linux (mac+Windows have it native).
+      - "host.docker.internal:host-gateway"

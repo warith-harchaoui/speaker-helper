@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install ruff
+        run: pip install ruff
+      # PEP 8 is enforced automatically: linting AND formatting must both pass,
+      # each blocking the merge like a failing test.
+      - name: ruff check
+        run: ruff check speaker_helper tests
+      - name: ruff format --check
+        run: ruff format --check speaker_helper tests
+
+  test:
+    name: Tests (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      # audio-helper slices/concatenates audio through ffmpeg; the fast suite
+      # exercises that path (voice-clone trimming), so ffmpeg must be present.
+      - name: System deps (ffmpeg)
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Install (dev + server)
+        run: pip install -e ".[dev,server]"
+      # The @slow live tests need a running Voicebox engine, which CI has no
+      # access to, so they are excluded here; the fast suite gates merges.
+      - name: pytest (fast suite)
+        run: pytest -q -m "not slow"

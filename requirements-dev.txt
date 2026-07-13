@@ -1,0 +1,14 @@
+# speaker-helper — dev + test requirements.
+# Runtime deps plus test/lint/build tooling.
+#
+#     pip install -r requirements-dev.txt
+#     pip install -e .
+
+-r requirements.txt
+
+# Dev / test tooling:
+pytest>=8
+pytest-asyncio>=0.23
+pytest-cov>=5
+ruff>=0.6
+mypy>=1.11

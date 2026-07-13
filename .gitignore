@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+# Tests
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Local scratch audio (keep fixtures + the bundled clone reference tracked)
+*.wav
+!tests/fixtures/*.wav
+!assets/ref-malo.wav
+
+# Real config files — keep only the committed examples.
+*config.json
+!*config.json.example
+settings.yaml
+!settings.yaml.example
+
+# Private living working files (handoff notes / plans, kept out of the repo).
+/todo.md
+/.private/
+
+# ASR transcript caches (sidecars next to audio)
+*.wav.txt
+
+# local-only tooling & secrets (root-level helper scripts, git hooks, secrets)
+/*.sh
+/.githooks/
+.secrets/
+.pypirc
