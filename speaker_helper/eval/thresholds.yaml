@@ -9,7 +9,9 @@ max_p95_rtf: 1.0
 # duration / bad sample rate).
 max_anomaly_rate: 0.0
 
-# Fidelity round-trip (only gated when a transcriber, e.g. vocal-helper, is
-# wired in — see runner.py). null = not gated.
-max_mean_wer: null
-min_mean_chrf: null
+# Fidelity round-trip — gated only when a transcriber (e.g. vocal-helper via the
+# CLI `--transcribe`, or an injected stub in CI tests) is wired in; a run without
+# one never touches these. Re-transcription of real synthesis should recover the
+# text closely, so we allow a small word error and require high chrF.
+max_mean_wer: 0.20
+min_mean_chrf: 0.75

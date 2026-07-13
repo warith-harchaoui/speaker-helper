@@ -186,6 +186,59 @@ def test_run_multilang_eval_mock() -> None:
     asyncio.run(go())
 
 
+def test_fidelity_round_trip_gates_on_wer_chrf() -> None:
+    """A perfect transcriber clears the WER/chrF gate; a broken one fails it.
+
+    This is the CI-runnable half of fidelity evaluation: a real synthesis →
+    transcription round-trip needs a live engine and STT (neither is in CI), so
+    here we inject deterministic stub transcribers to exercise the round-trip
+    *pipeline* and the WER/chrF *threshold gating* end-to-end. The real round-trip
+    runs locally via ``speaker-helper eval --transcribe`` (the ``stt`` extra).
+    """
+    from speaker_helper.eval import EvalCase, Thresholds
+
+    # Fixed reference so a stub transcriber can reproduce it exactly (the mock
+    # engine emits a tone, so the transcript cannot be recovered from audio).
+    cases = [
+        EvalCase(id=f"c{i}", text="Bonjour le monde.", language="fr",
+                 reference="bonjour le monde")
+        for i in range(3)
+    ]
+    # Speed/anomaly bars are trivially met by the mock; WER/chrF are the only
+    # discriminating gates in this scenario.
+    thr = Thresholds(max_mean_rtf=1.0, max_p95_rtf=1.0, max_anomaly_rate=0.0,
+                     max_mean_wer=0.20, min_mean_chrf=0.75)
+
+    class _Perfect:
+        """A transcriber that returns the exact reference (ideal round-trip)."""
+
+        async def transcribe(self, wav_bytes: bytes, *, language: str) -> str:
+            """Return the reference transcript verbatim."""
+            return "bonjour le monde"
+
+    class _Broken:
+        """A transcriber that returns unrelated words (a failed round-trip)."""
+
+        async def transcribe(self, wav_bytes: bytes, *, language: str) -> str:
+            """Return text sharing nothing with the reference."""
+            return "zzz zzz zzz"
+
+    async def go() -> None:
+        async with Speaker(Settings.from_mapping({"backend": "mock"})) as spk:
+            good = await run_eval(spk, cases, thresholds=thr, transcriber=_Perfect())
+            bad = await run_eval(spk, cases, thresholds=thr, transcriber=_Broken())
+        # Perfect transcription: zero word errors, full chrF, gate satisfied.
+        assert good.mean_wer == 0.0 and good.mean_chrf == 1.0
+        assert good.passed
+        # Broken transcription: WER climbs above the bar and the gate fails,
+        # citing a fidelity reason (WER or chrF).
+        assert bad.mean_wer is not None and bad.mean_wer > 0.20
+        assert not bad.passed
+        assert any("WER" in f or "chrF" in f for f in bad.failures)
+
+    asyncio.run(go())
+
+
 @pytest.mark.slow
 async def test_run_eval_live_kokoro(live_port: int) -> None:
     """The identical gate runs against the real engine when reachable."""

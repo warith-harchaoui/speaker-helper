@@ -104,6 +104,11 @@ def _build_parser() -> argparse.ArgumentParser:
     p_eval.add_argument("--languages", default=None,
                         help="Comma-separated language codes to measure "
                              "(e.g. fr,en,es); prints a per-language matrix.")
+    # Opt-in fidelity round-trip: re-transcribe the synthesised audio with
+    # vocal-helper (the ``stt`` extra) and gate on WER/chrF. Off by default
+    # because it needs a real engine and STT, which CI does not have.
+    p_eval.add_argument("--transcribe", action="store_true",
+                        help="Re-transcribe output (vocal-helper) and gate on WER/chrF.")
 
     p_from = sub.add_parser(
         "speak-from",
@@ -229,16 +234,63 @@ def _cmd_clone(args: argparse.Namespace, settings: Settings) -> int:
     return asyncio.run(run())
 
 
+def _build_transcriber(args: argparse.Namespace):  # type: ignore[no-untyped-def]
+    """Return a fidelity transcriber when ``--transcribe`` was passed, else ``None``.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parsed CLI arguments; only ``transcribe`` and ``language`` are read.
+
+    Returns
+    -------
+    VocalHelperTranscriber or None
+        A vocal-helper-backed transcriber enabling the WER/chrF round-trip, or
+        ``None`` when fidelity was not requested.
+
+    Notes
+    -----
+    Imported lazily so ``vocal-helper`` stays optional (the ``stt`` extra): it is
+    only needed when the user opts into ``--transcribe``.
+    """
+    # No fidelity requested: keep vocal-helper out of the import path entirely.
+    if not getattr(args, "transcribe", False):
+        return None
+    # Build the adapter in the configured language (defaults to French).
+    from speaker_helper.transcription import VocalHelperTranscriber
+
+    return VocalHelperTranscriber(getattr(args, "language", None) or "fr")
+
+
 def _cmd_eval_multilang(args: argparse.Namespace, settings: Settings, thresholds) -> int:
-    """Run the evaluation across ``--languages`` and print a matrix; gate on all."""
+    """Run the evaluation across ``--languages`` and print a matrix; gate on all.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parsed CLI arguments (``languages``, ``json_out``, ``transcribe``).
+    settings : Settings
+        Base configuration; language/voice are overridden per language.
+    thresholds : Thresholds
+        Pass/fail bar applied to every language.
+
+    Returns
+    -------
+    int
+        ``0`` when every language passes, ``1`` otherwise.
+    """
     import json
 
     from speaker_helper.eval import format_matrix, run_multilang_eval
 
+    # Split "fr,en,es" into a clean list, dropping empty entries.
     languages = [lang.strip() for lang in args.languages.split(",") if lang.strip()]
+    # Optional fidelity round-trip, shared across every language.
+    transcriber = _build_transcriber(args)
 
     async def run() -> int:
-        reports = await run_multilang_eval(settings, languages, thresholds=thresholds)
+        reports = await run_multilang_eval(
+            settings, languages, thresholds=thresholds, transcriber=transcriber)
         sys.stdout.write(format_matrix(reports) + "\n")
         if args.json_out is not None:
             args.json_out.write_text(
@@ -291,10 +343,13 @@ def _cmd_eval(args: argparse.Namespace, settings: Settings) -> int:
         return _cmd_eval_multilang(args, settings, thresholds)
 
     cases = load_dataset(args.dataset)
+    # Optional fidelity round-trip (WER/chrF) via vocal-helper; None otherwise.
+    transcriber = _build_transcriber(args)
 
     async def run() -> int:
         async with Speaker(settings) as spk:
-            report = await run_eval(spk, cases, thresholds=thresholds)
+            report = await run_eval(
+                spk, cases, thresholds=thresholds, transcriber=transcriber)
         if args.json_out is not None:
             args.json_out.write_text(
                 json.dumps(report.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8")
