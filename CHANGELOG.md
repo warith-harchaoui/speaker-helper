@@ -4,6 +4,17 @@ All notable changes to speaker-helper are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project aims to adhere
 to [Semantic Versioning](https://semver.org/).
 
+## [0.7.0] — 2026-07-13
+
+### Added
+- **WER/chrF fidelity gating in CI.** The round-trip *pipeline* and *threshold
+  gating* now run in CI via deterministic stub transcribers (a real
+  synthesis→STT round-trip needs a live engine the runner lacks). Versioned
+  fidelity thresholds (`max_mean_wer: 0.20`, `min_mean_chrf: 0.75`) in
+  `thresholds.yaml`. New `speaker-helper eval --transcribe` runs the *real*
+  round-trip locally with `vocal-helper` (the `stt` extra), for one language or
+  a `--languages` matrix.
+
 ## [0.6.0] — 2026-07-13
 
 ### Added

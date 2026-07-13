@@ -250,9 +250,11 @@ référence du §5.1 (M2 Max, natif MLX) ; un autre hôte les recalibre en un ap
 - Les chiffres de RTF dépendent du matériel et de la charge ; c'est
   l'évaluation, pas une table statique, qui fait foi — relancez-la sur votre
   hôte.
-- La fidélité (WER/chrF) n'est pas encore verrouillée en CI, car elle nécessite
-  un transcripteur que le runner hébergé n'embarque pas ; elle tourne en local
-  avec l'extra `stt`.
+- La fidélité a deux moitiés. Le *pipeline* WER/chrF et le *gating par seuils*
+  tournent en CI avec des transcripteurs stubs déterministes (un vrai
+  aller-retour synthèse→STT exige un moteur vivant que le runner hébergé n'a
+  pas) ; le *vrai* aller-retour tourne en local via
+  `speaker-helper eval --transcribe` (l'extra `stt`).
 - La référence de clonage livrée est dans l'arbre source ; son empaquetage dans
   le wheel reste à faire.
 - Prévu : des matrices de Pareto multi-moteurs mesurées par langue, et des

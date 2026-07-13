@@ -232,8 +232,10 @@ different host recalibrates them with one call.
 
 - The RTF numbers are hardware- and load-dependent; the evaluation, not a static
   table, is the source of truth — re-run it on your host.
-- Fidelity (WER/chrF) is not gated in CI yet, because it needs a transcriber the
-  hosted runner does not carry; it runs locally with the `stt` extra.
+- Fidelity has two halves. The WER/chrF *pipeline and threshold gating* run in
+  CI with deterministic stub transcribers (a real synthesis→STT round-trip needs
+  a live engine the hosted runner lacks); the *real* round-trip runs locally via
+  `speaker-helper eval --transcribe` (the `stt` extra).
 - The bundled clone reference ships in the source tree; packaging it into the
   wheel is pending.
 - Planned: measured multi-engine Pareto matrices per language, and richer
