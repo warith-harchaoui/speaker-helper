@@ -185,7 +185,18 @@ class MockEngine:
     """
 
     def __init__(self, settings: Settings) -> None:
+        """Read the ``mock`` knobs from settings into typed attributes.
+
+        Parameters
+        ----------
+        settings : Settings
+            Configuration; its :attr:`Settings.mock` mapping supplies the
+            tone/duration parameters (with sensible defaults).
+        """
+        # Keep the full settings for language/engine labels on results.
         self.settings = settings
+        # Pull the mock-specific knobs, coercing each to its declared type and
+        # falling back to defaults tuned for realistic (non-degenerate) audio.
         m = settings.mock
         self.rtf: float = float(m.get("rtf", 0.3))
         self.chars_per_sec: float = float(m.get("chars_per_sec", 15.0))
@@ -274,9 +285,26 @@ class MockEngine:
         return None
 
     async def __aenter__(self) -> MockEngine:
+        """Enter the async context manager and return this engine.
+
+        Returns
+        -------
+        MockEngine
+            This same instance, usable inside ``async with``.
+        """
+        # The mock holds no resources, so there is nothing to set up.
         return self
 
     async def __aexit__(self, *exc: object) -> None:
+        """Exit the async context manager, releasing any resources.
+
+        Parameters
+        ----------
+        *exc : object
+            The ``(exc_type, exc, tb)`` triple from the ``with`` body,
+            ignored here since the mock closes cleanly regardless.
+        """
+        # Delegate to aclose (a no-op) so the API mirrors the real client.
         await self.aclose()
 
     def _render_tone(self, duration_s: float) -> bytes:

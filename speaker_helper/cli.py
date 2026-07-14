@@ -61,6 +61,7 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Path to settings.yaml (default: ./settings.yaml if present).",
     )
+    # Global overrides: they precede the sub-command and win over settings.yaml.
     parser.add_argument("--backend", default=None, help="TTS backend: voicebox (default) or mock.")
     parser.add_argument("--host", default=None, help="Voicebox host override.")
     parser.add_argument("--port", type=int, default=None, help="Voicebox port override.")
@@ -85,8 +86,10 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Transcript of --clone-audio (auto-transcribed if omitted).",
     )
 
+    # One sub-command is mandatory; each gets its own argument group below.
     sub = parser.add_subparsers(dest="command", required=True)
 
+    # `synth`: text (or stdin) -> WAV, offline or streaming.
     p_synth = sub.add_parser("synth", help="Synthesise text to a WAV file.")
     p_synth.add_argument(
         "text", nargs="?", default=None, help="Text to speak; omit to read from stdin."
@@ -104,11 +107,14 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Streaming mode: report time-to-first-audio and cadence.",
     )
 
+    # `voices`: enumerate an engine's preset voices.
     p_voices = sub.add_parser("voices", help="List preset voices for an engine.")
     p_voices.add_argument("--engine", default=None, help="Engine id (default: configured).")
 
+    # `clone`: register a cloned voice (uses the global --clone* flags) and print its id.
     sub.add_parser("clone", help="Register a cloned voice from reference audio and print its id.")
 
+    # `eval`: measure the engine against a dataset and gate on thresholds.
     p_eval = sub.add_parser(
         "eval", help="Evaluate the engine against a dataset and gate on thresholds."
     )
@@ -140,6 +146,7 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Re-transcribe output (vocal-helper) and gate on WER/chrF.",
     )
 
+    # `speak-from`: speech-to-speech — pull audio from a source and re-voice it.
     p_from = sub.add_parser(
         "speak-from", help="Re-voice audio from a source (youtube / podcast / microphone)."
     )
@@ -172,6 +179,8 @@ def _build_parser() -> argparse.ArgumentParser:
 
 def _settings_from_args(args: argparse.Namespace) -> Settings:
     """Load settings from ``--config`` and apply CLI overrides."""
+    # Start from the file/defaults, then let any explicitly-passed flag win.
+    # `getattr(..., None)` guards flags that only exist on some sub-commands.
     settings = Settings.load(args.config)
     if getattr(args, "backend", None):
         settings.backend = args.backend
@@ -194,6 +203,8 @@ def _settings_from_args(args: argparse.Namespace) -> Settings:
         or args.command == "clone"
     )
     if clone_requested:
+        # Copy the settings' clone mapping so per-invocation flag overrides do
+        # not mutate the loaded configuration in place.
         clone: dict[str, object] = dict(settings.clone)
         if getattr(args, "clone_name", None):
             clone["name"] = args.clone_name
@@ -207,18 +218,30 @@ def _settings_from_args(args: argparse.Namespace) -> Settings:
 
 def _cmd_synth(args: argparse.Namespace, settings: Settings) -> int:
     """Handle the ``synth`` sub-command; return a process exit code."""
+    # Text comes from the positional argument, or stdin when it is omitted.
     text = args.text if args.text is not None else sys.stdin.read()
+    # Refuse to synthesise nothing: a blank input is a usage error (exit 2).
     if not text or not text.strip():
         osh.error("no text provided (argument or stdin)")
         return 2
 
     async def run() -> int:
+        """Drive one synthesis (streaming or offline) and write the WAV.
+
+        Returns
+        -------
+        int
+            ``0`` on success; exceptions propagate to :func:`asyncio.run`.
+        """
         async with Speaker(settings) as spk:
             if args.stream:
+                # Streaming path: collect per-sentence chunks as they arrive,
+                # tracking time-to-first-audio and total duration for the report.
                 first_ttfa: float | None = None
                 total_audio = 0.0
                 buffers: list[bytes] = []
                 async for chunk in spk.stream(text):
+                    # The first chunk carries the TTFA measurement; keep it.
                     if chunk.ttfa_s is not None:
                         first_ttfa = chunk.ttfa_s
                     total_audio += chunk.audio.duration_s
@@ -229,6 +252,7 @@ def _cmd_synth(args: argparse.Namespace, settings: Settings) -> int:
                         chunk.audio.duration_s,
                         chunk.audio.rtf,
                     )
+                # Stitch the streamed chunks into a single output WAV.
                 _concat_wavs(buffers, args.out)
                 osh.info(
                     "streamed %.2fs audio to %s (TTFA %.2fs)",
@@ -237,6 +261,7 @@ def _cmd_synth(args: argparse.Namespace, settings: Settings) -> int:
                     first_ttfa or 0.0,
                 )
             else:
+                # Offline path: one call yields the whole audio at once.
                 result = await spk.say(text)
                 Path(args.out).write_bytes(result.wav_bytes)
                 osh.info(
@@ -251,6 +276,13 @@ def _cmd_voices(args: argparse.Namespace, settings: Settings) -> int:
     """Handle the ``voices`` sub-command; return a process exit code."""
 
     async def run() -> int:
+        """List the engine's preset voices, one per tab-separated line.
+
+        Returns
+        -------
+        int
+            ``0`` on success.
+        """
         async with Speaker(settings) as spk:
             listing = await spk.voices(args.engine)
             # This is user-facing CLI output, so writing to stdout is correct.
@@ -275,7 +307,15 @@ def _cmd_clone(args: argparse.Namespace, settings: Settings) -> int:
     """Handle the ``clone`` sub-command; register a voice and print its id."""
 
     async def run() -> int:
+        """Register the configured clone and emit its voice id.
+
+        Returns
+        -------
+        int
+            ``0`` on success.
+        """
         async with Speaker(settings) as spk:
+            # Uses the clone reference resolved from settings (default ref-malo).
             voice_id = await spk.clone_voice()
         # User-facing: print the id so it can be captured / reused.
         sys.stdout.write(voice_id + "\n")
@@ -339,10 +379,20 @@ def _cmd_eval_multilang(args: argparse.Namespace, settings: Settings, thresholds
     transcriber = _build_transcriber(args)
 
     async def run() -> int:
+        """Evaluate every requested language, print the matrix, gate on all.
+
+        Returns
+        -------
+        int
+            ``0`` only if every language passes its threshold bar, else ``1``.
+        """
+        # Measure each language against the shared thresholds in one pass.
         reports = await run_multilang_eval(
             settings, languages, thresholds=thresholds, transcriber=transcriber
         )
+        # Human-readable per-language matrix on stdout.
         sys.stdout.write(format_matrix(reports) + "\n")
+        # Optional machine-readable dump for CI artifacts / dashboards.
         if args.json_out is not None:
             args.json_out.write_text(
                 json.dumps(
@@ -366,9 +416,18 @@ def _cmd_speak_from(args: argparse.Namespace, settings: Settings) -> int:
     )
 
     async def run() -> int:
+        """Resolve the requested source, re-voice it, and write the WAV.
+
+        Returns
+        -------
+        int
+            ``0`` on success, ``2`` when a required ``--url`` is missing.
+        """
+        # youtube/podcast sources need a URL; the mic source does not.
         if args.source in ("youtube", "podcast") and not args.url:
             osh.error("--url is required for the %s source", args.source)
             return 2
+        # Build the source adapter matching the requested origin.
         if args.source == "youtube":
             src = from_youtube(args.url)
         elif args.source == "podcast":
@@ -406,8 +465,17 @@ def _cmd_eval(args: argparse.Namespace, settings: Settings) -> int:
     transcriber = _build_transcriber(args)
 
     async def run() -> int:
+        """Run the single-language evaluation and print the pass/fail verdict.
+
+        Returns
+        -------
+        int
+            ``0`` if the report passes the threshold bar, ``1`` otherwise.
+        """
+        # Evaluate every dataset case against the engine under the thresholds.
         async with Speaker(settings) as spk:
             report = await run_eval(spk, cases, thresholds=thresholds, transcriber=transcriber)
+        # Optional machine-readable dump before the human summary.
         if args.json_out is not None:
             args.json_out.write_text(
                 json.dumps(report.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8"
@@ -436,15 +504,19 @@ def _concat_wavs(buffers: list[bytes], out: Path) -> None:
     encodings robustly — the ecosystem's audio path rather than a hand-rolled
     numpy concat.
     """
+    # Imported lazily so a plain `synth` (offline) never pulls in audio-helper.
     import audio_helper as ah
     import os_helper as osh
 
+    # Spill each in-memory chunk to a temp file so audio-helper can stitch them.
     with osh.temporary_folder() as tmp:
         parts: list[str] = []
         for i, buf in enumerate(buffers):
+            # Zero-pad the index so lexical order matches playback order.
             part = osh.join(tmp, f"chunk_{i:04d}.wav")
             Path(part).write_bytes(buf)
             parts.append(part)
+        # Concatenate through the ecosystem's robust encoder-aware path.
         ah.audio_concatenation(parts, output_audio_filename=str(out), overwrite=True)
 
 
@@ -466,7 +538,9 @@ def main(argv: list[str] | None = None) -> int:
     osh.init_logging()
     parser = _build_parser()
     args = parser.parse_args(argv)
+    # Merge file config with CLI overrides once, then dispatch on the command.
     settings = _settings_from_args(args)
+    # Each branch delegates to a `_cmd_*` handler that returns the exit code.
     if args.command == "synth":
         return _cmd_synth(args, settings)
     if args.command == "voices":

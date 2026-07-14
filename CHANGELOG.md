@@ -4,6 +4,13 @@ All notable changes to speaker-helper are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project aims to adhere
 to [Semantic Versioning](https://semver.org/).
 
+## [0.7.2] — 2026-07-14
+
+### Maintenance
+- Apply the project coding standards across the package and `tests/`: Numpy-style docstrings on every function/class (including private and nested helpers), full typing, and comment density above the floor. No public API or behavior changes.
+- Route library logging through the os-helper logging surface (`osh.info/warning/error`) and adopt os-helper utilities more widely; pin `os-helper>=1.5.0`.
+- Refresh the project logo asset.
+
 ## [0.7.1] — 2026-07-13
 
 ### Maintenance

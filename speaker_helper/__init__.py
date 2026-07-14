@@ -28,8 +28,13 @@ Warith HARCHAOUI — https://linkedin.com/in/warith-harchaoui
 
 from __future__ import annotations
 
+# Low-level HTTP client that talks to the Voicebox REST service.
 from speaker_helper.client import VoiceboxClient, VoiceboxError
+
+# Typed configuration (connection details plus voice/language/mode).
 from speaker_helper.config import Settings, VoiceboxConfig
+
+# Backend registry and the engine protocol the rest of the package targets.
 from speaker_helper.engine import (
     MockEngine,
     TTSEngine,
@@ -37,14 +42,22 @@ from speaker_helper.engine import (
     create_engine,
     register_backend,
 )
+
+# Per-language operating profiles and their tuning helpers.
 from speaker_helper.profiles import (
     DEFAULT_PROFILES,
     LanguageProfile,
     profile_for,
     tune_profiles,
 )
+
+# High-level entry point most callers use.
 from speaker_helper.speaker import Speaker
+
+# Deterministic sentence splitter used for streaming synthesis.
 from speaker_helper.text import chunk_for_streaming, split_sentences
+
+# Dataclasses exchanged across the public surface.
 from speaker_helper.types import (
     AudioResult,
     Mode,
@@ -56,6 +69,8 @@ from speaker_helper.types import (
 
 __version__ = "0.7.1"
 
+# Explicit, sorted public API: only these names are re-exported from the
+# package root; the sub-modules above hold the implementation.
 __all__ = [
     "DEFAULT_PROFILES",
     "AudioResult",

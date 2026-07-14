@@ -38,6 +38,9 @@ from deepeval.metrics import BaseMetric
 
 def _metadata(test_case: Any) -> dict:
     """Return a test case's metadata across DeepEval versions (metadata first)."""
+    # DeepEval renamed the attribute across releases: newer builds expose
+    # ``metadata``, older ones ``additional_metadata``. Try both, then fall
+    # back to an empty dict so a missing attribute is not an error.
     return (
         getattr(test_case, "metadata", None)
         or getattr(test_case, "additional_metadata", None)
@@ -60,6 +63,9 @@ class RealTimeFactorMetric(BaseMetric):
     """
 
     def __init__(self, threshold: float = 1.0) -> None:
+        """Store the RTF bar and initialise DeepEval's result fields."""
+        # ``threshold`` is the pass bar; the remaining fields are the standard
+        # DeepEval result slots, populated on the first ``measure`` call.
         self.threshold = threshold
         self.score: float = 0.0
         self.success: bool = False
@@ -88,6 +94,7 @@ class RealTimeFactorMetric(BaseMetric):
 
     @property
     def __name__(self) -> str:  # noqa: A003 - DeepEval reads this for reporting
+        """Human-readable metric name DeepEval shows in its report."""
         return "Real-Time Factor"
 
 
@@ -101,6 +108,9 @@ class AudioIntegrityMetric(BaseMetric):
     """
 
     def __init__(self) -> None:
+        """Initialise DeepEval's result fields (integrity is all-or-nothing)."""
+        # No tunable bar: a clean case scores 1.0 and a flagged one 0.0, so the
+        # threshold is fixed at 1.0. The rest are DeepEval's result slots.
         self.threshold = 1.0
         self.score: float = 0.0
         self.success: bool = False
@@ -108,9 +118,12 @@ class AudioIntegrityMetric(BaseMetric):
 
     def measure(self, test_case: Any) -> float:
         """Score 1.0 when there are no audio anomalies, else 0.0."""
+        # Anomaly labels are carried in the test case metadata; absent means clean.
         anomalies = list(_metadata(test_case).get("anomalies", []))
+        # Any anomaly at all fails the case; mirror the verdict into DeepEval.
         self.score = 1.0 if not anomalies else 0.0
         self.success = self.score >= 1.0
+        # Report either a clean bill or the comma-joined list of offending labels.
         self.reason = "clean audio" if self.success else f"anomalies: {', '.join(anomalies)}"
         return self.score
 
@@ -124,4 +137,5 @@ class AudioIntegrityMetric(BaseMetric):
 
     @property
     def __name__(self) -> str:  # noqa: A003 - DeepEval reads this for reporting
+        """Human-readable metric name DeepEval shows in its report."""
         return "Audio Integrity"

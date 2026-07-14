@@ -57,7 +57,22 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 class _Transcriber(Protocol):
     """A callable that turns an audio file path into text (e.g. vocal-helper)."""
 
-    def __call__(self, path: str, *, language: str) -> str: ...
+    def __call__(self, path: str, *, language: str) -> str:
+        """Transcribe the audio at ``path`` into text.
+
+        Parameters
+        ----------
+        path : str
+            Filesystem path to the audio file.
+        language : str
+            ISO-639-1 language hint for ASR.
+
+        Returns
+        -------
+        str
+            The transcript of the recording.
+        """
+        ...
 
 
 @dataclass
@@ -83,6 +98,8 @@ def _require(module: str, extra: str):  # type: ignore[no-untyped-def]
     """Import an optional source helper or raise a helpful error naming the extra."""
     import importlib
 
+    # Import lazily so the heavy optional dependency is only loaded on demand;
+    # translate a missing package into an actionable "install this extra" error.
     try:
         return importlib.import_module(module)
     except ImportError as exc:  # pragma: no cover - exercised only without the dep
@@ -119,9 +136,11 @@ def from_youtube(
     ImportError
         If ``youtube-helper`` (extra ``youtube``) is not installed.
     """
+    # Resolve the optional youtube-helper backend, then pull the audio track.
     yh = _require("youtube_helper", "youtube")
     osh.info("downloading YouTube audio: %s", url)
     path = yh.download_audio(url, output_path=output_path, target_sample_rate=sample_rate)
+    # Fetch the title separately: it is a nice-to-have label, not essential.
     title = ""
     try:  # metadata is best-effort; never fail the download over a missing title
         title = yh.video_url_meta_data(url).get("title", "")
@@ -152,11 +171,15 @@ def from_podcast(feed_url: str, *, output_path: str | None = None) -> SourceAudi
     ValueError
         If the latest episode carries no downloadable audio enclosure.
     """
+    # Resolve the optional podcast-helper backend and read the feed's newest item.
     ph = _require("podcast_helper", "podcast")
     episode = ph.latest_episode(feed_url)
+    # The audio lives in the episode's enclosure; without it there is nothing to
+    # download, so fail loudly rather than producing an empty source.
     enclosure = episode.get("enclosure_url")
     if not enclosure:
         raise ValueError(f"latest episode of {feed_url!r} has no audio enclosure")
+    # Default to a fresh temp file so repeated calls do not clobber each other.
     if output_path is None:
         output_path = str(Path(tempfile.mkdtemp(prefix="speaker-helper-")) / "episode.mp3")
     osh.info("downloading podcast episode: %s", episode.get("title", enclosure))
@@ -220,6 +243,7 @@ async def from_microphone(
         chunks.append(frame.pcm)
     pcm = np.concatenate(chunks) if chunks else np.zeros(0, dtype="float32")
 
+    # Persist the captured signal to a WAV file (temp file by default).
     if output_path is None:
         output_path = str(Path(tempfile.mkdtemp(prefix="speaker-helper-")) / "mic.wav")
     sf.write(output_path, pcm.astype("float32"), sample_rate)
@@ -264,14 +288,19 @@ async def revoice(
     ValueError
         If the transcript is empty (nothing to speak).
     """
+    # Accept either a SourceAudio wrapper or a bare path.
     path = source.path if isinstance(source, SourceAudio) else source
+    # Transcribe in the target language; fall back to the speaker's own default.
     lang = language or speaker.settings.language
+    # Default to vocal-helper's file transcription unless the caller injected one.
     if transcriber is None:
         from speaker_helper.transcription import transcribe_file
 
         transcriber = transcribe_file
     text = transcriber(path, language=lang)
+    # An empty transcript means there is nothing to synthesise — bail out.
     if not text or not text.strip():
         raise ValueError(f"transcription of {path!r} produced no text to speak")
     osh.info("re-voicing %d characters transcribed from %s", len(text), path)
+    # Speak the transcript back through the speaker (cloned voice / new language).
     return await speaker.say(text, language=language)

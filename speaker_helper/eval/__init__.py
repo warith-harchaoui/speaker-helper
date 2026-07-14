@@ -29,32 +29,45 @@ Warith HARCHAOUI — https://linkedin.com/in/warith-harchaoui
 
 from __future__ import annotations
 
+# Datasets: the versioned reference utterances an evaluation runs against.
 from speaker_helper.eval.dataset import (
     DEFAULT_DATASET,
     EvalCase,
     available_languages,
     load_dataset,
 )
+
+# Metrics: the raw speed/fidelity/integrity measurements.
 from speaker_helper.eval.metrics import (
     chrf,
     detect_anomalies,
     percentile,
     word_error_rate,
 )
+
+# Multi-language sweep: one report per language plus a text matrix renderer.
 from speaker_helper.eval.multilang import format_matrix, run_multilang_eval
+
+# Quality priors and Pareto selection over the quality↔RTF plane.
 from speaker_helper.eval.priors import (
     TTS_QUALITY_PRIORS,
     engine_quality_prior,
     pareto_front,
 )
+
+# Runner: drives a Speaker over cases and gates on thresholds.
 from speaker_helper.eval.runner import (
     CaseResult,
     EvalReport,
     Transcriber,
     run_eval,
 )
+
+# The versioned pass/fail bar the runner compares each report against.
 from speaker_helper.eval.thresholds import Thresholds
 
+# Explicit public surface: the names above are the eval layer's stable API;
+# everything else in the sub-modules is an implementation detail.
 __all__ = [
     "DEFAULT_DATASET",
     "TTS_QUALITY_PRIORS",

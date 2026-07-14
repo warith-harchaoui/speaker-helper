@@ -71,7 +71,9 @@ class EvalCase:
     reference: str = ""
 
     def __post_init__(self) -> None:
+        """Default an empty ``reference`` to ``text`` (frozen-safe)."""
         # A missing reference means "score against the input text itself".
+        # The dataclass is frozen, so mutate the field via ``object.__setattr__``.
         if not self.reference:
             object.__setattr__(self, "reference", self.text)
 

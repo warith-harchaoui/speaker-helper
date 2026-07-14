@@ -91,26 +91,42 @@ def create_app(settings: Settings | None = None, *, enable_mcp: bool = True) -> 
         The configured application. A single shared :class:`Speaker` is created
         at startup and closed at shutdown.
     """
+    # Resolve configuration once and build the single shared Speaker that every
+    # request handler below closes over (one pooled HTTP client for the app).
     settings = settings or Settings.load()
     speaker = Speaker(settings)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        """Manage the shared engine's startup/shutdown for the app's lifetime.
+
+        Yields
+        ------
+        None
+            Control is yielded to the running application between warmup and
+            teardown; nothing is passed back.
+        """
         # One Speaker (and its pooled HTTP client) for the app's lifetime.
         # Warm the engine up front so the first client request is not the one
         # that pays the model download / load.
         await speaker.warmup()
         yield
+        # On shutdown, release the pooled HTTP client and engine resources.
         await speaker.aclose()
 
+    # Wire the lifespan into the app so warmup/teardown run around serving.
     app = FastAPI(title="speaker-helper", version=_version(), lifespan=lifespan)
 
     @app.get("/health", operation_id="health")
     async def health() -> dict:
         """Return server liveness and upstream Voicebox health."""
         try:
+            # Liveness is trivially true (we answered); the interesting signal is
+            # whether the upstream engine is reachable, so probe it here.
             upstream = await speaker.engine.health()
         except Exception as exc:  # noqa: BLE001 - report upstream failure verbatim
+            # We are up but the engine is not: report "degraded" rather than 5xx
+            # so callers can distinguish "server dead" from "engine dead".
             return {"status": "degraded", "backend": settings.backend, "engine_error": str(exc)}
         return {"status": "ok", "backend": settings.backend, "engine": upstream}
 
@@ -124,6 +140,7 @@ def create_app(settings: Settings | None = None, *, enable_mcp: bool = True) -> 
     async def synth(req: SynthRequest) -> Response:
         """Synthesise text and return an ``audio/wav`` body."""
         try:
+            # Whole-text (offline) synthesis: one WAV back in one response.
             result = await speaker.say(req.text, language=req.language)
         # Bad input (e.g. empty text) is the client's fault -> 400.
         except ValueError as exc:
@@ -149,8 +166,21 @@ def create_app(settings: Settings | None = None, *, enable_mcp: bool = True) -> 
         """
 
         async def events() -> AsyncIterator[bytes]:
+            """Yield one SSE ``data:`` frame per synthesised chunk.
+
+            Yields
+            ------
+            bytes
+                A Server-Sent-Events frame: normally a ``data:`` line carrying
+                the chunk metadata and base64 WAV; on failure, a terminal
+                ``event: error`` frame with the error detail.
+            """
             try:
+                # Forward each streaming chunk to the client the moment it is
+                # ready, so playback can start before the whole text is done.
                 async for chunk in speaker.stream(req.text, language=req.language):
+                    # Serialise chunk metadata + audio into the SSE payload.
+                    # ttfa_s is only meaningful on the first chunk (else None).
                     payload = {
                         "seq": chunk.seq,
                         "duration_s": round(chunk.audio.duration_s, 3),
@@ -159,9 +189,12 @@ def create_app(settings: Settings | None = None, *, enable_mcp: bool = True) -> 
                         "is_final": chunk.is_final,
                         "audio": base64.b64encode(chunk.audio.wav_bytes).decode("ascii"),
                     }
+                    # SSE frames are terminated by a blank line.
                     yield f"data: {json.dumps(payload)}\n\n".encode()
+            # Bad input surfaces as an error frame (status is already 200 here).
             except ValueError as exc:
                 yield f"event: error\ndata: {json.dumps({'detail': str(exc)})}\n\n".encode()
+            # Engine failures mid-stream: log and tell the client via an error frame.
             except Exception as exc:  # noqa: BLE001 - surface engine failures to the client
                 osh.warning("stream failed: %s", exc)
                 yield f"event: error\ndata: {json.dumps({'detail': str(exc)})}\n\n".encode()
@@ -182,6 +215,8 @@ def create_app(settings: Settings | None = None, *, enable_mcp: bool = True) -> 
         with ``vocal-helper``. The cloned voice becomes the server's active
         voice, so subsequent ``/synth`` calls use it.
         """
+        # Pair each uploaded file with its transcript by position; a file with no
+        # matching transcript gets "" and is auto-transcribed downstream.
         samples = [
             VoiceSample(
                 audio=await f.read(),
@@ -190,6 +225,7 @@ def create_app(settings: Settings | None = None, *, enable_mcp: bool = True) -> 
             for i, f in enumerate(files)
         ]
         try:
+            # Register the clone; it becomes the server's active voice on success.
             voice_id = await speaker.clone_voice(name, samples)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -197,6 +233,7 @@ def create_app(settings: Settings | None = None, *, enable_mcp: bool = True) -> 
             raise HTTPException(status_code=502, detail=str(exc)) from exc
         return {"voice_id": voice_id}
 
+    # Optionally expose every endpoint above as an MCP tool for assistants.
     if enable_mcp:
         _mount_mcp(app)
 
@@ -212,8 +249,10 @@ def _mount_mcp(app: FastAPI) -> None:
     warning) when ``fastapi-mcp`` is not installed.
     """
     try:
+        # Import lazily: fastapi-mcp lives behind the optional 'mcp' extra.
         from fastapi_mcp import FastApiMCP
     except ImportError:
+        # Absent extra is not an error — the REST API works fine without MCP.
         osh.warning(
             "fastapi-mcp not installed; MCP server not mounted "
             "(install the 'mcp' extra to enable /mcp)"
@@ -240,9 +279,11 @@ def serve(settings: Settings | None = None, *, host: str = "127.0.0.1", port: in
     port : int
         Bind port.
     """
+    # Import uvicorn lazily so the core package never requires the server extra.
     import uvicorn
 
     osh.info("starting speaker-helper API on %s:%d", host, port)
+    # Blocking call: hands control to uvicorn's event loop until interrupted.
     uvicorn.run(create_app(settings), host=host, port=port)
 
 

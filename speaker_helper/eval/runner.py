@@ -159,6 +159,8 @@ class EvalReport:
 
     def to_dict(self) -> dict:
         """Return a JSON-serialisable dict of the whole report."""
+        # ``asdict`` recurses into the nested CaseResult dataclasses too, giving a
+        # fully plain-dict tree ready for JSON serialisation.
         d = asdict(self)
         return d
 
@@ -189,16 +191,23 @@ async def run_eval(
     EvalReport
         The aggregated report and verdict.
     """
+    # Fall back to the bundled dataset and threshold bar when the caller omits
+    # them, so ``run_eval(speaker)`` is a valid, fully-defaulted invocation.
     cases = cases if cases is not None else load_dataset()
     thresholds = thresholds or Thresholds.load()
 
+    # Run cases sequentially so RTF is measured under a single, uncontended
+    # engine rather than distorted by concurrent synthesis load.
     results: list[CaseResult] = []
     for case in cases:
         results.append(await _run_case(speaker, case, transcriber))
+        # Log each case's headline numbers as it lands for live progress.
         osh.info(
             "eval %s: rtf=%.3f anomalies=%s", case.id, results[-1].rtf, results[-1].anomalies or "-"
         )
 
+    # Fold the per-case results into a single report and apply the gate. Fidelity
+    # thresholds are only enforced when a transcriber actually produced scores.
     return _aggregate(
         speaker.settings.backend,
         speaker.settings.engine,
@@ -284,6 +293,8 @@ def _aggregate(
         prior_key = "mock" if backend == "mock" else engine
         quality, quality_source = round(engine_quality_prior(prior_key), 4), "prior"
 
+    # Collect a human-readable reason for every breached threshold; a non-empty
+    # list means the run failed. Speed and anomaly gates always apply.
     failures: list[str] = []
     if mean_rtf > thresholds.max_mean_rtf:
         failures.append(f"mean RTF {mean_rtf} > {thresholds.max_mean_rtf}")
@@ -291,6 +302,8 @@ def _aggregate(
         failures.append(f"p95 RTF {p95_rtf} > {thresholds.max_p95_rtf}")
     if anomaly_rate > thresholds.max_anomaly_rate:
         failures.append(f"anomaly rate {anomaly_rate} > {thresholds.max_anomaly_rate}")
+    # Fidelity gates (WER/chrF) only fire when a transcriber ran AND the bar is
+    # configured AND a mean was computed — otherwise fidelity is not gated.
     if (
         gated_fidelity
         and thresholds.max_mean_wer is not None
@@ -306,6 +319,8 @@ def _aggregate(
     ):
         failures.append(f"mean chrF {mean_chrf} < {thresholds.min_mean_chrf}")
 
+    # Echo the applied thresholds alongside the numbers so a report is a complete,
+    # self-describing provenance record. ``passed`` is simply "no failures".
     return EvalReport(
         backend=backend,
         n_cases=n,

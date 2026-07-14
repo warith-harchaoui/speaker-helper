@@ -42,6 +42,8 @@ _ASR_SAMPLE_RATE = 16000
 
 def _require_vocal_helper():  # type: ignore[no-untyped-def]
     """Return ``vocal_helper.transcribe_pcm`` or raise a helpful ImportError."""
+    # Import lazily so vocal-helper is only needed when transcription runs;
+    # turn a missing dependency into an actionable install hint.
     try:
         from vocal_helper import transcribe_pcm
     except ImportError as exc:  # pragma: no cover - exercised only without the dep
@@ -87,9 +89,12 @@ def transcribe_bytes(wav_bytes: bytes, *, language: str = "fr") -> str:
     import soundfile as sf
 
     transcribe_pcm = _require_vocal_helper()
+    # Decode the encoded payload to float PCM, then normalise it to the mono
+    # 16 kHz format whisper.cpp expects before handing it to the ASR backend.
     data, sr = sf.read(io.BytesIO(wav_bytes), dtype="float32", always_2d=False)
     pcm = _to_asr_pcm(data, sr)
     text = transcribe_pcm(pcm, _ASR_SAMPLE_RATE, language=language)
+    # Collapse runs of whitespace so downstream text/WER handling is stable.
     return " ".join(text.split()).strip()
 
 
@@ -131,13 +136,17 @@ def ensure_transcript(audio_path: str | Path, *, language: str = "fr") -> str:
         The transcript.
     """
     audio_path = Path(audio_path)
+    # The cache is a ``.txt`` sidecar sitting next to the audio file.
     sidecar = audio_path.with_suffix(audio_path.suffix + ".txt")
+    # Fast path: a non-empty sidecar means we already transcribed this file.
     if sidecar.is_file():
         cached = sidecar.read_text(encoding="utf-8").strip()
         if cached:
             return cached
+    # Cache miss: run ASR once...
     osh.info("transcribing %s with vocal-helper (cached to %s)", audio_path, sidecar)
     text = transcribe_file(audio_path, language=language)
+    # ...and persist the result for next time (never fatal if the write fails).
     try:
         sidecar.write_text(text + "\n", encoding="utf-8")
     except OSError as exc:  # caching is best-effort
@@ -161,10 +170,20 @@ class VocalHelperTranscriber:
     """
 
     def __init__(self, language: str = "fr") -> None:
+        """Store the default language hint for later transcription calls.
+
+        Parameters
+        ----------
+        language : str
+            ISO-639-1 hint used when :meth:`transcribe` gets no explicit one.
+        """
+        # Remembered so per-call language can stay optional.
         self.language = language
 
     async def transcribe(self, wav_bytes: bytes, *, language: str | None = None) -> str:
         """Transcribe ``wav_bytes`` off the event loop; see :class:`Transcriber`."""
+        # ASR is blocking and CPU/GPU-bound, so run it in a worker thread to
+        # keep the event loop responsive.
         return await asyncio.to_thread(
             transcribe_bytes, wav_bytes, language=language or self.language
         )

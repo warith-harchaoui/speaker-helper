@@ -68,10 +68,14 @@ class _ParetoPoint(Protocol):
     """A candidate carrying a quality (maximise) and an RTF (minimise)."""
 
     @property
-    def quality(self) -> float: ...
+    def quality(self) -> float:
+        """Quality score to maximise (higher is better)."""
+        ...
 
     @property
-    def mean_rtf(self) -> float: ...
+    def mean_rtf(self) -> float:
+        """Mean real-time factor to minimise (lower is faster)."""
+        ...
 
 
 def pareto_front(points: Sequence[_ParetoPoint]) -> list[_ParetoPoint]:

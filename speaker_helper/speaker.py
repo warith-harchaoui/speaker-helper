@@ -83,8 +83,22 @@ class Speaker:
         engine: TTSEngine | None = None,
         stream_concurrency: int = 1,
     ) -> None:
+        """Wire up configuration and the TTS backend for this speaker.
+
+        Parameters
+        ----------
+        settings : Settings or None
+            Configuration; ``None`` loads defaults via :meth:`Settings.load`.
+        engine : TTSEngine or None
+            Pre-built backend to inject; ``None`` builds one from ``settings``.
+        stream_concurrency : int
+            Max chunks synthesised in parallel while streaming (floored at 1).
+        """
+        # Fall back to file/env-derived settings when none are supplied.
         self.settings = settings or Settings.load()
+        # A concurrency of at least 1 is required for the streaming pipeline.
         self.stream_concurrency = max(1, stream_concurrency)
+        # Reuse an injected engine (tests/mocks) or build one from settings.
         self.engine: TTSEngine = engine or create_engine(self.settings)
 
     @classmethod
@@ -115,7 +129,10 @@ class Speaker:
         Speaker
             A speaker configured for the profile's language.
         """
+        # Let the profile fold its language/engine/voice choices into settings.
         applied = profile.apply(settings)  # type: ignore[attr-defined]
+        # stream_concurrency is a consumer knob, not a Settings field, so it is
+        # read off the profile object and forwarded separately.
         return cls(
             applied,
             engine=engine,
@@ -151,9 +168,24 @@ class Speaker:
             osh.warning("engine warm-up failed (continuing): %s", exc)
 
     async def __aenter__(self) -> Speaker:
+        """Enter the async context, returning this speaker unchanged.
+
+        Returns
+        -------
+        Speaker
+            This instance, ready for use inside ``async with``.
+        """
         return self
 
     async def __aexit__(self, *exc: object) -> None:
+        """Leave the async context, releasing engine resources.
+
+        Parameters
+        ----------
+        *exc : object
+            Exception type/value/traceback (ignored; cleanup runs regardless).
+        """
+        # Always release the backend, whether or not the block raised.
         await self.aclose()
 
     # ----- discovery ------------------------------------------------------
@@ -199,11 +231,14 @@ class Speaker:
         """
         from speaker_helper.cloning import clone_name, resolve_samples
 
+        # The clone config (possibly empty) supplies defaults for both the
+        # reference samples and the profile name when the caller omits them.
         cfg = self.settings.clone or {}
         if samples is None:
             samples = resolve_samples(cfg)
         if name is None:
             name = clone_name(cfg)
+        # Hand off to the backend, which registers the voice and returns its id.
         return await self.engine.clone_voice(name, samples, language=language)
 
     # ----- offline --------------------------------------------------------
@@ -314,9 +349,26 @@ class Speaker:
         return _run_sync(self._say_and_close(text, language))
 
     async def _say_and_close(self, text: str, language: str | None) -> AudioResult:
+        """Synthesise once, then close the engine (drives the sync wrappers).
+
+        Parameters
+        ----------
+        text : str
+            The text to speak.
+        language : str or None
+            Override the configured target language.
+
+        Returns
+        -------
+        AudioResult
+            The synthesised audio.
+        """
         try:
+            # Do the actual synthesis...
             return await self.say(text, language=language)
         finally:
+            # ...and tear down the engine even if synthesis raised, since the
+            # sync wrappers create and own this speaker for a single call.
             await self.aclose()
 
     def save(self, text: str, path: str | Path, *, language: str | None = None) -> AudioResult:
@@ -336,6 +388,7 @@ class Speaker:
         AudioResult
             The synthesised audio (also written to ``path``).
         """
+        # Synthesise synchronously, then persist the raw WAV bytes to disk.
         result = self.say_sync(text, language=language)
         Path(path).write_bytes(result.wav_bytes)
         osh.info("wrote %s (%.2fs audio, RTF %.2f)", path, result.duration_s, result.rtf)
@@ -344,6 +397,9 @@ class Speaker:
 
 def _run_sync(coro):  # type: ignore[no-untyped-def]
     """Run a coroutine to completion, refusing to nest inside a running loop."""
+    # If get_running_loop() raises, there is no active loop, so it is safe to
+    # spin up our own with asyncio.run(). If it succeeds, we are already inside
+    # a loop and nesting asyncio.run() would deadlock — refuse instead.
     try:
         asyncio.get_running_loop()
     except RuntimeError:

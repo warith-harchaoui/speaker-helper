@@ -78,10 +78,26 @@ class VoiceboxClient:
     """
 
     def __init__(self, settings: Settings) -> None:
+        """Store configuration and prepare lazy HTTP/profile state.
+
+        Parameters
+        ----------
+        settings : Settings
+            Resolved connection and voice configuration.
+
+        Notes
+        -----
+        No network I/O happens here: the :class:`httpx.AsyncClient` and the
+        resolved ``profile_id`` are created lazily on first use.
+        """
+        # Keep the settings and pre-compute the base URL used for every request.
         self.settings = settings
         self.base = settings.base_url
+        # HTTP client and resolved profile are built lazily (see _http /
+        # ensure_profile) so construction stays cheap and side-effect free.
         self._client: httpx.AsyncClient | None = None
         self._profile_id: str | None = None
+        # Guards the one-time profile bootstrap against concurrent syntheses.
         self._profile_lock = asyncio.Lock()
 
     # ----- lifecycle ------------------------------------------------------
@@ -149,6 +165,14 @@ class VoiceboxClient:
             self._client = None
 
     async def __aenter__(self) -> VoiceboxClient:
+        """Enter the async context manager and return this client.
+
+        Returns
+        -------
+        VoiceboxClient
+            This same instance, ready for use inside ``async with``.
+        """
+        # Nothing to set up eagerly; the HTTP client is created on demand.
         return self
 
     async def __aexit__(
@@ -157,6 +181,18 @@ class VoiceboxClient:
         exc: BaseException | None,
         tb: TracebackType | None,
     ) -> None:
+        """Exit the async context manager, closing the HTTP client.
+
+        Parameters
+        ----------
+        exc_type : type[BaseException] or None
+            Exception class raised in the ``async with`` body, if any.
+        exc : BaseException or None
+            The exception instance, if any.
+        tb : TracebackType or None
+            The associated traceback, if any.
+        """
+        # Always release connections on exit, whether or not the body raised.
         await self.aclose()
 
     # ----- discovery ------------------------------------------------------
@@ -191,10 +227,15 @@ class VoiceboxClient:
         VoiceList
             The engine and its preset voices (possibly empty).
         """
+        # Fall back to the configured engine when the caller passes none.
         engine = engine or self.settings.engine
+        # Ask Voicebox for this engine's preset catalogue.
         resp = await self._send(lambda: self._http().get(f"{self.base}/profiles/presets/{engine}"))
         _raise_for_status(resp)
+        # The payload's "voices" key is optional; treat a missing one as empty.
         raw = resp.json().get("voices", [])
+        # Normalise each raw entry into a typed Voice, filling absent fields with
+        # forgiving defaults (name falls back to the id; language/gender to "").
         voices = [
             Voice(
                 voice_id=v["voice_id"],
@@ -211,13 +252,17 @@ class VoiceboxClient:
 
     async def _resolve_voice_id(self, engine: str) -> str:
         """Return the configured voice id, or auto-pick one for the language."""
+        # An explicit voice id always wins — no discovery needed.
         if self.settings.voice_id:
             return self.settings.voice_id
+        # Otherwise pick from the engine's presets; refuse if it exposes none.
         voices = (await self.list_voices(engine)).voices
         if not voices:
             raise VoiceboxError(
                 f"engine {engine!r} exposes no preset voices; set voice_id explicitly."
             )
+        # Prefer the first voice whose language matches the target; if none do,
+        # fall back to the first preset so synthesis can still proceed.
         match = next(
             (v for v in voices if v.language.startswith(self.settings.language)),
             None,
@@ -226,9 +271,12 @@ class VoiceboxClient:
 
     async def _find_profile(self, engine: str, voice_id: str, name: str) -> str | None:
         """Return an existing profile id for this preset voice, if any."""
+        # List every profile and search locally (Voicebox has no query filter).
         resp = await self._send(lambda: self._http().get(f"{self.base}/profiles"))
         _raise_for_status(resp)
         profiles = resp.json()
+        # Prefer an exact preset-engine + preset-voice match; only if none is
+        # found do we fall back to a plain name match (handles legacy profiles).
         match = next(
             (
                 p
@@ -241,9 +289,11 @@ class VoiceboxClient:
 
     async def _find_profile_by_name(self, name: str) -> str | None:
         """Return an existing profile id matching ``name``, if any."""
+        # Fetch all profiles and scan for the first with a matching name.
         resp = await self._send(lambda: self._http().get(f"{self.base}/profiles"))
         _raise_for_status(resp)
         match = next((p for p in resp.json() if p.get("name") == name), None)
+        # Return its id, or None so callers know to create the profile.
         return match["id"] if match else None
 
     async def ensure_profile(self) -> str:
@@ -271,15 +321,19 @@ class VoiceboxClient:
             # (lib/CLI/API) from a single ``settings.clone`` block.
             if self.settings.clone:
                 return await self._ensure_cloned_profile()
+            # Resolve which preset voice to use and derive a stable, unique
+            # profile name from engine + voice so lookups stay idempotent.
             engine = self.settings.engine
             voice_id = await self._resolve_voice_id(engine)
             name = f"speaker-helper-{engine}-{voice_id}"
 
+            # Reuse a matching profile from a previous run instead of duplicating.
             existing = await self._find_profile(engine, voice_id, name)
             if existing:
                 self._profile_id = existing
                 return existing
 
+            # None found: create a fresh preset profile for this voice.
             resp = await self._http().post(
                 f"{self.base}/profiles",
                 json={
@@ -291,12 +345,15 @@ class VoiceboxClient:
                     "default_engine": engine,
                 },
             )
+            # A concurrent creator (or a prior partial run) may have won the
+            # race; recover by looking the just-created profile back up.
             if resp.status_code == 400 and "already exists" in resp.text.lower():
                 existing = await self._find_profile(engine, voice_id, name)
                 if existing:
                     self._profile_id = existing
                     return existing
             _raise_for_status(resp)
+            # Cache the new id so subsequent syntheses skip this whole bootstrap.
             self._profile_id = resp.json()["id"]
             osh.info(
                 "created Voicebox preset profile %s (%s/%s)", self._profile_id, engine, voice_id
@@ -317,11 +374,14 @@ class VoiceboxClient:
             resolve_samples,
         )
 
+        # Derive the deterministic clone name and reuse an existing clone by
+        # that name so repeated startups don't re-upload the same samples.
         name = clone_name(self.settings.clone)
         existing = await self._find_profile_by_name(name)
         if existing:
             self._profile_id = existing
             return existing
+        # Materialise the reference samples described in settings.clone.
         samples = resolve_samples(self.settings.clone)
         # Transcription (via vocal-helper) is blocking and heavy — off the loop.
         samples = await asyncio.to_thread(prepare_samples, samples, language=self.settings.language)
@@ -360,11 +420,14 @@ class VoiceboxClient:
         from speaker_helper.cloning import prepare_samples
 
         language = language or self.settings.language
+        # Serialise clone creation with other profile bootstraps on this client.
         async with self._profile_lock:
+            # Idempotency: reuse a clone already registered under this name.
             existing = await self._find_profile_by_name(name)
             if existing:
                 self._profile_id = existing
                 return existing
+            # Transcription is blocking/heavy — run it off the event loop.
             samples = await asyncio.to_thread(prepare_samples, samples, language=language)
             return await self._create_clone(name, samples, language=language)
 
@@ -376,8 +439,10 @@ class VoiceboxClient:
         language: str,
     ) -> str:
         """Create a cloned profile and upload its reference samples."""
+        # A clone with no reference audio is meaningless — reject early.
         if not samples:
             raise VoiceboxError("cloning needs at least one reference sample")
+        # Register the empty cloned profile first; samples are attached below.
         engine = self.settings.engine
         resp = await self._send(
             lambda: self._http().post(
@@ -390,6 +455,7 @@ class VoiceboxClient:
                 },
             )
         )
+        # If the name was taken meanwhile, adopt the existing clone instead.
         if resp.status_code == 400 and "already exists" in resp.text.lower():
             existing = await self._find_profile_by_name(name)
             if existing:

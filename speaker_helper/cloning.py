@@ -53,6 +53,8 @@ DEFAULT_CLONE_TEXT_FILE = _REPO_ROOT / "assets" / "ref-malo.txt"
 
 def default_reference_text() -> str:
     """Return the bundled ref-malo transcript, or ``""`` if it is missing."""
+    # Best-effort read: a missing/unreadable transcript degrades to empty text
+    # rather than breaking callers that only wanted a sensible default.
     try:
         return DEFAULT_CLONE_TEXT_FILE.read_text(encoding="utf-8").strip()
     except OSError:
@@ -61,6 +63,7 @@ def default_reference_text() -> str:
 
 def clone_name(clone: dict[str, Any]) -> str:
     """Return the profile name for a clone configuration (default ``ref-malo``)."""
+    # An absent or falsy name falls back to the bundled reference's name.
     return str(clone.get("name") or DEFAULT_CLONE_NAME)
 
 
@@ -90,9 +93,11 @@ def resolve_samples(clone: dict[str, Any]) -> list[VoiceSample]:
     only for the bundled default audio; a custom audio with no transcript keeps
     an empty string (the engine may reject it — supply the transcript).
     """
+    # Preferred path: an explicit multi-sample list wins over the single pair.
     explicit = clone.get("samples")
     if explicit:
         samples: list[VoiceSample] = []
+        # Each entry must carry audio; transcripts are optional at this stage.
         for i, item in enumerate(explicit):
             audio = item.get("audio")
             if not audio:
@@ -102,12 +107,16 @@ def resolve_samples(clone: dict[str, Any]) -> list[VoiceSample]:
             )
         return samples
 
+    # Single-sample path: use the configured audio, or the bundled default.
     audio = clone.get("audio") or str(DEFAULT_CLONE_AUDIO)
     is_default_audio = str(audio) == str(DEFAULT_CLONE_AUDIO)
+    # Only auto-fill the transcript for the bundled audio; a custom recording
+    # with no transcript stays empty (the engine may then require one).
     reference_text = clone.get("reference_text")
     if reference_text is None:
         reference_text = default_reference_text() if is_default_audio else ""
 
+    # Guard against a missing bundled asset so the failure is explicit.
     if is_default_audio and not DEFAULT_CLONE_AUDIO.is_file():
         raise ValueError(
             f"default clone reference not found: {DEFAULT_CLONE_AUDIO}. "

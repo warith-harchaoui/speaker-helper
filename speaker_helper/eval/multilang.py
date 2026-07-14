@@ -75,15 +75,21 @@ async def run_multilang_eval(
     dict
         Mapping ``language -> EvalReport`` in the requested order.
     """
+    # One shared threshold bar is applied to every language for a fair matrix.
     thresholds = thresholds or Thresholds.load()
     reports: dict[str, EvalReport] = {}
+    # Measure each language in turn; insertion order preserves the requested order.
     for lang in languages:
         # Fresh language + auto voice pick (empty voice_id) so the engine
         # bootstraps a profile for this language rather than reusing another.
         settings = dataclasses.replace(base_settings, language=lang, voice_id="")
+        # Load this language's bundled reference set (raises if none ships).
         cases = load_dataset(language=lang)
         osh.info("measuring language %s (%d cases)", lang, len(cases))
+        # A fresh Speaker per language isolates model/voice state between runs.
         async with Speaker(settings) as spk:
+            # Optionally warm the voice so the numbers reflect steady state, not
+            # a one-off cold model/voice load.
             if warmup:
                 await spk.warmup()
             reports[lang] = await run_eval(
