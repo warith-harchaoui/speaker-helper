@@ -11,7 +11,7 @@
 
 
 **Synthèse vocale professionnelle — hors-ligne et en streaming, avec clonage de
-voix et une passerelle d'évaluation intégrée — au-dessus d'un moteur TTS local
+voix et une passerelle d'évaluation intégrée — au-dessus d'un moteur de synthèse vocale local
 ([Voicebox](https://github.com/jamiepine/voicebox) par défaut).**
 
 speaker-helper est le pendant de
@@ -53,7 +53,7 @@ flowchart LR
         speaker["Speaker<br/>hors-ligne · streaming · clonage"]:::core
         eval["évaluation<br/>RTF · anomalies · WER/chrF"]:::eval
     end
-    engine["moteur TTS<br/>voicebox · mock · …"]:::engine
+    engine["moteur de synthèse vocale<br/>voicebox · mock · …"]:::engine
     audio["audio WAV"]:::output
 
     text --> speaker

@@ -11,7 +11,7 @@
 
 
 **Professional text-to-speech — offline and streaming, with voice cloning and a
-built-in evaluation gate — over a local TTS engine
+built-in evaluation gate — over a local Speech Synthesis engine
 ([Voicebox](https://github.com/jamiepine/voicebox) by default).**
 
 speaker-helper is the counterpart of
@@ -50,7 +50,7 @@ flowchart LR
         speaker["Speaker<br/>offline · streaming · clone"]:::core
         eval["evaluation<br/>RTF · anomalies · WER/chrF"]:::eval
     end
-    engine["TTS engine<br/>voicebox · mock · …"]:::engine
+    engine["Speech Synthesis engine<br/>voicebox · mock · …"]:::engine
     audio["WAV audio"]:::output
 
     text --> speaker

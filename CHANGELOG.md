@@ -4,6 +4,11 @@ All notable changes to speaker-helper are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project aims to adhere
 to [Semantic Versioning](https://semver.org/).
 
+## [0.7.3] — 2026-07-14
+
+### Documentation
+- Finalize suite wording: use plain-language capability names (Speech Synthesis) in the description and README instead of tool-specific acronyms, for consistency across the suite.
+
 ## [0.7.2] — 2026-07-14
 
 ### Maintenance
