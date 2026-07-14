@@ -44,6 +44,12 @@ anglaise.
 
 ---
 
+# Documentation
+
+[💻 Documentation](https://harchaoui.org/warith/ai-helpers/docs/speaker-helper-doc/)
+
+[📋 Exemples](https://github.com/warith-harchaoui/speaker-helper/blob/main/EXAMPLES.md)
+
 ## Fonctionnement
 
 ```mermaid

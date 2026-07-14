@@ -41,6 +41,12 @@ readme.
 
 ---
 
+# Documentation
+
+[💻 Documentation](https://harchaoui.org/warith/ai-helpers/docs/speaker-helper-doc/)
+
+[📋 Examples](https://github.com/warith-harchaoui/speaker-helper/blob/main/EXAMPLES.md)
+
 ## How it fits together
 
 ```mermaid
