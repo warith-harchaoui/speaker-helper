@@ -67,7 +67,7 @@ from speaker_helper.types import (
     VoiceSample,
 )
 
-__version__ = "0.7.1"
+__version__ = "0.7.4"
 
 # Explicit, sorted public API: only these names are re-exported from the
 # package root; the sub-modules above hold the implementation.

@@ -2,6 +2,7 @@
 
 [🇫🇷](https://github.com/warith-harchaoui/speaker-helper/blob/main/LISEZMOI.md) · [🇬🇧](https://github.com/warith-harchaoui/speaker-helper/blob/main/README.md)
 
+[![CI](https://github.com/warith-harchaoui/speaker-helper/actions/workflows/ci.yml/badge.svg)](https://github.com/warith-harchaoui/speaker-helper/actions/workflows/ci.yml) [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](LICENSE) [![Python](https://img.shields.io/badge/python-3.10%E2%80%933.13-blue.svg)](#)
 
 `Speaker Helper` belongs to a collection of libraries called `AI Helpers` developed for building Artificial Intelligence.
 
@@ -39,9 +40,7 @@ See [`EXAMPLES.md`](https://github.com/warith-harchaoui/speaker-helper/blob/main
 ([FR](https://github.com/warith-harchaoui/speaker-helper/blob/main/docs/tech-report.fr.md)), and [`LISEZMOI.md`](https://github.com/warith-harchaoui/speaker-helper/blob/main/LISEZMOI.md) for the French
 readme.
 
----
-
-# Documentation
+## Documentation
 
 [💻 Documentation](https://harchaoui.org/warith/ai-helpers/docs/speaker-helper-doc/)
 
@@ -77,20 +76,32 @@ speaker-helper at it.
 
 ---
 
-## Install
+## Installation
 
-### 1. System dependencies: libsndfile + ffmpeg
+**Prerequisites** — **Python 3.10–3.13** and **git**, **libsndfile**, **ffmpeg**, cross-platform. `soundfile` needs the native `libsndfile` library, and `audio-helper` (voice-clone trimming / concatenation) uses `ffmpeg`:
 
-`soundfile` needs the native `libsndfile` library, and `audio-helper` (voice-clone
-trimming / concatenation) uses `ffmpeg`.
+- 🍎 **macOS** ([Homebrew](https://brew.sh)): `brew install python git libsndfile ffmpeg`
+- 🐧 **Ubuntu/Debian**: `sudo apt update && sudo apt install -y python3 python3-pip git libsndfile1 ffmpeg`
+- 🪟 **Windows** (PowerShell): `winget install Python.Python.3.12 Git.Git ffmpeg` (`libsndfile` is bundled with the `soundfile` wheel — no separate install).
 
-- macOS 🍎 : `brew install libsndfile ffmpeg`
-  (install `brew` thanks to [brew.sh](https://brew.sh/))
-- Ubuntu 🐧 : `sudo apt install libsndfile1 ffmpeg`
-- Windows 🪟 : `winget install ffmpeg` (`libsndfile` is bundled with the
-  `soundfile` wheel — no separate install).
+We recommend using Python environments. Check this link if you're unfamiliar with setting one up: [🥸 Tech tips](https://harchaoui.org/warith/4ml/#install).
 
-### 2. The package (conda + pip, local)
+### From source
+
+speaker-helper is **not on PyPI yet** (PyPI release coming soon). Like the other
+`*-helper` projects, it installs from git, pinned to a release tag:
+
+```bash
+# core
+pip install "git+https://github.com/warith-harchaoui/speaker-helper.git@v0.7.4"
+# with extras (server + MCP, and STT for cloning/eval round-trip):
+pip install "speaker-helper[server,stt] @ git+https://github.com/warith-harchaoui/speaker-helper.git@v0.7.4"
+```
+
+Available extras: `server` (REST API + MCP), `stt` (vocal-helper), `youtube`,
+`podcast`, `mic` (speech-to-speech sources), `eval` (DeepEval), `dev`.
+
+Or, for local development (conda + pip):
 
 ```bash
 conda create -n speaker-helper python=3.11 -y
@@ -102,27 +113,11 @@ pip install -e ".[server,stt]"      # add ",stt" to auto-transcribe clone refere
 speaker-helper is part of the **AI Helpers** ecosystem: it installs
 [`os-helper`](https://github.com/warith-harchaoui/os-helper) (logging) and
 [`audio-helper`](https://github.com/warith-harchaoui/audio-helper) (audio
-slicing/concatenation) from git automatically. The optional `stt` extra adds
+slicing/concatenation) automatically. The optional `stt` extra adds
 [`vocal-helper`](https://github.com/warith-harchaoui/vocal-helper) for
 transcribing voice-clone references and the evaluation round-trip.
 
-### Install directly from git (no PyPI yet)
-
-Like the other `*-helper` projects, speaker-helper is installed from git and
-pinned to a release tag (there is no PyPI package yet). The repository is
-private, so use SSH (or a token):
-
-```bash
-# core
-pip install "speaker-helper @ git+ssh://git@github.com/warith-harchaoui/speaker-helper.git@v0.4.0"
-# with extras (server + MCP, and STT for cloning/eval round-trip):
-pip install "speaker-helper[server,stt] @ git+ssh://git@github.com/warith-harchaoui/speaker-helper.git@v0.4.0"
-```
-
-Available extras: `server` (REST API + MCP), `stt` (vocal-helper), `youtube`,
-`podcast`, `mic` (speech-to-speech sources), `eval` (DeepEval), `dev`.
-
-### 3. A Voicebox engine
+### A Voicebox engine
 
 speaker-helper needs a running Voicebox.
 

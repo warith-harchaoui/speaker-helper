@@ -4,6 +4,13 @@ All notable changes to speaker-helper are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project aims to adhere
 to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+## [0.7.4] - 2026-07-15
+
+### Documentation
+- Harmonize README/LISEZMOI to the AI Helpers common structure (single H1, Documentation block, source install pinned to v0.7.4, PyPI-coming-soon note); no code changes.
+
 ## [0.7.3] — 2026-07-14
 
 ### Documentation
