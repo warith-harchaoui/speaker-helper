@@ -306,6 +306,10 @@ ne nécessite donc aucun moteur.
 
 ---
 
+## Auteur
+
+- [Warith HARCHAOUI](https://linkedin.com/in/warith-harchaoui)
+
 ## Remerciements
 
 Remerciements chaleureux aux contributrices, contributeurs, relectrices,

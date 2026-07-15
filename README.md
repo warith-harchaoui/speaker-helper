@@ -297,6 +297,10 @@ The fast suite drives the deterministic `mock` backend, so it needs no engine.
 
 ---
 
+## Author
+
+- [Warith HARCHAOUI](https://linkedin.com/in/warith-harchaoui)
+
 ## Acknowledgements
 
 Special thanks to the contributors, reviewers, and users who helped improve
