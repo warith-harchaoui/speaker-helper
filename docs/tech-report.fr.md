@@ -191,7 +191,7 @@ texte-seul à mesurer de l'audio ; nous *adaptons* plutôt les mesures en
 métriques DeepEval [@deepeval] sur mesure (`RealTimeFactorMetric`,
 `AudioIntegrityMetric`). Elles sont déterministes et hors-ligne — pas de LLM, de
 clé ni de réseau — si bien que les équipes qui standardisent sur DeepEval
-obtiennent les mêmes chiffres dans leur harnais existant.
+obtiennent les mêmes chiffres dans leur outillage existant.
 
 # 5. Mesures
 
