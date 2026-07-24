@@ -49,5 +49,3 @@ s.yaml
 *.secret.yaml
 
 # Generated landscape CSVs (derived from LANDSCAPE.md / PAYSAGE.md star tables)
-assets/landscape.csv
-assets/paysage.csv

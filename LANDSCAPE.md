@@ -14,6 +14,7 @@ not penalised in the abstract — the score just reflects fit to *this* niche.
 
 ## At a glance
 
+<!-- TABLE:START -->
 | Speech Synthesis | Offline / local | Streaming | Voice cloning | Multilingual | AI-pipeline ergonomics | Multi-surface | Light install |
 | --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | **speaker-helper** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
@@ -28,14 +29,17 @@ not penalised in the abstract — the score just reflects fit to *this* niche.
 | pyttsx3 | ⭐⭐⭐⭐⭐ | ⭐ | ⭐ | ⭐⭐ | ⭐⭐ | ⭐ | ⭐⭐⭐⭐⭐ |
 | gTTS | ⭐ | ⭐ | ⭐ | ⭐⭐⭐⭐ | ⭐⭐ | ⭐ | ⭐⭐⭐⭐⭐ |
 | ElevenLabs (cloud) | ⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐ |
+<!-- TABLE:END -->
 
 ## Positioning map
 
+<!-- FIGURE:START -->
 2D representation of the table above.
 
 ![Positioning map](https://raw.githubusercontent.com/warith-harchaoui/speaker-helper/main/assets/landscape.png)
 
-The map is a 2-D summary of the seven criteria, so read it as a shape, not a scoreboard. `speaker-helper` is at the top-right corner. The axes read **Horizontal — Install ↔ Cloning** and **Vertical — Offline ↔ Ergonomics**.
+The map is a 2-D summary of the seven criteria, so read it as a shape, not a scoreboard. `speaker-helper` is at the top-right corner. The axes read **Horizontal — Simplicity ↔ Versatility** and **Vertical — Stability ↔ Efficiency**.
+<!-- FIGURE:END -->
 
 ## Positioning
 

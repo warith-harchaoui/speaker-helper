@@ -15,6 +15,7 @@ pénalisé dans l'absolu — la note reflète seulement l'adéquation à *ce* cr
 
 ## En un coup d'œil
 
+<!-- TABLE:START -->
 | Synthèse vocale | Hors-ligne / local | Streaming | Clonage de voix | Multilingue | Ergonomie pipeline IA | Multi-surface | Installation légère |
 | --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | **speaker-helper** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
@@ -29,14 +30,17 @@ pénalisé dans l'absolu — la note reflète seulement l'adéquation à *ce* cr
 | pyttsx3 | ⭐⭐⭐⭐⭐ | ⭐ | ⭐ | ⭐⭐ | ⭐⭐ | ⭐ | ⭐⭐⭐⭐⭐ |
 | gTTS | ⭐ | ⭐ | ⭐ | ⭐⭐⭐⭐ | ⭐⭐ | ⭐ | ⭐⭐⭐⭐⭐ |
 | ElevenLabs (cloud) | ⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐ |
+<!-- TABLE:END -->
 
 ## Carte de positionnement
 
+<!-- FIGURE:START -->
 Représentation 2D du tableau ci-dessus.
 
 ![Carte de positionnement](https://raw.githubusercontent.com/warith-harchaoui/speaker-helper/main/assets/paysage.png)
 
-La carte est un résumé en 2D des 7 critères : à lire comme une forme, pas comme un classement. « speaker-helper » se situe dans le coin en haut à droite. Les axes se lisent **Horizontal — Installation ↔ Clonage** et **Vertical — Ligne ↔ Ergonomie**.
+La carte est un résumé en 2D des 7 critères : à lire comme une forme, pas comme un classement. « speaker-helper » se situe dans le coin en haut à droite. Les axes se lisent **Horizontal — Facile à installer ↔ Polyvalent et flexible** et **Vertical — Confortable et portable ↔ Simplicité d'utilisation**.
+<!-- FIGURE:END -->
 
 ## Positionnement
 

@@ -1,0 +1,13 @@
+Speech Synthesis,Offline / local,Streaming,Voice cloning,Multilingual,AI-pipeline ergonomics,Multi-surface,Light install
+speaker-helper,5,5,5,5,5,5,3
+Coqui XTTS,5,4,5,5,3,1,1
+Piper,5,4,1,4,3,2,5
+Kokoro,5,4,1,4,3,1,4
+Chatterbox,5,3,5,3,2,1,2
+F5-TTS,5,2,5,4,2,1,2
+OpenVoice,5,2,5,4,2,1,2
+Bark,5,2,2,4,2,1,1
+Tortoise-TTS,5,1,4,2,2,1,1
+pyttsx3,5,1,1,2,2,1,5
+gTTS,1,1,1,4,2,1,5
+ElevenLabs (cloud),1,5,5,5,3,2,3
