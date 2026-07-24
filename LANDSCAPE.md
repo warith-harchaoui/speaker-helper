@@ -38,7 +38,7 @@ not penalised in the abstract — the score just reflects fit to *this* niche.
 
 ![Positioning map](https://raw.githubusercontent.com/warith-harchaoui/speaker-helper/main/assets/landscape.png)
 
-The map is a 2-D summary of the seven criteria, so read it as a shape, not a scoreboard. `speaker-helper` is at the top-right corner. The axes read **Horizontal — Simplicity ↔ Versatility** and **Vertical — Stability ↔ Efficiency**.
+The map is a 2-D summary of the seven criteria, so read it as a shape, not a scoreboard. `speaker-helper` is at the top-right corner. The axes read **Horizontal — Compact ↔ Versatile** and **Vertical — Self-sufficient ↔ Efficient**.
 <!-- FIGURE:END -->
 
 ## Positioning
