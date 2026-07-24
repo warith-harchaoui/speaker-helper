@@ -11,44 +11,43 @@
 [![logo](assets/logo.png)](https://harchaoui.org/warith/ai-helpers)
 
 
-**Synthèse vocale professionnelle — hors-ligne et en streaming, avec clonage de
-voix et une passerelle d'évaluation intégrée — au-dessus d'un moteur de synthèse vocale local
+**Synthèse vocale professionnelle, hors-ligne et en streaming, avec clonage de
+voix et évaluation intégrée, par-dessus un moteur de synthèse vocale local
 ([Voicebox](https://github.com/jamiepine/voicebox) par défaut).**
 
 speaker-helper est le pendant de
-[`vocal-helper`](https://github.com/warith-harchaoui) : là où vocal-helper
+[`vocal-helper`](https://github.com/warith-harchaoui) : vocal-helper
 transforme la *parole en texte*, speaker-helper transforme le **texte en
-parole**. Il vous donne le même cœur au travers de **cinq surfaces** — une API
+parole**. Même cœur, exposé sur **cinq surfaces** : une API
 Python typée, une CLI, une API REST, une GUI web minimale, un serveur MCP et des
-skills Claude/OpenCode — utilisable en local (conda + pip) ou comme serveur
-Docker.
+skills Claude/OpenCode. En local (conda + pip) ou comme serveur Docker.
 
 - **Deux modes.** *Hors-ligne* (tout le texte → un audio) et *streaming*
   (découpage en phrases, faible temps jusqu'au premier son).
-- **Aiguillage automatique du moteur.** Indiquez à speaker-helper votre
-  *condition* — **temps réel en ligne** (streaming à délai borné ; la vitesse =
-  facteur temps réel, doit tourner plus vite que le temps réel) ou **hors-ligne**
-  (par lots ; la qualité est le seul objectif) — et le routeur choisit le
-  meilleur moteur + mode à partir de preuves qualité↔vitesse mesurées, avec une
-  justification qui cite les chiffres. Sans deviner.
+- **Aiguillage automatique du moteur.** Donnez votre
+  *condition* — **temps réel en ligne** (streaming à délai borné ; la vitesse se
+  mesure en facteur temps réel, le moteur doit tourner plus vite que le temps réel) ou **hors-ligne**
+  (par lots ; seule la qualité compte). Le routeur choisit le
+  meilleur moteur et le meilleur mode à partir de preuves qualité↔vitesse mesurées, avec une
+  justification chiffrée. Rien n'est deviné.
 - **Temps réel sur CPU.** Le moteur `kokoro` par défaut synthétise plus vite
   que le temps réel (RTF nettement inférieur à 1.0) — sans GPU.
-- **Agnostique du moteur.** Le moteur est un détail d'implémentation derrière un
+- **Agnostique du moteur.** Le moteur est un détail d'implémentation derrière le
   protocole `TTSEngine`. Voicebox est le défaut ; un backend `mock` déterministe
-  est fourni pour les tests et la CI, et ajouter un backend est un changement
+  couvre les tests et la CI, et ajouter un backend est un changement
   local et minime.
-- **Clonage de voix, partout.** Pointez vers un enregistrement et speaker-helper
+- **Clonage de voix, partout.** Pointez vers un enregistrement, speaker-helper
   clone la voix — dans la bibliothèque, la CLI, l'API REST et la GUI. Les
   transcriptions manquantes sont produites automatiquement avec
   [`vocal-helper`](https://github.com/warith-harchaoui).
 - **Évaluation IA intégrée.** Un jeu de données committé, des seuils versionnés
-  et des métriques de vitesse/anomalie/fidélité verrouillent la qualité en CI —
-  pas de « vibe checks ». La qualité est mesurée comme l'**intelligibilité** en
+  et des métriques de vitesse, d'anomalie et de fidélité verrouillent la qualité en CI :
+  pas de « vibe checks ». La qualité se mesure comme l'**intelligibilité** en
   aller-retour (texte→parole→texte WER/chrF).
 - **Auto-hébergé, sans Hugging Face à l'exécution.** Un bundle optionnel
   [`speaker-engines`](#moteurs-auto-hébergés-sans-hugging-face) sert chaque
-  moteur + modèle de métrique depuis votre propre serveur, si bien que les
-  moteurs tournent en environnement clos.
+  moteur et chaque modèle de métrique depuis votre propre serveur ; les
+  moteurs tournent alors en environnement clos.
 - **Tout inclus.** Bibliothèque, CLI (argparse + click), API REST, GUI web,
   serveur MCP, skills Claude/OpenCode, Docker.
 
@@ -95,7 +94,7 @@ flowchart LR
 
 speaker-helper ne parle qu'au protocole `TTSEngine`, donc le moteur concret
 (Voicebox par défaut) est interchangeable. Le **routeur** transforme une
-condition de fonctionnement en un moteur + mode concrets à partir de preuves
+condition de fonctionnement en moteur et mode concrets à partir de preuves
 mesurées ; la couche d'**évaluation** produit ces preuves. Lancez un moteur une
 fois, puis pointez speaker-helper dessus.
 
@@ -109,7 +108,7 @@ fois, puis pointez speaker-helper dessus.
 - 🐧 **Ubuntu/Debian** : `sudo apt update && sudo apt install -y python3 python3-pip git libsndfile1 ffmpeg`
 - 🪟 **Windows** (PowerShell) : `winget install Python.Python.3.12 Git.Git ffmpeg` (`libsndfile` est inclus dans le wheel `soundfile` — rien à installer).
 
-Nous recommandons d'utiliser des environnements Python. Consultez ce lien si vous ne savez pas en configurer un : [🥸 Tech tips](https://harchaoui.org/warith/4ml/#install).
+Travaillez dans un environnement Python dédié. Si vous ne savez pas en configurer un, voir [🥸 Tech tips](https://harchaoui.org/warith/4ml/#install).
 
 ### Depuis les sources
 
@@ -140,7 +139,7 @@ speaker-helper fait partie de l'écosystème **AI Helpers** : il installe
 automatiquement [`os-helper`](https://github.com/warith-harchaoui/os-helper)
 (journalisation) et
 [`audio-helper`](https://github.com/warith-harchaoui/audio-helper)
-(découpe/concaténation audio). L'extra optionnel `stt` ajoute
+(découpe et concaténation audio). L'extra optionnel `stt` ajoute
 [`vocal-helper`](https://github.com/warith-harchaoui/vocal-helper) pour
 transcrire les références de clonage et l'aller-retour d'évaluation.
 
@@ -149,13 +148,13 @@ transcrire les références de clonage et l'aller-retour d'évaluation.
 speaker-helper a besoin d'un Voicebox en fonctionnement.
 
 - **Apple Silicon (recommandé) : Voicebox natif MLX sur `:17493`.** Il utilise
-  le **GPU** Apple et est nettement plus rapide (bien sous le temps réel). C'est
-  le port par défaut de speaker-helper — aucun override nécessaire. Note :
+  le **GPU** Apple et va nettement plus vite (bien sous le temps réel). C'est
+  le port par défaut de speaker-helper, aucun override nécessaire. À noter :
   Docker sur macOS n'a **pas de passthrough GPU/Metal**, seul le build natif
-  bénéficie du GPU.
-- **CPU / Docker sur `:17600`** (portable, sans GPU) : bien pour la
-  fonctionnalité ; le facteur temps réel est à la limite et sensible à la charge
-  sur CPU (voir [`BENCHMARKS.md`](BENCHMARKS.md)).
+  profite du GPU.
+- **CPU / Docker sur `:17600`** (portable, sans GPU) : suffisant pour la
+  fonctionnalité ; sur CPU, le facteur temps réel est à la limite et sensible à la charge
+  (voir [`BENCHMARKS.md`](BENCHMARKS.md)).
 
 ```bash
 git clone https://github.com/jamiepine/voicebox && cd voicebox
@@ -169,10 +168,10 @@ ou `SPEAKER_HELPER_VOICEBOX_PORT`).
 
 Par défaut, le serveur de moteurs télécharge les poids des modèles depuis
 Hugging Face à la première utilisation. Pour une machine de production ou en
-environnement clos, vous pouvez à la place servir chaque moteur — **et les
-modèles « métriques » de l'évaluation** — depuis des archives auto-hébergées, si
-bien que rien n'est récupéré depuis Hugging Face à l'exécution. Le bundle est
-livré en **plusieurs petits zips** (un par moteur TTS + un pour les modèles de
+environnement clos, vous pouvez servir chaque moteur — **et les
+modèles « métriques » de l'évaluation** — depuis des archives auto-hébergées ;
+rien n'est alors récupéré depuis Hugging Face à l'exécution. Le bundle est
+livré en **plusieurs petits zips** (un par moteur TTS, un pour les modèles de
 métriques) : vous ne téléchargez que ce que vous utilisez, et chaque zip se
 décompresse dans la même arborescence `speaker-engines/` :
 
@@ -188,7 +187,7 @@ export HF_HUB_OFFLINE=1                                      # ne contacte jamai
 ```
 
 Les zips se construisent une fois avec les scripts de `~/speaker-engines/` (voir
-son `README.md`) ; côté exécution, seules les deux variables d'environnement
+son `README.md`) ; à l'exécution, seules les deux variables d'environnement
 ci-dessus sont nécessaires.
 
 ---
@@ -212,8 +211,8 @@ print(f"{result.duration_s:.2f}s d'audio, RTF {result.rtf:.2f}")
 
 La commande principale `speaker-helper` est un groupe
 [click](https://click.palletsprojects.com) ; le front-end argparse de la
-bibliothèque standard reste disponible sous `speaker-helper-argparse` (mêmes
-sous-commandes). Les options globales précèdent la sous-commande
+bibliothèque standard reste disponible sous `speaker-helper-argparse`, avec les mêmes
+sous-commandes. Les options globales précèdent la sous-commande
 (`speaker-helper --backend mock synth …`).
 
 ```bash
@@ -240,13 +239,13 @@ Le serveur, en plus :
 
 - sert une **GUI web minimale** à `/` (une page vanilla-JS + Tailwind sans
   dépendance pour la synthèse, le streaming, les voix, le clonage et le
-  routeur) — ouvrez simplement `http://localhost:8080/` ;
+  routeur) : ouvrez `http://localhost:8080/` ;
 - expose `POST /route` (le routeur de moteurs) aux côtés de `/synth`,
   `/synth/stream`, `/voices` et `/clone` ;
 - monte un endpoint **Model Context Protocol** à `/mcp` (via
   [`fastapi-mcp`](https://github.com/tadata-org/fastapi-mcp), inclus dans l'extra
   `server`), qui expose `synth`, `synth_stream`, `clone_voice`, `list_voices`,
-  `route` et `health` comme outils MCP qu'un assistant peut appeler directement.
+  `route` et `health` comme outils MCP qu'un assistant appelle directement.
 
 Ou avec Docker (le serveur pointe vers un Voicebox sur l'hôte) :
 
@@ -260,21 +259,21 @@ docker compose up --build            # API speaker-helper sur :8080
 
 La couche d'évaluation *mesure* la qualité et la vitesse ; le **routeur** agit
 sur ces preuves. Vous énoncez une **condition** de fonctionnement et il renvoie
-un moteur + mode concrets, justifiés par les chiffres — jamais une supposition.
+un moteur et un mode concrets, justifiés par les chiffres, jamais devinés.
 
-- **`online_realtime`** — streaming à délai borné. La vitesse est le **facteur
+- **`online_realtime`** — streaming à délai borné. La vitesse se mesure en **facteur
   temps réel (RTF)** : le moteur doit synthétiser *plus vite que le temps réel*
   (`RTF < 1`), avec une marge pour le temps jusqu'au premier son et la gigue
   (plafond `0.8`). Parmi les moteurs qui tiennent le rythme, le routeur
   **maximise la qualité** sur le front de Pareto qualité↔RTF, et sélectionne le
   streaming avec des réglages à faible TTFA.
-- **`offline`** — par lots. Il n'y a aucune contrainte temps réel, donc **la
-  qualité est le seul objectif** : le moteur de plus haute qualité l'emporte, la
+- **`offline`** — par lots. Aucune contrainte temps réel, donc **seule la
+  qualité compte** : le moteur de plus haute qualité l'emporte, la
   vitesse est ignorée.
 
-La qualité est mesurée comme l'**intelligibilité** en aller-retour
+La qualité se mesure comme l'**intelligibilité** en aller-retour
 (texte→parole→texte WER/chrF via `vocal-helper`) ou, tant qu'un moteur n'est pas
-mesuré, un prior hérité — chaque décision indique lequel (`quality_source`) et un
+mesuré, comme un prior hérité. Chaque décision indique lequel (`quality_source`) et porte un
 flag de `confidence`.
 
 ```python
@@ -293,15 +292,15 @@ speaker-helper route --condition online_realtime --language fr
 speaker-helper route --condition offline --json decision.json
 ```
 
-Les nouveaux moteurs sont caractérisés dans l'*étude* compagne (RTF / MOS /
-similarité de locuteur mesurés) et réinjectés ici comme données — la boîte à
+Les nouveaux moteurs sont caractérisés dans l'*étude* compagne (RTF, MOS et
+similarité de locuteur mesurés) et réinjectés ici comme données : la boîte à
 outils aiguille, l'étude mesure.
 
 ---
 
 ## Clonage de voix
 
-Pointez vers un enregistrement et speaker-helper clone la voix — dans la
+Pointez vers un enregistrement, speaker-helper clone la voix — dans la
 bibliothèque, la CLI et l'API REST. Si vous ne fournissez pas de transcription
 de la référence, elle est produite automatiquement avec
 [`vocal-helper`](https://github.com/warith-harchaoui) (installez l'extra `stt`).
@@ -322,18 +321,18 @@ speaker-helper --port 17600 --clone-audio ma_voix.wav synth "Bonjour." -o out.wa
 ```
 
 Un audio de référence plus long que la limite du moteur (Voicebox : 30 s) est
-automatiquement tronqué (via
-[`audio-helper`](https://github.com/warith-harchaoui/audio-helper)) et
-re-transcrit pour que l'audio et le texte restent alignés.
+tronqué automatiquement (via
+[`audio-helper`](https://github.com/warith-harchaoui/audio-helper)) puis
+re-transcrit, pour que l'audio et le texte restent alignés.
 
 ---
 
 ## Speech-to-speech (re-voicing)
 
 Importez de l'audio depuis les paquets sources de l'écosystème AI Helpers et
-re-voicez-le — transcrit avec
-[`vocal-helper`](https://github.com/warith-harchaoui) puis re-synthétisé
-(éventuellement dans une voix clonée ou une autre langue) :
+re-voicez-le : transcrit avec
+[`vocal-helper`](https://github.com/warith-harchaoui) puis re-synthétisé,
+au besoin dans une voix clonée ou une autre langue :
 
 ```python
 import asyncio
@@ -363,8 +362,8 @@ Les sources sont des extras optionnels : `youtube` (`youtube-helper`), `podcast`
 ## Évaluation (pas de « vibe checks »)
 
 La qualité est verrouillée, pas devinée. `speaker-helper eval` exécute le moteur
-sur un jeu de données committé et vérifie des seuils versionnés — **synthèse plus
-rapide que le temps réel**, **zéro anomalie audio** (vide / saturé / durée
+sur un jeu de données committé et vérifie des seuils versionnés : **synthèse plus
+rapide que le temps réel**, **zéro anomalie audio** (vide, saturé, durée
 aberrante) et, avec un transcripteur branché, un **aller-retour** WER/chrF. Il
 sort avec un code non nul quand la barre n'est pas atteinte, ce qui verrouille la
 CI.
@@ -378,14 +377,14 @@ speaker-helper --port 17600 --engine kokoro eval --json report.json
 ```
 
 L'évaluation cible le `Speaker` agnostique du moteur, donc la même passerelle
-évalue le backend `mock` en CI ou un vrai moteur en local — seul `--backend`
+évalue le backend `mock` en CI ou un vrai moteur en local ; seul `--backend`
 change.
 
 Pour les équipes qui standardisent sur un framework, l'extra `eval` ajoute un
 pont [DeepEval](https://github.com/confident-ai/deepeval)
-(`RealTimeFactorMetric`, `AudioIntegrityMetric` et `RoundTripIdempotenceMetric`
-— le contrôle chrF texte→parole→texte) qui rapporte les mêmes mesures comme
-métriques DeepEval — déterministe et hors-ligne.
+(`RealTimeFactorMetric`, `AudioIntegrityMetric` et `RoundTripIdempotenceMetric`,
+le contrôle chrF texte→parole→texte) qui rapporte les mêmes mesures comme
+métriques DeepEval, de façon déterministe et hors-ligne.
 
 ---
 
@@ -404,7 +403,7 @@ l'environnement au chargement.
 
 Le répertoire `skills/` contient des [skills Claude /
 OpenCode](https://docs.claude.com/en/docs/agents-and-tools/agent-skills)
-portables, si bien qu'un assistant peut piloter speaker-helper directement :
+portables, qui laissent un assistant piloter speaker-helper directement :
 
 - `speaker-helper-synthesize` — texte → parole (hors-ligne + streaming), voix ;
 - `speaker-helper-clone-voice` — clone une voix depuis un enregistrement de
@@ -412,9 +411,9 @@ portables, si bien qu'un assistant peut piloter speaker-helper directement :
 - `speaker-helper-choose-engine` — le routeur (choisir un moteur par condition
   et qualité↔vitesse).
 
-Copiez un dossier de skill dans `~/.claude/skills/` (ou le
-`.claude/skills/` de votre projet, ou le répertoire de skills d'OpenCode) —
-aucune modification nécessaire ; le format est partagé.
+Copiez un dossier de skill dans `~/.claude/skills/` (ou dans le
+`.claude/skills/` de votre projet, ou dans le répertoire de skills d'OpenCode).
+Aucune modification nécessaire, le format est partagé.
 
 ---
 
@@ -431,8 +430,8 @@ speaker-helper --backend mock eval    # exécute la passerelle d'évaluation en 
 
 La CI exécute ruff (lint + format) et la suite rapide avec couverture verrouillée
 (`--cov-fail-under=70`) sur Python 3.10–3.13 ; un test qui échoue bloque les
-fusions. La suite rapide pilote le backend `mock` déterministe, elle ne nécessite
-donc aucun moteur.
+fusions. La suite rapide pilote le backend `mock` déterministe : elle ne nécessite
+aucun moteur.
 
 ---
 
@@ -442,8 +441,8 @@ donc aucun moteur.
 
 ## Remerciements
 
-Remerciements chaleureux aux contributrices, contributeurs, relectrices,
-relecteurs et utilisateurs qui ont aidé à améliorer ce projet — ainsi qu'aux
+Merci aux contributrices, contributeurs, relectrices,
+relecteurs et utilisateurs qui ont aidé à améliorer ce projet, ainsi qu'aux
 auteurs de [Voicebox](https://github.com/jamiepine/voicebox), le moteur sur
 lequel speaker-helper s'appuie.
 

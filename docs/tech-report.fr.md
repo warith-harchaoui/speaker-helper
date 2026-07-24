@@ -11,28 +11,28 @@ lang: fr
 
 Speaker Helper transforme du texte en parole sur votre propre machine. C'est le
 pendant « sortie » de Vocal Helper (parole → texte) dans l'écosystème AI
-Helpers [@aihelpers], et il enveloppe un moteur de synthèse vocale *local* —
+Helpers [@aihelpers] : il enveloppe un moteur de synthèse vocale *local* —
 Voicebox [@voicebox] exécutant le modèle Kokoro [@kokoro] par défaut — derrière
 une petite API Python typée, une CLI, une API REST et un serveur Model Context
 Protocol [@mcp]. Deux partis pris traversent tout le système. D'abord, **le
-moteur est un détail d'implémentation** : chaque composant parle à un protocole
+moteur est un détail d'implémentation** : chaque composant parle au protocole
 `TTSEngine`, si bien que Voicebox n'est qu'un backend parmi d'autres et qu'un
 backend `mock` déterministe rend le paquet (et son évaluation) exécutable en CI
 sans serveur. Ensuite, **la qualité se mesure, elle ne se décrète pas** : un jeu
 de données committé, des seuils versionnés et des métriques propres à l'audio
-(facteur temps réel, anomalies de signal et — avec un transcripteur — un
+(facteur temps réel, anomalies de signal et, avec un transcripteur, un
 aller-retour WER / chrF [@popovic2015chrf]) verrouillent le projet comme des
 tests unitaires verrouillent du code ordinaire. Ces mêmes preuves mesurées
 alimentent un **routeur de backends** qui transforme une *condition* de
-fonctionnement (temps réel en ligne ou hors-ligne) en un moteur + mode concrets
-avec une justification qui cite les chiffres, et toute la pile peut tourner avec
-des **modèles de moteurs et de métriques auto-hébergés**, si bien que rien n'est
+fonctionnement (temps réel en ligne ou hors-ligne) en moteur et mode concrets
+avec une justification chiffrée, et toute la pile peut tourner avec
+des **modèles de moteurs et de métriques auto-hébergés** : rien n'est alors
 récupéré depuis Hugging Face à l'exécution. Nous décrivons l'architecture, le
 pipeline de streaming producteur/consommateur, le clonage de voix, les sources
 speech-to-speech, la couche d'évaluation et le routeur, puis nous rapportons des
 mesures multilingues : sur Apple Silicon, le backend natif MLX [@mlx] synthétise
 Kokoro **6 à 8× plus vite que le temps réel** en français, anglais et espagnol,
-alors que le même moteur sur CPU-dans-Docker est à la limite et sensible à la
+tandis que le même moteur sur CPU-dans-Docker est à la limite et sensible à la
 charge.
 
 # 1. Objectifs et non-objectifs
@@ -44,17 +44,17 @@ charge.
   un serveur MCP et des skills Claude/OpenCode qu'un développeur seul ou une
   petite équipe peut adopter sans contexte privé.
 - **Indépendance vis-à-vis du moteur.** Rien au-dessus de la frontière backend
-  ne doit dépendre d'un moteur concret. Ajouter ou remplacer un backend est un
+  ne doit dépendre d'un moteur concret. Ajouter ou remplacer un backend reste un
   changement local.
 - **Deux modes de synthèse.** *Hors-ligne* (tout le texte → un audio, optimise
   le débit) et *streaming* (découpé en phrases, optimise le temps jusqu'au
   premier son).
-- **Clonage de voix trivial** — pointez vers un enregistrement ; la
+- **Clonage de voix trivial** : pointez vers un enregistrement, la
   transcription est produite automatiquement si elle manque.
-- **Une passerelle d'évaluation de premier plan** — vitesse et intégrité du
+- **Une passerelle d'évaluation de premier plan** : vitesse et intégrité du
   signal toujours, fidélité quand un transcripteur est disponible ; branchée à
   la CI via un code de sortie.
-- **Local-first et sans coût à l'inférence** — pas d'API hébergée, pas
+- **Local-first et sans coût à l'inférence** : pas d'API hébergée, pas
   d'exfiltration de données.
 
 ## 1.2 Non-objectifs
@@ -88,7 +88,7 @@ votre texte ──▶ Speaker (hors-ligne · streaming · clone) ──TTSEngine
 - **Interfaces** : CLI (`cli.py`), API REST + MCP (`api.py`, [@fastapi; @fastapimcp]).
 - **Évaluation** (`eval/`) : jeux de données, métriques, seuils, runner, priors,
   pont DeepEval [@deepeval], pilote multilingue.
-- **Colle écosystème** : journalisation via `os-helper`, découpe/concaténation
+- **Colle écosystème** : journalisation via `os-helper`, découpe et concaténation
   audio via `audio-helper`, transcription via Vocal Helper [@aihelpers].
 
 ## 2.1 Format d'échange
@@ -96,7 +96,7 @@ votre texte ──▶ Speaker (hors-ligne · streaming · clone) ──TTSEngine
 L'audio traverse la frontière moteur sous forme d'une charge WAV `bytes` en
 mémoire, plus les métadonnées nécessaires pour l'enregistrer, le streamer ou le
 *mesurer*. Le facteur temps réel (RTF), quantité centrale de l'étude, vaut
-`compute_s / duration_s` : sous `1.0`, c'est plus rapide que le temps réel. Il
+`compute_s / duration_s` : sous `1.0`, la synthèse est plus rapide que le temps réel. Il
 est dérivé de l'`AudioResult`, jamais deviné.
 
 # 3. Conception par composant
@@ -108,9 +108,9 @@ est dérivé de l'`AudioResult`, jamais deviné.
 idempotent d'un *profil* (voix preset ou clonée), un chemin synchrone
 `POST /generate/stream` avec repli transparent vers le chemin asynchrone
 `/generate` qui déclenche le téléchargement du modèle au premier appel, et des
-retries avec backoff exponentiel sur les échecs transitoires (transport / 5xx).
+retries avec backoff exponentiel sur les échecs transitoires (transport, 5xx).
 Le backend `mock` rend un signal sinusoïdal déterministe dont la durée suit la
-longueur d'entrée et dont le `compute_s` reproduit un RTF configuré — assez pour
+longueur d'entrée et dont le `compute_s` reproduit un RTF configuré : assez pour
 exercer chaque chemin de code, y compris les détections d'anomalies de
 l'évaluation, sans serveur.
 
@@ -127,12 +127,12 @@ jusqu'au premier son (TTFA) et le débit :
   morceau aussi petit que possible, donc le premier son est émis au plus tôt.
 - `stream_concurrency` (parallélisme consommateur) — le défaut `1` est un
   pipeline strict : comme un moteur rapide synthétise chaque morceau suivant
-  avant la fin de lecture du précédent, le TTFA est minimal sans affamer la
+  avant la fin de lecture du précédent, le TTFA reste minimal sans affamer la
   lecture.
 
 Concrètement, Kokoro synthétisant bien en deçà du temps réel, le pipeline strict
 (`stream_concurrency = 1`) atteint le premier son en ≈ 0,8 s, contre ≈ 2,7 s
-quand un premier lot plus grand est synthétisé avant toute émission — d'où le
+quand un premier lot plus grand est synthétisé avant toute émission. D'où le
 défaut faible latence : granularité producteur plus fine et consommateur strict.
 Ces boutons, avec le choix de voix et de moteur, forment le *profil de
 fonctionnement* par langue du §5.3.
@@ -143,8 +143,8 @@ Le clonage est uniforme entre la bibliothèque, la CLI et l'API REST. L'appelant
 fournit un ou plusieurs enregistrements de référence ; l'audio trop long est
 tronqué à la limite du moteur avec `audio-helper`, et une transcription
 manquante est produite avec Vocal Helper puis mise en cache dans un fichier
-voisin. Une référence prête à l'emploi est livrée par défaut, si bien que
-`--clone` seul produit une voix clonée. Le clonage est exposé sur le protocole
+voisin. Une référence prête à l'emploi est livrée par défaut : `--clone` seul
+produit donc une voix clonée. Le clonage passe par le protocole
 `TTSEngine`, donc un backend incapable de cloner échoue explicitement plutôt que
 silencieusement.
 
@@ -152,16 +152,16 @@ silencieusement.
 
 `sources.py` boucle la chaîne speech-to-speech : `from_youtube` [@ytdlp],
 `from_podcast` et `from_microphone` font entrer de l'audio, et `revoice` le
-transcrit (Vocal Helper) puis reparle la transcription via un `Speaker` — dans
+transcrit (Vocal Helper) puis reparle la transcription via un `Speaker`, dans
 une voix clonée ou une autre langue. Tous les imports tiers sont paresseux et
-derrière des extras optionnels, si bien que le cœur reste léger.
+derrière des extras optionnels : le cœur reste léger.
 
 # 4. Méthodologie d'évaluation
 
 Le contrat du projet interdit les « vibe checks » : tout ce qui est IA doit
 franchir une barre committée. L'évaluation cible le `Speaker` agnostique du
 moteur, si bien que la même passerelle évalue le backend `mock` en CI ou un vrai
-moteur en local — seul `backend` change.
+moteur en local ; seul `backend` change.
 
 ## 4.1 Métriques
 
@@ -171,7 +171,7 @@ Toutes les métriques sont en Python pur et sans dépendance au cœur :
 - **Anomalies de signal.** `detect_anomalies` signale, à partir du seul audio,
   `empty_audio`, `invalid_sample_rate`, `clipping` (un échantillon à pleine
   échelle) et `duration_too_short` / `duration_too_long` (caractères par seconde
-  hors d'une bande plausible — troncature ou étirement aberrant). C'est le *taux*
+  hors d'une bande plausible, signe d'une troncature ou d'un étirement aberrant). C'est le *taux*
   d'anomalie qui est verrouillé.
 - **Aller-retour de fidélité (optionnel).** Quand un transcripteur est injecté,
   l'audio est re-transcrit et comparé au texte de référence par le **taux
@@ -183,11 +183,11 @@ Toutes les métriques sont en Python pur et sans dépendance au cœur :
 ## 4.2 Seuils, priors et sélection de Pareto
 
 La barre pass/fail vit dans un `thresholds.yaml` committé : RTF `< 1.0` (moyenne
-et p95), taux d'anomalie nul toléré, et — seulement si un transcripteur tourne —
+et p95), taux d'anomalie nul toléré, et, seulement si un transcripteur tourne,
 des seuils WER/chrF. Un axe qualité est *toujours* rapporté : chrF mesuré quand
-disponible, sinon un **prior** par moteur dans `[0, 1]`, si bien que la sélection
-vitesse↔qualité fonctionne sans transcripteur. `pareto_front` extrait les points
-non dominés sur le plan qualité↔RTF [@deb2001multiobjective] — la réponse
+disponible, sinon un **prior** par moteur dans `[0, 1]` ; la sélection
+vitesse↔qualité fonctionne donc sans transcripteur. `pareto_front` extrait les points
+non dominés sur le plan qualité↔RTF [@deb2001multiobjective], la réponse
 opérationnelle à « quel réglage livrer ? ».
 
 ## 4.3 Un pont DeepEval
@@ -195,9 +195,9 @@ opérationnelle à « quel réglage livrer ? ».
 Comme les mesures sont propres à l'audio, nous ne forçons pas un framework
 texte-seul à mesurer de l'audio ; nous *adaptons* plutôt les mesures en
 métriques DeepEval [@deepeval] sur mesure (`RealTimeFactorMetric`,
-`AudioIntegrityMetric` et `RoundTripIdempotenceMetric` — le contrôle chrF
+`AudioIntegrityMetric` et `RoundTripIdempotenceMetric`, le contrôle chrF
 texte→parole→texte). Elles sont déterministes et hors-ligne — pas de LLM, de clé
-ni de réseau — si bien que les équipes qui standardisent sur DeepEval obtiennent
+ni de réseau — et les équipes qui standardisent sur DeepEval retrouvent ainsi
 les mêmes chiffres dans leur outillage existant.
 
 ## 4.4 Aiguillage des backends
@@ -205,7 +205,7 @@ les mêmes chiffres dans leur outillage existant.
 La couche d'évaluation *mesure* la qualité et la vitesse ; le **routeur**
 (`speaker_helper.router` : `route`, `RouteRequest`, `RouteDecision`,
 `Speaker.from_route`) *agit* sur ces preuves. L'appelant énonce une **condition**
-de fonctionnement et le routeur renvoie un moteur + mode concrets, justifiés par
+de fonctionnement et le routeur renvoie un moteur et un mode concrets, justifiés par
 les chiffres plutôt que devinés :
 
 - **`online_realtime`** — streaming à délai borné. La vitesse est le **facteur
@@ -215,16 +215,16 @@ les chiffres plutôt que devinés :
   Parmi les moteurs qui tiennent le rythme, le routeur **maximise la qualité**
   sur le front de Pareto qualité↔RTF [@deb2001multiobjective] et sélectionne le
   streaming avec des réglages à faible TTFA.
-- **`offline`** — par lots. Il n'y a aucune contrainte temps réel, donc **la
-  qualité est le seul objectif** : le moteur de plus haute qualité l'emporte et
+- **`offline`** — par lots. Aucune contrainte temps réel, donc **seule la
+  qualité compte** : le moteur de plus haute qualité l'emporte et
   la vitesse est ignorée.
 
 La qualité est l'**intelligibilité** en aller-retour (texte→parole→texte
 WER/chrF) quand un moteur a été mesuré, sinon un prior hérité par moteur ; chaque
-`RouteDecision` indique lequel via `quality_source` (mesuré vs prior), porte un
-flag de `confidence` et une `justification` qui cite les chiffres. Les nouveaux
-moteurs sont caractérisés dans l'étude compagne et réinjectés ici comme données,
-si bien que le routeur s'améliore à mesure que les preuves grandissent, sans
+`RouteDecision` indique lequel via `quality_source` (mesuré ou prior), porte un
+flag de `confidence` et une `justification` chiffrée. Les nouveaux
+moteurs sont caractérisés dans l'étude compagne et réinjectés ici comme données :
+le routeur s'améliore à mesure que les preuves grandissent, sans
 aucun changement de code.
 
 ## 4.5 Moteurs auto-hébergés (sans Hugging Face)
@@ -235,8 +235,8 @@ environnement clos, un bundle optionnel `speaker-engines` (hébergé à
 `https://harchaoui.org/warith/speaker-engines/`) sert chaque moteur TTS — **et les
 modèles de métriques de l'évaluation** — depuis une seule archive auto-hébergée.
 Le consommateur le télécharge et le décompresse, puis pointe l'exécution dessus
-avec `VOICEBOX_MODELS_DIR=$HOME/speaker-engines/tts` et `HF_HUB_OFFLINE=1`, si
-bien que rien n'est récupéré depuis Hugging Face à l'exécution.
+avec `VOICEBOX_MODELS_DIR=$HOME/speaker-engines/tts` et `HF_HUB_OFFLINE=1` : rien
+n'est alors récupéré depuis Hugging Face à l'exécution.
 
 # 5. Mesures
 
@@ -270,13 +270,13 @@ mesure ≈ 0,32–0,37 (réussite), mais sous contention il grimpe au-dessus de 
 Docker sur macOS n'a **pas de passthrough GPU/Metal**, ce qui explique l'écart
 d'environ ×8 avec le §5.1. Point crucial : *la qualité et l'intégrité tiennent
 dans les deux régimes* (zéro anomalie partout) ; seule la vitesse manque la
-barre sur CPU chargé — exactement ce que la passerelle doit détecter.
+barre sur CPU chargé, exactement ce que la passerelle doit détecter.
 
 ## 5.3 Profils de fonctionnement par langue
 
-`LanguageProfile` regroupe la voix/moteur d'une langue et ses boutons
+`LanguageProfile` regroupe la voix et le moteur d'une langue et ses boutons
 producteur/consommateur avec un **point de fonctionnement mesuré**.
-`tune_profiles` mesure un ensemble de langues et réinjecte le RTF/qualité de
+`tune_profiles` mesure un ensemble de langues et réinjecte le RTF et la qualité de
 chaque rapport dans son profil. Les défauts livrés portent les chiffres de
 référence du §5.1 (M2 Max, natif MLX) ; un autre hôte les recalibre en un appel.
 
@@ -290,23 +290,23 @@ Le même cœur est exposé au travers de cinq surfaces :
   `synth`, `voices`, `clone`, `route`, `eval` (avec `--languages` pour une
   matrice), `speak-from` (speech-to-speech), `serve`.
 - **REST** : `GET /health`, `GET /voices`, `POST /synth`, `POST /synth/stream`
-  (Server-Sent Events, un morceau JSON par phrase [@sse]), `POST /clone`, et
+  (Server-Sent Events, un morceau JSON par phrase [@sse]), `POST /clone` et
   `POST /route` (le routeur de backends).
 - **GUI web** : une page vanilla-JS + Tailwind minimale et sans dépendance,
   servie à `/`, pour la synthèse, le streaming, les voix, le clonage et le
   routeur.
 - **MCP** [@mcp] : quand `fastapi-mcp` [@fastapimcp] est présent, les mêmes
   endpoints — y compris `route` — sont montés à `/mcp` comme outils qu'un
-  assistant peut appeler directement.
+  assistant appelle directement.
 - **Skills Claude/OpenCode** : des dossiers de skills portables dans `skills/`
   (`speaker-helper-synthesize`, `speaker-helper-clone-voice`,
-  `speaker-helper-choose-engine`) permettent à un assistant de piloter la boîte
+  `speaker-helper-choose-engine`) laissent un assistant piloter la boîte
   à outils directement.
 
 # 7. Limites et travaux futurs
 
 - Les chiffres de RTF dépendent du matériel et de la charge ; c'est
-  l'évaluation, pas une table statique, qui fait foi — relancez-la sur votre
+  l'évaluation, pas une table statique, qui fait foi : relancez-la sur votre
   hôte.
 - La fidélité a deux moitiés. Le *pipeline* WER/chrF et le *gating par seuils*
   tournent en CI avec des transcripteurs stubs déterministes (un vrai
