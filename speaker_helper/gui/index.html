@@ -1,0 +1,207 @@
+<!doctype html>
+<!--
+  speaker-helper GUI (single page).
+  Served by the speaker-helper FastAPI app at "/" (static mount, wired separately).
+  All fetches are same-origin: it talks to the same-origin speaker-helper API
+  (/health, /voices, /synth, /synth/stream, /clone, /route). No base URL, no CORS.
+  Vanilla JS + Tailwind (CDN) only — no build step, no framework.
+-->
+<html lang="en" class="h-full">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>speaker-helper</title>
+
+  <!-- Tailwind via CDN; enable class-based dark mode driven by the OS preference. -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { darkMode: "class" };
+    // Follow the OS colour scheme (dark-mode aware, no toggle needed).
+    if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+      document.documentElement.classList.add("dark");
+    }
+  </script>
+
+  <style>
+    /* Respect users who asked for reduced motion. */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+  </style>
+</head>
+
+<body class="h-full bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 antialiased">
+  <div class="mx-auto max-w-3xl px-4 py-8 space-y-8">
+
+    <!-- Header + health badge (polled once on load). -->
+    <header class="flex items-center justify-between gap-4">
+      <div>
+        <h1 class="text-2xl font-semibold tracking-tight">speaker-helper</h1>
+        <p class="text-sm text-slate-500 dark:text-slate-400">Text-to-speech toolbox</p>
+      </div>
+      <span id="health-badge"
+            class="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-1 text-sm font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+            aria-live="polite">
+        <span id="health-dot" class="h-2 w-2 rounded-full bg-slate-400"></span>
+        <span id="health-text">checking…</span>
+      </span>
+    </header>
+
+    <!-- ===================== 1. Synthesize ===================== -->
+    <section aria-labelledby="synth-h"
+             class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <h2 id="synth-h" class="text-lg font-semibold">Synthesize</h2>
+
+      <div id="synth-error" role="alert" hidden
+           class="mt-3 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300"></div>
+
+      <div class="mt-4 space-y-4">
+        <div>
+          <label for="synth-text" class="block text-sm font-medium">Text</label>
+          <textarea id="synth-text" rows="4"
+                    class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950"
+                    placeholder="Bonjour, ceci est un test.">Bonjour, ceci est un test.</textarea>
+        </div>
+
+        <div class="flex flex-wrap items-end gap-3">
+          <div>
+            <label for="synth-lang" class="block text-sm font-medium">Language</label>
+            <input id="synth-lang" type="text" value="fr"
+                   class="mt-1 w-24 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950" />
+          </div>
+          <button id="btn-speak" type="button"
+                  class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 dark:focus:ring-offset-slate-900">
+            Speak (offline)
+          </button>
+          <button id="btn-stream" type="button"
+                  class="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 disabled:opacity-50 dark:bg-slate-700 dark:hover:bg-slate-600 dark:focus:ring-offset-slate-900">
+            Stream
+          </button>
+        </div>
+
+        <p id="synth-meta" class="text-sm text-slate-500 dark:text-slate-400" aria-live="polite"></p>
+        <audio id="synth-audio" controls class="w-full" hidden></audio>
+      </div>
+    </section>
+
+    <!-- ===================== 2. Voices ===================== -->
+    <section aria-labelledby="voices-h"
+             class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <h2 id="voices-h" class="text-lg font-semibold">Voices</h2>
+
+      <div id="voices-error" role="alert" hidden
+           class="mt-3 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300"></div>
+
+      <div class="mt-4 flex flex-wrap items-end gap-3">
+        <div>
+          <label for="voices-engine" class="block text-sm font-medium">Engine</label>
+          <input id="voices-engine" type="text" value="kokoro"
+                 class="mt-1 w-40 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950" />
+        </div>
+        <button id="btn-voices" type="button"
+                class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 dark:focus:ring-offset-slate-900">
+          List voices
+        </button>
+      </div>
+
+      <div class="mt-4 overflow-x-auto">
+        <table class="min-w-full text-left text-sm">
+          <thead class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            <tr>
+              <th scope="col" class="py-2 pr-4">Voice ID</th>
+              <th scope="col" class="py-2 pr-4">Name</th>
+              <th scope="col" class="py-2 pr-4">Language</th>
+              <th scope="col" class="py-2 pr-4">Gender</th>
+              <th scope="col" class="py-2 pr-4">Engine</th>
+            </tr>
+          </thead>
+          <tbody id="voices-body" class="divide-y divide-slate-100 dark:divide-slate-800"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===================== 3. Clone voice ===================== -->
+    <section aria-labelledby="clone-h"
+             class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <h2 id="clone-h" class="text-lg font-semibold">Clone voice</h2>
+
+      <div id="clone-error" role="alert" hidden
+           class="mt-3 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300"></div>
+
+      <div class="mt-4 space-y-4">
+        <div>
+          <label for="clone-name" class="block text-sm font-medium">Name</label>
+          <input id="clone-name" type="text" placeholder="my-voice"
+                 class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950" />
+        </div>
+        <div>
+          <label for="clone-files" class="block text-sm font-medium">Reference audio</label>
+          <input id="clone-files" type="file" accept="audio/*" multiple
+                 class="mt-1 block w-full text-sm text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-indigo-600 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:text-slate-300" />
+        </div>
+        <div>
+          <label for="clone-texts" class="block text-sm font-medium">Transcripts (optional, one per line)</label>
+          <textarea id="clone-texts" rows="2"
+                    class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950"
+                    placeholder="Auto-transcribed if left empty."></textarea>
+        </div>
+        <div class="flex items-center gap-3">
+          <button id="btn-clone" type="button"
+                  class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 dark:focus:ring-offset-slate-900">
+            Clone
+          </button>
+          <p id="clone-result" class="text-sm text-slate-600 dark:text-slate-300" aria-live="polite"></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== 4. Choose engine (router) ===================== -->
+    <section aria-labelledby="route-h"
+             class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <h2 id="route-h" class="text-lg font-semibold">Choose engine (router)</h2>
+
+      <div id="route-error" role="alert" hidden
+           class="mt-3 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300"></div>
+
+      <div class="mt-4 flex flex-wrap items-end gap-3">
+        <div>
+          <label for="route-condition" class="block text-sm font-medium">Condition</label>
+          <select id="route-condition"
+                  class="mt-1 w-52 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950">
+            <option value="online_realtime">online_realtime</option>
+            <option value="offline">offline</option>
+          </select>
+        </div>
+        <div>
+          <label for="route-lang" class="block text-sm font-medium">Language</label>
+          <input id="route-lang" type="text" value="fr"
+                 class="mt-1 w-24 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950" />
+        </div>
+        <div>
+          <label for="route-ceiling" class="block text-sm font-medium">RTF ceiling</label>
+          <input id="route-ceiling" type="number" step="0.1" min="0" placeholder="0.8"
+                 class="mt-1 w-28 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950" />
+        </div>
+        <button id="btn-route" type="button"
+                class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 dark:focus:ring-offset-slate-900">
+          Route
+        </button>
+      </div>
+
+      <div id="route-card" hidden
+           class="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950"></div>
+    </section>
+
+    <footer class="pb-8 text-center text-xs text-slate-400">
+      speaker-helper — served at <code>/</code>, same-origin API.
+    </footer>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>

@@ -21,9 +21,14 @@ backend makes the package (and its evaluation) runnable in CI without a server.
 Second, **quality is measured, not asserted**: a committed dataset, versioned
 thresholds, and audio-specific metrics (real-time factor, signal anomalies,
 and — with a transcriber — a word-error / chrF round-trip [@popovic2015chrf])
-gate the project the way unit tests gate ordinary code. We describe the
-architecture, the streaming producer/consumer pipeline, voice cloning,
-speech-to-speech sources, and the evaluation layer, and we report multi-language
+gate the project the way unit tests gate ordinary code. That same measured
+evidence feeds a **backend router** that turns an operating *condition*
+(online-real-time or offline) into a concrete engine + mode with a
+number-citing justification, and the whole stack can run with **self-hosted
+engine and metric models** so nothing is fetched from Hugging Face at runtime.
+We describe the architecture, the streaming producer/consumer pipeline, voice
+cloning, speech-to-speech sources, the evaluation layer, and the router, and we
+report multi-language
 measurements: on Apple silicon the native MLX backend [@mlx] synthesises Kokoro
 **6–8× faster than real time** across French, English and Spanish, whereas the
 same engine on CPU-in-Docker is borderline and load-sensitive.
@@ -32,8 +37,9 @@ same engine on CPU-in-Docker is borderline and load-sensitive.
 
 ## 1.1 Goals
 
-- **A ready-to-use, operational toolbox**, not a study: a library, a CLI, a REST
-  API and an MCP server that a solo developer or a small team can adopt without
+- **A ready-to-use, operational toolbox**, not a study: a library, a CLI
+  (argparse + click), a REST API, a minimal web GUI, an MCP server, and
+  Claude/OpenCode skills that a solo developer or a small team can adopt without
   private context.
 - **Engine independence.** Nothing above the backend boundary may depend on a
   concrete engine. Adding or swapping a backend is a local change.
@@ -175,9 +181,44 @@ setting should I ship?".
 
 Because the measurements are audio-specific, we do not force a text-only
 framework to measure audio; instead we *adapt* the measurements as DeepEval
-[@deepeval] custom metrics (`RealTimeFactorMetric`, `AudioIntegrityMetric`).
-They are deterministic and offline — no LLM, key, or network — so teams that
-standardise on DeepEval get the same numbers inside their existing harness.
+[@deepeval] custom metrics (`RealTimeFactorMetric`, `AudioIntegrityMetric`, and
+`RoundTripIdempotenceMetric` — the text→speech→text chrF check). They are
+deterministic and offline — no LLM, key, or network — so teams that standardise
+on DeepEval get the same numbers inside their existing harness.
+
+## 4.4 Backend routing
+
+The evaluation layer *measures* quality and speed; the **router**
+(`speaker_helper.router`: `route`, `RouteRequest`, `RouteDecision`,
+`Speaker.from_route`) *acts* on that evidence. The caller states an operating
+**condition** and the router returns a concrete engine + mode, justified by the
+numbers rather than guessed:
+
+- **`online_realtime`** — delay-bounded streaming. Speed is the **real-time
+  factor (RTF)** and defines a hard feasibility boundary: an engine is admissible
+  only if it synthesises *faster than real time* (`RTF < 1`), with a margin for
+  time-to-first-audio and jitter (ceiling `0.8`). Among the engines that keep up,
+  the router **maximises quality** on the quality↔RTF Pareto front [@deb2001multiobjective]
+  and selects streaming with low-TTFA knobs.
+- **`offline`** — batch. There is no real-time constraint, so **quality is the
+  only objective**: the highest-quality engine wins and speed is disregarded.
+
+Quality is round-trip **intelligibility** (text→speech→text WER/chrF) when an
+engine has been measured, else an inherited per-engine prior; every
+`RouteDecision` records which via `quality_source` (measured vs prior), carries a
+`confidence` flag, and a number-citing `justification`. New engines are
+characterised in the companion study and folded back here as data, so the router
+improves as the evidence grows without any code change.
+
+## 4.5 Self-hosted engines (no Hugging Face)
+
+By default the engine server downloads model weights from Hugging Face on first
+use. For a production or air-gapped host, an optional `speaker-engines` bundle
+(hosted at `https://harchaoui.org/warith/speaker-engines/`) serves every TTS engine —
+**and the evaluation metric models** — from a single self-hosted archive. The
+consumer downloads and unzips it, then points the runtime at it with
+`VOICEBOX_MODELS_DIR=$HOME/speaker-engines/tts` and `HF_HUB_OFFLINE=1`, so
+nothing is fetched from Hugging Face at runtime.
 
 # 5. Measurements
 
@@ -221,12 +262,24 @@ different host recalibrates them with one call.
 
 # 6. Interfaces
 
-- **CLI**: `synth`, `voices`, `clone`, `eval` (with `--languages` for a matrix),
-  `speak-from` (speech-to-speech), `serve`.
+The same core is exposed over five surfaces:
+
+- **CLI**: a primary [click](https://click.palletsprojects.com) group with global
+  options preceding the sub-command, and the standard-library argparse front-end
+  kept as `speaker-helper-argparse`. Sub-commands: `synth`, `voices`, `clone`,
+  `route`, `eval` (with `--languages` for a matrix), `speak-from`
+  (speech-to-speech), `serve`.
 - **REST**: `GET /health`, `GET /voices`, `POST /synth`, `POST /synth/stream`
-  (Server-Sent Events, one JSON chunk per sentence [@sse]), `POST /clone`.
+  (Server-Sent Events, one JSON chunk per sentence [@sse]), `POST /clone`, and
+  `POST /route` (the backend router).
+- **Web GUI**: a minimal, dependency-free vanilla-JS + Tailwind page served at
+  `/` for synth, streaming, voices, cloning, and the router.
 - **MCP** [@mcp]: when `fastapi-mcp` [@fastapimcp] is present, the same
-  endpoints are mounted at `/mcp` as tools an assistant can call directly.
+  endpoints — including `route` — are mounted at `/mcp` as tools an assistant
+  can call directly.
+- **Claude/OpenCode skills**: portable skill folders in `skills/`
+  (`speaker-helper-synthesize`, `speaker-helper-clone-voice`,
+  `speaker-helper-choose-engine`) let an assistant drive the toolbox directly.
 
 # 7. Limitations & future work
 

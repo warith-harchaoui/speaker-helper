@@ -31,6 +31,8 @@ from dataclasses import dataclass, fields
 from pathlib import Path
 from typing import Any
 
+import os_helper as osh
+
 DEFAULT_THRESHOLDS_FILE = Path(__file__).parent / "thresholds.yaml"
 
 
@@ -79,7 +81,8 @@ class Thresholds:
         """
         # No explicit path: use the bundled YAML if it exists, else fall through.
         if path is None:
-            path = DEFAULT_THRESHOLDS_FILE if DEFAULT_THRESHOLDS_FILE.is_file() else None
+            bundled = osh.file_exists(str(DEFAULT_THRESHOLDS_FILE))
+            path = DEFAULT_THRESHOLDS_FILE if bundled else None
         # Still nothing to read: the dataclass defaults are the bar.
         if path is None:
             return cls()

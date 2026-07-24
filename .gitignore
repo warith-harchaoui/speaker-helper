@@ -43,3 +43,11 @@ settings.yaml
 /.githooks/
 .secrets/
 .pypirc
+
+# Local secrets (HF token, etc.) — never commit.
+s.yaml
+*.secret.yaml
+
+# Generated landscape CSVs (derived from LANDSCAPE.md / PAYSAGE.md star tables)
+assets/landscape.csv
+assets/paysage.csv

@@ -72,6 +72,32 @@ class SynthRequest(BaseModel):
     language: str | None = Field(None, description="Override target language.")
 
 
+class RouteRequestBody(BaseModel):
+    """Request body for ``POST /route``.
+
+    Parameters
+    ----------
+    condition : str
+        ``"online_realtime"`` (delay-bounded streaming) or ``"offline"``
+        (quality-only batch).
+    language : str
+        ISO-639-1 target language driving the candidate catalogue.
+    rtf_ceiling : float
+        Online only: the ``mean_rtf`` an engine must beat to keep up (default
+        ``0.8``).
+    rtf_budget : float or None
+        Offline only: optional patience cap on ``mean_rtf``.
+    quality_floor : float or None
+        Reject candidates below this quality in either condition.
+    """
+
+    condition: str = Field(..., description="online_realtime | offline")
+    language: str = Field("fr", description="Target language (ISO-639-1).")
+    rtf_ceiling: float = Field(0.8, description="Online RTF ceiling (must keep up).")
+    rtf_budget: float | None = Field(None, description="Offline RTF patience cap.")
+    quality_floor: float | None = Field(None, description="Minimum quality to accept.")
+
+
 def create_app(settings: Settings | None = None, *, enable_mcp: bool = True) -> FastAPI:
     """Build the FastAPI application.
 
@@ -135,6 +161,33 @@ def create_app(settings: Settings | None = None, *, enable_mcp: bool = True) -> 
         """List preset voices for an engine."""
         listing = await speaker.voices(engine)
         return {"engine": listing.engine, "voices": [vars(v) for v in listing.voices]}
+
+    @app.post("/route", operation_id="route")
+    async def route_endpoint(req: RouteRequestBody) -> dict:
+        """Choose an engine + mode from measured quality↔speed evidence.
+
+        Returns the routing decision (engine, mode, streaming knobs, provenance,
+        confidence, and a number-citing justification) for the requested
+        condition — ``online_realtime`` (speed=RTF, must keep up) or ``offline``
+        (quality only). See :mod:`speaker_helper.router`.
+        """
+        # Imported here so the router stays out of the API's import-time cost.
+        from speaker_helper.router import RouteRequest, route
+
+        try:
+            decision = route(
+                RouteRequest(
+                    condition=req.condition,
+                    language=req.language,
+                    rtf_ceiling=req.rtf_ceiling,
+                    rtf_budget=req.rtf_budget,
+                    quality_floor=req.quality_floor,
+                )
+            )
+        # A bad condition or an infeasible request is the caller's fault -> 400.
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return decision.to_dict()
 
     @app.post("/synth", operation_id="synth")
     async def synth(req: SynthRequest) -> Response:
@@ -237,7 +290,36 @@ def create_app(settings: Settings | None = None, *, enable_mcp: bool = True) -> 
     if enable_mcp:
         _mount_mcp(app)
 
+    # Serve the minimal single-page GUI at ``/`` (added last so the explicit API
+    # routes above always take precedence over the static catch-all).
+    _mount_gui(app)
+
     return app
+
+
+def _mount_gui(app: FastAPI) -> None:
+    """Mount the bundled single-page GUI at ``/`` when its assets are present.
+
+    The GUI (``speaker_helper/gui/index.html`` + ``app.js``) is a dependency-free
+    vanilla-JS + Tailwind page that drives ``/synth``, ``/synth/stream``,
+    ``/voices``, ``/clone`` and ``/route`` from the browser. ``html=True`` makes
+    the mount serve ``index.html`` for ``/`` and the relative ``./app.js`` it
+    references. A no-op (with a warning) if the assets are missing from the
+    install.
+    """
+    from pathlib import Path
+
+    from fastapi.staticfiles import StaticFiles
+
+    # Resolve the packaged gui/ directory next to this module.
+    gui_dir = Path(__file__).parent / "gui"
+    if not osh.file_exists(str(gui_dir / "index.html")):
+        # Missing assets are not fatal — the JSON API works without the GUI.
+        osh.warning("GUI assets not found at %s; not serving the web UI", gui_dir)
+        return
+    # Mounted at "/" with html=True: "/" -> index.html, "/app.js" -> app.js.
+    app.mount("/", StaticFiles(directory=str(gui_dir), html=True), name="gui")
+    osh.info("GUI mounted at /")
 
 
 def _mount_mcp(app: FastAPI) -> None:

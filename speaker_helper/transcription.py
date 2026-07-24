@@ -139,7 +139,7 @@ def ensure_transcript(audio_path: str | Path, *, language: str = "fr") -> str:
     # The cache is a ``.txt`` sidecar sitting next to the audio file.
     sidecar = audio_path.with_suffix(audio_path.suffix + ".txt")
     # Fast path: a non-empty sidecar means we already transcribed this file.
-    if sidecar.is_file():
+    if osh.file_exists(str(sidecar)):
         cached = sidecar.read_text(encoding="utf-8").strip()
         if cached:
             return cached

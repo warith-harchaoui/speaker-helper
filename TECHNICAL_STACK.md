@@ -9,13 +9,17 @@ the **AI Helpers** ecosystem.
 
 ```mermaid
 flowchart TB
-    subgraph clients["Entry points"]
-        lib["Python API<br/>Speaker"]:::core
-        cli["CLI<br/>synth · voices · clone · eval · serve"]:::core
-        api["REST API<br/>/synth · /synth/stream · /clone · /voices · /health"]:::core
+    subgraph clients["Entry points (5 surfaces)"]
+        lib["Python API<br/>Speaker · route"]:::core
+        cli["CLI (argparse + click)<br/>synth · voices · clone · eval · route · serve"]:::core
+        api["REST API<br/>/synth · /synth/stream · /clone · /voices · /route · /health"]:::core
+        gui["Web GUI<br/>served at /"]:::core
+        mcp["MCP server<br/>/mcp tools"]:::core
+        skills["Claude / OpenCode<br/>skills/"]:::core
     end
 
     speaker["Speaker façade<br/>offline · streaming · clone · warmup"]:::core
+    router["router<br/>condition → engine + mode"]:::core
     text["text splitter<br/>sentence chunks → low TTFA"]:::util
 
     subgraph engines["TTSEngine protocol (backend-agnostic)"]
@@ -40,12 +44,17 @@ flowchart TB
     lib --> speaker
     cli --> speaker
     api --> speaker
+    gui --> api
+    mcp --> api
+    skills -.->|drive| cli
     speaker --> text
+    router -.->|picks engine + mode| speaker
     speaker -- "TTSEngine" --> voicebox
     speaker -- "TTSEngine" --> mock
     voicebox -->|HTTP| engine
     speaker -.->|measured by| metrics
     metrics --> priors --> thresholds
+    priors -.->|evidence| router
     speaker -.->|logging| osh
     speaker -.->|clone trim/concat| ah
     speaker -.->|clone transcript| vh
@@ -68,15 +77,17 @@ flowchart TB
 | Config | `config.py` | YAML + `${VAR}` + `SPEAKER_HELPER_*` overrides; `backend`, `clone`, `mock` |
 | Engine | `engine.py` | `TTSEngine` protocol, backend registry, `MockEngine` |
 | Backend | `client.py` | `VoiceboxClient` — presets, cloning, retries/backoff, async fallback |
-| Façade | `speaker.py` | `Speaker` — `say` / `stream` / `clone_voice` / `warmup` / `from_profile` |
+| Façade | `speaker.py` | `Speaker` — `say` / `stream` / `clone_voice` / `warmup` / `from_profile` / `from_route` |
+| Router | `router.py` | condition (`online_realtime` / `offline`) → engine + mode from measured quality↔speed evidence |
 | Profiles | `profiles.py` | per-language hyperparameters (producer/consumer) + measured RTF/quality |
 | Text | `text.py` | sentence splitting for low time-to-first-audio |
-| CLI | `cli.py` | `synth`, `voices`, `clone`, `eval`, `serve` |
-| API | `api.py` | FastAPI — offline, SSE streaming, cloning upload |
+| CLI | `cli.py` / `click_cli.py` | `synth`, `voices`, `clone`, `eval`, `speak-from`, `route`, `serve` — argparse core + click front-end (shared handlers) |
+| API | `api.py` | FastAPI — offline, SSE streaming, cloning upload, `/route`, `/mcp`, GUI at `/` |
+| GUI | `gui/` | minimal vanilla-JS + Tailwind single page (synth / stream / voices / clone / route) |
 | Cloning | `cloning.py` | clone defaults (ref-malo), trim + transcript preparation |
 | Transcription | `transcription.py` | `vocal-helper` adapter (clone transcript + eval round-trip) |
 | Sources | `sources.py` | speech-to-speech in: youtube / podcast / microphone → `revoice` |
-| Evaluation | `eval/` | dataset, metrics, priors/Pareto, thresholds, runner, DeepEval metrics |
+| Evaluation | `eval/` | dataset, metrics, priors/Pareto, thresholds, runner, DeepEval metrics (incl. round-trip idempotence) |
 
 ---
 
@@ -91,7 +102,18 @@ flowchart TB
   emitted as early as possible while later chunks are produced ahead of playback.
 - **Evaluation, not vibe checks.** A committed dataset + versioned thresholds
   gate speed (RTF), signal integrity (anomalies), and — with a transcriber —
-  fidelity (WER/chrF). The gate returns a non-zero exit code for CI.
+  fidelity (WER/chrF). The gate returns a non-zero exit code for CI. Quality is
+  round-trip **intelligibility** (text→speech→text); naturalness (MOS) and
+  speaker-similarity are measured in the companion study and fed back as data.
+- **Routing, justified by measurement.** The evaluation layer measures; the
+  `router` acts. A **condition** — `online_realtime` (speed = RTF, must beat real
+  time; maximise quality on the Pareto front among engines that keep up) or
+  `offline` (quality only) — maps to a concrete engine + mode, with provenance
+  (`quality_source`), a `confidence` flag, and a number-citing justification.
+- **Self-hosted, no Hugging Face at runtime.** An optional `speaker-engines`
+  bundle serves every engine + metric model from your own server; point
+  `VOICEBOX_MODELS_DIR` at it with `HF_HUB_OFFLINE=1` and nothing is fetched from
+  Hugging Face at runtime.
 - **Cloning made trivial.** Supply a recording; the transcript is derived with
   `vocal-helper` and over-long audio is trimmed with `audio-helper`, so a custom
   voice works from the library, CLI, and REST API alike.

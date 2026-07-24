@@ -9,6 +9,15 @@ aberrant-duration outputs.
 > **These numbers are hardware-dependent — read the conditions.** The evaluation
 > is the source of truth; re-run it on your machine.
 
+These measured RTFs are exactly the evidence the **router** (`speaker-helper
+route`) consumes: for the `online_realtime` condition it keeps only engines whose
+mean RTF beats real time (with margin) and, among those, maximises quality. The
+**quality** column here is the engine *prior* (`quality_source = prior`) because
+these runs had no transcriber. Measured quality comes from either the round-trip
+**intelligibility** check (`eval --transcribe`, WER/chrF, text→speech→text) or,
+for **naturalness**, a MOS predictor (UTMOSv2) measured in the companion study
+and folded back as `quality_source = measured_mos`.
+
 Hardware: Apple M2 Max. Engine: **kokoro** (Voicebox).
 
 ## Native MLX (Apple GPU / Metal) — `:17493` — recommended

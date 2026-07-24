@@ -22,9 +22,14 @@ sans serveur. Ensuite, **la qualité se mesure, elle ne se décrète pas** : un 
 de données committé, des seuils versionnés et des métriques propres à l'audio
 (facteur temps réel, anomalies de signal et — avec un transcripteur — un
 aller-retour WER / chrF [@popovic2015chrf]) verrouillent le projet comme des
-tests unitaires verrouillent du code ordinaire. Nous décrivons l'architecture,
-le pipeline de streaming producteur/consommateur, le clonage de voix, les
-sources speech-to-speech et la couche d'évaluation, puis nous rapportons des
+tests unitaires verrouillent du code ordinaire. Ces mêmes preuves mesurées
+alimentent un **routeur de backends** qui transforme une *condition* de
+fonctionnement (temps réel en ligne ou hors-ligne) en un moteur + mode concrets
+avec une justification qui cite les chiffres, et toute la pile peut tourner avec
+des **modèles de moteurs et de métriques auto-hébergés**, si bien que rien n'est
+récupéré depuis Hugging Face à l'exécution. Nous décrivons l'architecture, le
+pipeline de streaming producteur/consommateur, le clonage de voix, les sources
+speech-to-speech, la couche d'évaluation et le routeur, puis nous rapportons des
 mesures multilingues : sur Apple Silicon, le backend natif MLX [@mlx] synthétise
 Kokoro **6 à 8× plus vite que le temps réel** en français, anglais et espagnol,
 alors que le même moteur sur CPU-dans-Docker est à la limite et sensible à la
@@ -35,8 +40,9 @@ charge.
 ## 1.1 Objectifs
 
 - **Une boîte à outils opérationnelle, prête à l'emploi**, pas une étude : une
-  bibliothèque, une CLI, une API REST et un serveur MCP qu'un développeur seul
-  ou une petite équipe peut adopter sans contexte privé.
+  bibliothèque, une CLI (argparse + click), une API REST, une GUI web minimale,
+  un serveur MCP et des skills Claude/OpenCode qu'un développeur seul ou une
+  petite équipe peut adopter sans contexte privé.
 - **Indépendance vis-à-vis du moteur.** Rien au-dessus de la frontière backend
   ne doit dépendre d'un moteur concret. Ajouter ou remplacer un backend est un
   changement local.
@@ -189,9 +195,48 @@ opérationnelle à « quel réglage livrer ? ».
 Comme les mesures sont propres à l'audio, nous ne forçons pas un framework
 texte-seul à mesurer de l'audio ; nous *adaptons* plutôt les mesures en
 métriques DeepEval [@deepeval] sur mesure (`RealTimeFactorMetric`,
-`AudioIntegrityMetric`). Elles sont déterministes et hors-ligne — pas de LLM, de
-clé ni de réseau — si bien que les équipes qui standardisent sur DeepEval
-obtiennent les mêmes chiffres dans leur outillage existant.
+`AudioIntegrityMetric` et `RoundTripIdempotenceMetric` — le contrôle chrF
+texte→parole→texte). Elles sont déterministes et hors-ligne — pas de LLM, de clé
+ni de réseau — si bien que les équipes qui standardisent sur DeepEval obtiennent
+les mêmes chiffres dans leur outillage existant.
+
+## 4.4 Aiguillage des backends
+
+La couche d'évaluation *mesure* la qualité et la vitesse ; le **routeur**
+(`speaker_helper.router` : `route`, `RouteRequest`, `RouteDecision`,
+`Speaker.from_route`) *agit* sur ces preuves. L'appelant énonce une **condition**
+de fonctionnement et le routeur renvoie un moteur + mode concrets, justifiés par
+les chiffres plutôt que devinés :
+
+- **`online_realtime`** — streaming à délai borné. La vitesse est le **facteur
+  temps réel (RTF)** et définit une frontière de faisabilité dure : un moteur
+  n'est admissible que s'il synthétise *plus vite que le temps réel* (`RTF < 1`),
+  avec une marge pour le temps jusqu'au premier son et la gigue (plafond `0.8`).
+  Parmi les moteurs qui tiennent le rythme, le routeur **maximise la qualité**
+  sur le front de Pareto qualité↔RTF [@deb2001multiobjective] et sélectionne le
+  streaming avec des réglages à faible TTFA.
+- **`offline`** — par lots. Il n'y a aucune contrainte temps réel, donc **la
+  qualité est le seul objectif** : le moteur de plus haute qualité l'emporte et
+  la vitesse est ignorée.
+
+La qualité est l'**intelligibilité** en aller-retour (texte→parole→texte
+WER/chrF) quand un moteur a été mesuré, sinon un prior hérité par moteur ; chaque
+`RouteDecision` indique lequel via `quality_source` (mesuré vs prior), porte un
+flag de `confidence` et une `justification` qui cite les chiffres. Les nouveaux
+moteurs sont caractérisés dans l'étude compagne et réinjectés ici comme données,
+si bien que le routeur s'améliore à mesure que les preuves grandissent, sans
+aucun changement de code.
+
+## 4.5 Moteurs auto-hébergés (sans Hugging Face)
+
+Par défaut, le serveur de moteurs télécharge les poids des modèles depuis
+Hugging Face à la première utilisation. Pour un hôte de production ou en
+environnement clos, un bundle optionnel `speaker-engines` (hébergé à
+`https://harchaoui.org/warith/speaker-engines/`) sert chaque moteur TTS — **et les
+modèles de métriques de l'évaluation** — depuis une seule archive auto-hébergée.
+Le consommateur le télécharge et le décompresse, puis pointe l'exécution dessus
+avec `VOICEBOX_MODELS_DIR=$HOME/speaker-engines/tts` et `HF_HUB_OFFLINE=1`, si
+bien que rien n'est récupéré depuis Hugging Face à l'exécution.
 
 # 5. Mesures
 
@@ -237,13 +282,26 @@ référence du §5.1 (M2 Max, natif MLX) ; un autre hôte les recalibre en un ap
 
 # 6. Interfaces
 
-- **CLI** : `synth`, `voices`, `clone`, `eval` (avec `--languages` pour une
+Le même cœur est exposé au travers de cinq surfaces :
+
+- **CLI** : un groupe [click](https://click.palletsprojects.com) principal dont
+  les options globales précèdent la sous-commande, et le front-end argparse de la
+  bibliothèque standard conservé sous `speaker-helper-argparse`. Sous-commandes :
+  `synth`, `voices`, `clone`, `route`, `eval` (avec `--languages` pour une
   matrice), `speak-from` (speech-to-speech), `serve`.
 - **REST** : `GET /health`, `GET /voices`, `POST /synth`, `POST /synth/stream`
-  (Server-Sent Events, un morceau JSON par phrase [@sse]), `POST /clone`.
+  (Server-Sent Events, un morceau JSON par phrase [@sse]), `POST /clone`, et
+  `POST /route` (le routeur de backends).
+- **GUI web** : une page vanilla-JS + Tailwind minimale et sans dépendance,
+  servie à `/`, pour la synthèse, le streaming, les voix, le clonage et le
+  routeur.
 - **MCP** [@mcp] : quand `fastapi-mcp` [@fastapimcp] est présent, les mêmes
-  endpoints sont montés à `/mcp` comme outils qu'un assistant peut appeler
-  directement.
+  endpoints — y compris `route` — sont montés à `/mcp` comme outils qu'un
+  assistant peut appeler directement.
+- **Skills Claude/OpenCode** : des dossiers de skills portables dans `skills/`
+  (`speaker-helper-synthesize`, `speaker-helper-clone-voice`,
+  `speaker-helper-choose-engine`) permettent à un assistant de piloter la boîte
+  à outils directement.
 
 # 7. Limites et travaux futurs
 

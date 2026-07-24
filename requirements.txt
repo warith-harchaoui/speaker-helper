@@ -1,0 +1,23 @@
+# speaker-helper — runtime requirements (mirrors pyproject [project.dependencies]).
+#
+# Core dependency contract:
+# - Talks to a running TTS engine over REST (Voicebox by default). The ``mock``
+#   backend needs no server.
+# - Part of the AI Helpers ecosystem: logging via ``os-helper``, audio
+#   slicing/concatenation via ``audio-helper`` (both on PyPI).
+# - Audio crosses the engine API as WAV ``bytes``; soundfile/numpy decode it to
+#   measure duration and to concatenate streaming chunks.
+#
+# Optional features (server, stt, youtube, podcast, mic, eval) live behind
+# pyproject extras, not here — this file is the *runtime* floor only.
+#
+#     pip install -r requirements.txt      # runtime only
+#     pip install -e .                     # same, from the package metadata
+
+os-helper>=1.7.2
+audio-helper>=1.6.0
+httpx>=0.27
+pyyaml>=6.0
+numpy>=1.24
+soundfile>=0.12
+click>=8.1

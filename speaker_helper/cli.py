@@ -42,11 +42,18 @@ import argparse
 import asyncio
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import os_helper as osh
 
 from speaker_helper.config import Settings
 from speaker_helper.speaker import Speaker
+
+if TYPE_CHECKING:
+    # Imported only for type-checking so the runtime import path stays lazy
+    # (these pull in optional/heavier modules used by a subset of commands).
+    from speaker_helper.eval import Thresholds
+    from speaker_helper.transcription import VocalHelperTranscriber
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -166,6 +173,47 @@ def _build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=Path("out.wav"),
         help="Output WAV path (default: out.wav).",
+    )
+
+    # `route`: choose an engine + mode from measured quality<->speed evidence.
+    p_route = sub.add_parser(
+        "route",
+        help="Choose the best engine + mode for a condition (online real-time / offline).",
+    )
+    p_route.add_argument(
+        "--condition",
+        choices=["online_realtime", "offline"],
+        required=True,
+        help="online_realtime (delay-bounded streaming; speed=RTF) or offline (quality only).",
+    )
+    p_route.add_argument("--language", default="fr", help="Target language (default: fr).")
+    p_route.add_argument(
+        "--rtf-ceiling",
+        dest="rtf_ceiling",
+        type=float,
+        default=0.8,
+        help="Online only: max mean RTF an engine must beat to keep up (default 0.8).",
+    )
+    p_route.add_argument(
+        "--rtf-budget",
+        dest="rtf_budget",
+        type=float,
+        default=None,
+        help="Offline only: optional patience cap on mean RTF.",
+    )
+    p_route.add_argument(
+        "--quality-floor",
+        dest="quality_floor",
+        type=float,
+        default=None,
+        help="Reject candidates below this quality (0..1).",
+    )
+    p_route.add_argument(
+        "--json",
+        dest="json_out",
+        type=Path,
+        default=None,
+        help="Write the full decision JSON to this path.",
     )
 
     # Distinct dests so the server's *bind* address never collides with the
@@ -303,6 +351,60 @@ def _cmd_serve(args: argparse.Namespace, settings: Settings) -> int:
     return 0
 
 
+def _cmd_route(args: argparse.Namespace, settings: Settings) -> int:
+    """Handle the ``route`` sub-command; print the chosen operating point.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parsed CLI arguments (``condition``, ``language``, ``rtf_ceiling``,
+        ``rtf_budget``, ``quality_floor``, ``json_out``).
+    settings : Settings
+        Unused for the decision itself (kept for a uniform handler signature).
+
+    Returns
+    -------
+    int
+        ``0`` on a successful decision, ``2`` when the request is infeasible
+        (e.g. no engine keeps up online).
+    """
+    import json
+
+    from speaker_helper.router import RouteRequest, route
+
+    # Build the request straight from the flags; the router validates the
+    # condition and constraints and raises on an infeasible ask.
+    try:
+        decision = route(
+            RouteRequest(
+                condition=args.condition,
+                language=args.language,
+                rtf_ceiling=args.rtf_ceiling,
+                rtf_budget=args.rtf_budget,
+                quality_floor=args.quality_floor,
+            )
+        )
+    except ValueError as exc:
+        # An infeasible/invalid request is a usage error, not a crash.
+        osh.error("routing failed: %s", exc)
+        return 2
+    # Optional machine-readable dump before the human summary.
+    if args.json_out is not None:
+        args.json_out.write_text(
+            json.dumps(decision.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        osh.info("wrote decision JSON to %s", args.json_out)
+    # User-facing verdict on stdout: the headline choice plus the justification.
+    rtf = "n/a" if decision.mean_rtf is None else f"{decision.mean_rtf:.3f}"
+    sys.stdout.write(
+        f"condition={decision.condition} engine={decision.engine} mode={decision.mode}\n"
+        f"quality={decision.quality:.3f} ({decision.quality_source}) "
+        f"mean_rtf={rtf} ({decision.rtf_source}) confidence={decision.confidence}\n"
+        f"{decision.justification}\n"
+    )
+    return 0
+
+
 def _cmd_clone(args: argparse.Namespace, settings: Settings) -> int:
     """Handle the ``clone`` sub-command; register a voice and print its id."""
 
@@ -324,7 +426,7 @@ def _cmd_clone(args: argparse.Namespace, settings: Settings) -> int:
     return asyncio.run(run())
 
 
-def _build_transcriber(args: argparse.Namespace):  # type: ignore[no-untyped-def]
+def _build_transcriber(args: argparse.Namespace) -> VocalHelperTranscriber | None:
     """Return a fidelity transcriber when ``--transcribe`` was passed, else ``None``.
 
     Parameters
@@ -352,7 +454,9 @@ def _build_transcriber(args: argparse.Namespace):  # type: ignore[no-untyped-def
     return VocalHelperTranscriber(getattr(args, "language", None) or "fr")
 
 
-def _cmd_eval_multilang(args: argparse.Namespace, settings: Settings, thresholds) -> int:
+def _cmd_eval_multilang(
+    args: argparse.Namespace, settings: Settings, thresholds: Thresholds
+) -> int:
     """Run the evaluation across ``--languages`` and print a matrix; gate on all.
 
     Parameters
@@ -551,6 +655,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_eval(args, settings)
     if args.command == "speak-from":
         return _cmd_speak_from(args, settings)
+    if args.command == "route":
+        return _cmd_route(args, settings)
     if args.command == "serve":
         return _cmd_serve(args, settings)
     parser.error(f"unknown command {args.command!r}")

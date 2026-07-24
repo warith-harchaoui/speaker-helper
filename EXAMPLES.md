@@ -106,7 +106,14 @@ echo "Texte lu depuis l'entrée standard." | speaker-helper --port 17600 synth -
 
 # streaming (reports TTFA + per-chunk cadence)
 speaker-helper --port 17600 synth "Une. Deux. Trois." -o out.wav --stream
+
+# pick the best engine + mode for a condition (see §10)
+speaker-helper route --condition online_realtime --language fr
 ```
+
+The primary `speaker-helper` command is a click group; the argparse front-end
+stays available as `speaker-helper-argparse`. Global options (`--port`,
+`--backend`, …) precede the sub-command.
 
 ---
 
@@ -127,7 +134,17 @@ curl -s -X POST localhost:8080/synth \
      -H 'content-type: application/json' \
      -d '{"text": "Bonjour depuis l'\''API."}' -o out.wav
 # out.wav written; X-Audio-Duration-S / X-Audio-RTF returned as headers
+
+# the router, as an endpoint:
+curl -s -X POST localhost:8080/route \
+     -H 'content-type: application/json' \
+     -d '{"condition": "online_realtime", "language": "fr"}'
+# {"engine":"kokoro","mode":"streaming","confidence":"medium","justification":"…"}
 ```
+
+The server also serves a **minimal web GUI** at `http://localhost:8080/`
+(synth, streaming, voices, clone, and the router) and mounts an MCP server at
+`/mcp`.
 
 ---
 
@@ -232,7 +249,34 @@ asyncio.run(main())
 
 ---
 
-## 10. Picking an engine on the quality↔speed frontier
+## 10. Routing: pick an engine + mode for a condition
+
+State the operating **condition** and let the router choose, justified by
+measured quality↔speed evidence:
+
+```python
+from speaker_helper import route, RouteRequest, Speaker
+
+# online real-time: speed = RTF, must run faster than real time; among engines
+# that keep up, maximise quality -> streaming with low time-to-first-audio.
+d = route(RouteRequest(condition="online_realtime", language="fr"))
+print(d.engine, d.mode, d.confidence)       # kokoro streaming medium
+print(d.justification)                       # cites the numbers + provenance
+
+# offline: quality is the ONLY objective (speed disregarded).
+d2 = route(RouteRequest(condition="offline", language="fr"))
+
+# build a Speaker straight from a routed operating point:
+spk = Speaker.from_route("online_realtime", language="fr")
+```
+
+```bash
+speaker-helper route --condition online_realtime --language fr
+speaker-helper route --condition offline --json decision.json
+```
+
+Under the hood the router selects on the quality↔RTF **Pareto front**; you can
+use that primitive directly on a batch of evaluation reports:
 
 ```python
 from speaker_helper.eval import pareto_front

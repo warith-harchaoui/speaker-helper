@@ -30,6 +30,8 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
+import os_helper as osh
+
 # The built-in datasets live next to this module so they are importable from an
 # installed wheel, not just a source checkout. One JSON Lines file per language,
 # named ``<lang>_reference.jsonl``.
@@ -110,14 +112,14 @@ def load_dataset(
         path = Path(path)
     elif language is not None:
         path = dataset_path_for_language(language)
-        if not path.is_file():
+        if not osh.file_exists(str(path)):
             raise FileNotFoundError(
                 f"no built-in dataset for language {language!r}; "
                 f"available: {', '.join(available_languages())}"
             )
     else:
         path = DEFAULT_DATASET
-    if not path.is_file():
+    if not osh.file_exists(str(path)):
         raise FileNotFoundError(f"eval dataset not found: {path}")
     cases: list[EvalCase] = []
     # Parse JSON Lines: one case per line. ``lineno`` starts at 1 so errors

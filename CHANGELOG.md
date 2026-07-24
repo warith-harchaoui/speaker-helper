@@ -6,6 +6,47 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Backend router** (`speaker_helper.router`): choose an engine + mode from
+  measured quality↔speed evidence for an operating **condition** —
+  `online_realtime` (delay-bounded streaming; speed = real-time factor, the
+  engine must run faster than real time, ceiling 0.8 for TTFA/jitter margin;
+  maximise quality on the Pareto front among engines that keep up) or `offline`
+  (batch; **quality is the only objective**, speed disregarded — pure quality
+  argmax). Every `RouteDecision` carries provenance (`measured` vs `prior`), a
+  `confidence` flag, and a number-citing `justification`. `Speaker.from_route`,
+  `route`, `route_settings`, `default_operating_points`, `RouteRequest`,
+  `RouteDecision`, `OperatingPoint` are public. New engines are characterised in
+  the `speak` study and folded back as data.
+- **Router surfaces**: CLI `speaker-helper route --condition …`, REST
+  `POST /route` (auto-exposed as an MCP tool), and the GUI router panel.
+- **Click CLI** (`speaker-helper`, primary): grouped sub-commands over the same
+  handlers as the argparse CLI, which stays available as `speaker-helper-argparse`.
+- **Minimal web GUI** served at `/` by the API server (`speaker-helper serve`):
+  a dependency-free vanilla-JS + Tailwind page for synth (offline + SSE
+  streaming), voices, clone, and the router.
+- **Claude/OpenCode Skills** under `skills/`: `speaker-helper-synthesize`,
+  `-clone-voice`, `-choose-engine`, with exhaustive + negative triggers.
+- **`RoundTripIdempotenceMetric`** (DeepEval): text→speech→text intelligibility
+  as chrF, formalising the round-trip idempotence view of quality.
+
+### Fixed
+- **Install was broken**: `requirements-dev.txt` referenced a `requirements.txt`
+  that did not exist. Added `requirements.txt` (runtime deps mirroring pyproject).
+- Type annotations completed in `cli.py` (`_build_transcriber` return,
+  `_cmd_eval_multilang` `thresholds` param).
+
+### Changed
+- CI now **gates coverage** (`--cov-fail-under=70`); current fast-suite total ~74%.
+- Deeper **os-helper adoption**: file-existence checks use `osh.file_exists`,
+  temp directories use `osh.make_temporary_directory` + `osh.join` (replacing
+  `Path.is_file` / `tempfile.mkdtemp`); logging was already fully `osh`.
+- Coding-standards pass: every source module now clears the 15% in-code comment
+  floor (measured excluding docstrings); `click_cli.py` documented.
+- Bumped AI-Helpers dependency floors to the current improved releases:
+  `os-helper>=1.7.2`, `audio-helper>=1.6.0`, `vocal-helper>=0.4.4`,
+  `youtube-helper>=1.3.4`, `podcast-helper>=0.4.0`, `capture-helper>=0.3.0`.
+
 ## [0.7.4] - 2026-07-15
 
 ### Documentation

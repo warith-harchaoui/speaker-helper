@@ -35,6 +35,7 @@ from dataclasses import dataclass, field, fields
 from pathlib import Path
 from typing import Any
 
+import os_helper as osh
 import yaml
 
 _ENV_RE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
@@ -220,7 +221,7 @@ class Settings:
         """
         if path is None:
             default = Path("settings.yaml")
-            path = default if default.is_file() else None
+            path = default if osh.file_exists(str(default)) else None
         if path is None:
             return cls.from_mapping({})
         return cls.from_yaml_text(Path(path).read_text(encoding="utf-8"))

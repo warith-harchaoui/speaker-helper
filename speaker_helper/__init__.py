@@ -51,6 +51,16 @@ from speaker_helper.profiles import (
     tune_profiles,
 )
 
+# Backend router: choose engine + mode from measured quality↔speed evidence.
+from speaker_helper.router import (
+    OperatingPoint,
+    RouteDecision,
+    RouteRequest,
+    default_operating_points,
+    route,
+    route_settings,
+)
+
 # High-level entry point most callers use.
 from speaker_helper.speaker import Speaker
 
@@ -67,7 +77,7 @@ from speaker_helper.types import (
     VoiceSample,
 )
 
-__version__ = "0.7.4"
+__version__ = "0.7.5"
 
 # Explicit, sorted public API: only these names are re-exported from the
 # package root; the sub-modules above hold the implementation.
@@ -77,6 +87,9 @@ __all__ = [
     "LanguageProfile",
     "Mode",
     "MockEngine",
+    "OperatingPoint",
+    "RouteDecision",
+    "RouteRequest",
     "Settings",
     "Speaker",
     "StreamChunk",
@@ -91,8 +104,11 @@ __all__ = [
     "available_backends",
     "chunk_for_streaming",
     "create_engine",
+    "default_operating_points",
     "profile_for",
     "register_backend",
+    "route",
+    "route_settings",
     "split_sentences",
     "tune_profiles",
 ]

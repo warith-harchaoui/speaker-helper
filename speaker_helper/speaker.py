@@ -100,6 +100,9 @@ class Speaker:
         self.stream_concurrency = max(1, stream_concurrency)
         # Reuse an injected engine (tests/mocks) or build one from settings.
         self.engine: TTSEngine = engine or create_engine(self.settings)
+        # The routing decision that built this speaker, when created via
+        # :meth:`from_route` (else ``None``) — kept for provenance / logging.
+        self.route: object | None = None
 
     @classmethod
     def from_profile(
@@ -138,6 +141,63 @@ class Speaker:
             engine=engine,
             stream_concurrency=getattr(profile, "stream_concurrency", 1),
         )
+
+    @classmethod
+    def from_route(
+        cls,
+        condition: str,
+        *,
+        language: str = "fr",
+        settings: Settings | None = None,
+        engine: TTSEngine | None = None,
+        **route_kwargs: object,
+    ) -> Speaker:
+        """Build a :class:`Speaker` from a routed operating point.
+
+        Asks :func:`speaker_helper.router.route` to choose an engine + mode from
+        measured quality↔speed evidence for the given **condition**
+        (``"online_realtime"`` or ``"offline"``), applies that choice, and
+        forwards the decision's ``stream_concurrency``.
+
+        Parameters
+        ----------
+        condition : str
+            ``"online_realtime"`` (delay-bounded streaming) or ``"offline"``.
+        language : str
+            Target language driving the candidate catalogue.
+        settings : Settings or None
+            Base configuration to reconfigure; ``None`` uses defaults.
+        engine : TTSEngine or None
+            Optional injected backend (e.g. a mock in tests); when given, the
+            routing choice still sets language/mode but this engine is used.
+        **route_kwargs
+            Extra :class:`~speaker_helper.router.RouteRequest` fields
+            (``rtf_ceiling``, ``rtf_budget``, ``quality_floor``,
+            ``require_measured_rtf``).
+
+        Returns
+        -------
+        Speaker
+            A speaker configured for the routed operating point. The chosen
+            :class:`~speaker_helper.router.RouteDecision` is attached as
+            ``speaker.route`` for inspection / logging.
+        """
+        # Imported here (not at module top) to avoid a router→speaker cycle.
+        from speaker_helper.router import RouteRequest
+        from speaker_helper.router import route as route_fn
+
+        req = RouteRequest(condition=condition, language=language, **route_kwargs)  # type: ignore[arg-type]
+        decision = route_fn(req)
+        # Log the justification so the operating-point choice is visible, not magic.
+        osh.info("router: %s", decision.justification)
+        spk = cls(
+            decision.apply(settings),
+            engine=engine,
+            stream_concurrency=decision.stream_concurrency,
+        )
+        # Attach the decision for callers that want the provenance/confidence.
+        spk.route = decision
+        return spk
 
     @property
     def client(self) -> TTSEngine:

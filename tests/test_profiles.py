@@ -26,11 +26,16 @@ def test_profile_for_known_and_unknown() -> None:
 
 def test_default_profiles_carry_measured_reference() -> None:
     """Shipped fr/en/es profiles carry a sub-real-time reference measurement."""
-    # fr/en/es ship a reference GPU-MLX operating point (< real time)
+    # fr/en/es ship a reference GPU-MLX operating point (< real time) and a
+    # quality score in [0, 1].
     for lang in ("fr", "en", "es"):
         p = profile_for(lang)
         assert p.measured_rtf is not None and 0.0 < p.measured_rtf < 1.0
-        assert p.measured_quality == 0.75
+        assert p.measured_quality is not None and 0.0 < p.measured_quality <= 1.0
+    # fr/en/es quality are real UTMOSv2 MOS scores (kokoro: en 0.65 > fr 0.59 > es 0.55).
+    assert profile_for("fr").measured_quality == 0.59
+    assert profile_for("en").measured_quality == 0.65
+    assert profile_for("es").measured_quality == 0.55
     # an untuned language has no measurement
     assert profile_for("it").measured_rtf is None
 

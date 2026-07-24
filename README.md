@@ -17,32 +17,47 @@ built-in evaluation gate — over a local Speech Synthesis engine
 
 speaker-helper is the counterpart of
 [`vocal-helper`](https://github.com/warith-harchaoui): where vocal-helper turns
-*speech into text*, speaker-helper turns **text into speech**. It gives you a
-small, typed Python API, a CLI, and a REST API — runnable locally (conda + pip)
-or as a Docker server.
+*speech into text*, speaker-helper turns **text into speech**. It gives you the
+same core over **five surfaces** — a typed Python API, a CLI, a REST API, a
+minimal web GUI, an MCP server, and Claude/OpenCode skills — runnable locally
+(conda + pip) or as a Docker server.
 
 - **Two modes.** *Offline* (whole text → one audio) and *streaming*
   (sentence-split, low time-to-first-audio).
+- **Automatic engine routing.** Tell speaker-helper your *condition* —
+  **online real-time** (delay-bounded streaming; speed = real-time factor, must
+  run faster than real time) or **offline** (batch; quality is the only
+  objective) — and the router picks the best engine + mode from measured
+  quality↔speed evidence, with a number-citing justification. No guessing.
 - **Real-time on CPU.** The default `kokoro` engine synthesises faster than
   real time (real-time factor well below 1.0) — no GPU required.
 - **Backend-agnostic.** The engine is an implementation detail behind a
   `TTSEngine` protocol. Voicebox is the default; a deterministic `mock` backend
   ships for tests and CI, and new backends are a small, local change.
 - **Voice cloning, everywhere.** Point at a recording and speaker-helper clones
-  the voice — in the library, CLI, and REST API. Missing transcripts are
+  the voice — in the library, CLI, REST API, and GUI. Missing transcripts are
   derived automatically with [`vocal-helper`](https://github.com/warith-harchaoui).
 - **Built-in AI evaluation.** A committed dataset, versioned thresholds, and
-  speed/anomaly/fidelity metrics gate quality in CI — no vibe checks.
-- **Batteries included.** Library, CLI, REST API, Docker.
+  speed/anomaly/fidelity metrics gate quality in CI — no vibe checks. Quality is
+  measured as round-trip **intelligibility** (text→speech→text WER/chrF).
+- **Self-hosted, no Hugging Face at runtime.** An optional
+  [`speaker-engines`](#self-hosted-engines-no-hugging-face) bundle serves every
+  engine + metric model from your own server, so the engines run air-gapped.
+- **Batteries included.** Library, CLI (argparse + click), REST API, web GUI,
+  MCP server, Claude/OpenCode skills, Docker.
 
 See [`EXAMPLES.md`](https://github.com/warith-harchaoui/speaker-helper/blob/main/EXAMPLES.md) for a runnable cookbook,
 [`docs/tech-report.en.md`](https://github.com/warith-harchaoui/speaker-helper/blob/main/docs/tech-report.en.md) for the technical report
-([FR](https://github.com/warith-harchaoui/speaker-helper/blob/main/docs/tech-report.fr.md)), and [`LISEZMOI.md`](https://github.com/warith-harchaoui/speaker-helper/blob/main/LISEZMOI.md) for the French
+([FR](https://github.com/warith-harchaoui/speaker-helper/blob/main/docs/tech-report.fr.md)),
+[`LANDSCAPE.md`](https://github.com/warith-harchaoui/speaker-helper/blob/main/LANDSCAPE.md) for how speaker-helper compares to other TTS projects with a positioning map,
+and [`LISEZMOI.md`](https://github.com/warith-harchaoui/speaker-helper/blob/main/LISEZMOI.md) for the French
 readme.
 
 ## Documentation
 
 [💻 Documentation](https://harchaoui.org/warith/ai-helpers/docs/speaker-helper-doc/)
+
+[🗺️ Landscape](https://github.com/warith-harchaoui/speaker-helper/blob/main/LANDSCAPE.md)
 
 [📋 Examples](https://github.com/warith-harchaoui/speaker-helper/blob/main/EXAMPLES.md)
 
@@ -51,17 +66,20 @@ readme.
 ```mermaid
 flowchart LR
     text["your text"]:::input
-    subgraph SH["speaker-helper (library · CLI · REST API)"]
+    subgraph SH["speaker-helper — 5 surfaces: API · CLI · REST · GUI · MCP · Skills"]
         speaker["Speaker<br/>offline · streaming · clone"]:::core
+        router["router<br/>condition → engine + mode"]:::core
         eval["evaluation<br/>RTF · anomalies · WER/chrF"]:::eval
     end
     engine["Speech Synthesis engine<br/>voicebox · mock · …"]:::engine
     audio["WAV audio"]:::output
 
     text --> speaker
+    router -.->|picks| speaker
     speaker -- "TTSEngine protocol" --> engine
     engine --> audio
     speaker -.->|measured by| eval
+    eval -.->|evidence| router
 
     classDef input fill:#FFF5CC,stroke:#FFCC00,color:#000000
     classDef core fill:#CCE4FF,stroke:#007AFF,color:#000000
@@ -71,8 +89,9 @@ flowchart LR
 ```
 
 speaker-helper talks only to the `TTSEngine` protocol, so the concrete engine
-(Voicebox by default) is swappable. Start an engine once, then point
-speaker-helper at it.
+(Voicebox by default) is swappable. The **router** turns an operating condition
+into a concrete engine + mode from measured evidence; the **evaluation** layer
+produces that evidence. Start an engine once, then point speaker-helper at it.
 
 ---
 
@@ -93,9 +112,9 @@ speaker-helper is **not on PyPI yet** (PyPI release coming soon). Like the other
 
 ```bash
 # core
-pip install "git+https://github.com/warith-harchaoui/speaker-helper.git@v0.7.4"
+pip install "git+https://github.com/warith-harchaoui/speaker-helper.git@v0.7.5"
 # with extras (server + MCP, and STT for cloning/eval round-trip):
-pip install "speaker-helper[server,stt] @ git+https://github.com/warith-harchaoui/speaker-helper.git@v0.7.4"
+pip install "speaker-helper[server,stt] @ git+https://github.com/warith-harchaoui/speaker-helper.git@v0.7.5"
 ```
 
 Available extras: `server` (REST API + MCP), `stt` (vocal-helper), `youtube`,
@@ -137,6 +156,29 @@ docker compose up --build            # serves on 127.0.0.1:17600
 Then tell speaker-helper where it is (`--port`, `settings.yaml`, or
 `SPEAKER_HELPER_VOICEBOX_PORT`).
 
+### Self-hosted engines (no Hugging Face)
+
+By default the engine server downloads model weights from Hugging Face on first
+use. For a production or air-gapped box you can instead serve every engine —
+**and the evaluation "metrics" models** — from self-hosted archives, so nothing
+is fetched from Hugging Face at runtime. The bundle ships as **several small zips**
+(one per TTS engine + one for the metric models) so you download only what you
+use; each extracts into the same `speaker-engines/` tree:
+
+```bash
+cd "$HOME"
+for z in tts-hexgrad-kokoro-82m metrics; do                 # add the engines you use
+  curl -L "https://harchaoui.org/warith/speaker-engines/speaker-engines-${z}.zip" -o "se-${z}.zip"
+  unzip -oq "se-${z}.zip"                                    # -> ~/speaker-engines/…
+done
+export VOICEBOX_MODELS_DIR="$HOME/speaker-engines/tts"       # Voicebox reads this
+export HF_HUB_OFFLINE=1                                      # never phone home
+# start the engine as usual — it now loads kokoro/chatterbox/… from the bundle
+```
+
+The zips are built once with the scripts in `~/speaker-engines/` (see its
+`README.md`); the runtime side needs only the two environment variables above.
+
 ---
 
 ## Quickstart
@@ -156,10 +198,16 @@ print(f"{result.duration_s:.2f}s audio, RTF {result.rtf:.2f}")
 
 ### CLI
 
+The primary `speaker-helper` command is a [click](https://click.palletsprojects.com)
+group; the standard-library argparse front-end stays available as
+`speaker-helper-argparse` (same sub-commands). Global options precede the
+sub-command (`speaker-helper --backend mock synth …`).
+
 ```bash
 speaker-helper --port 17600 voices --engine kokoro
 speaker-helper --port 17600 synth "Bonjour le monde." -o hello.wav
 speaker-helper --port 17600 synth "Une. Deux. Trois." -o out.wav --stream
+speaker-helper route --condition online_realtime --language fr    # pick an engine
 speaker-helper --backend mock eval               # gate quality (no engine needed)
 speaker-helper --port 17600 --clone synth "Bonjour." -o cloned.wav
 ```
@@ -175,16 +223,63 @@ curl -N -X POST localhost:8080/synth/stream -H 'content-type: application/json' 
      -d '{"text": "Une. Deux. Trois."}'
 ```
 
-The server also mounts a **Model Context Protocol** endpoint at `/mcp` (via
-[`fastapi-mcp`](https://github.com/tadata-org/fastapi-mcp), bundled with the
-`server` extra), exposing `synth`, `synth_stream`, `clone_voice`, `list_voices`,
-and `health` as MCP tools an assistant can call directly.
+The server also:
+
+- serves a **minimal web GUI** at `/` (a dependency-free vanilla-JS + Tailwind
+  page for synth, streaming, voices, cloning, and the router) — just open
+  `http://localhost:8080/`;
+- exposes `POST /route` (the engine router) alongside `/synth`, `/synth/stream`,
+  `/voices`, and `/clone`;
+- mounts a **Model Context Protocol** endpoint at `/mcp` (via
+  [`fastapi-mcp`](https://github.com/tadata-org/fastapi-mcp), bundled with the
+  `server` extra), exposing `synth`, `synth_stream`, `clone_voice`, `list_voices`,
+  `route`, and `health` as MCP tools an assistant can call directly.
 
 Or with Docker (server points at a Voicebox on the host):
 
 ```bash
 docker compose up --build            # speaker-helper API on :8080
 ```
+
+---
+
+## Choosing an engine (the router)
+
+The evaluation layer *measures* quality and speed; the **router** acts on that
+evidence. You state an operating **condition** and it returns a concrete engine
++ mode, justified by the numbers — never a guess.
+
+- **`online_realtime`** — delay-bounded streaming. Speed is the **real-time
+  factor (RTF)**: the engine must synthesise *faster than real time* (`RTF < 1`),
+  with a margin for time-to-first-audio and jitter (ceiling `0.8`). Among the
+  engines that keep up, the router **maximises quality** on the quality↔RTF
+  Pareto front, and selects streaming with low-TTFA knobs.
+- **`offline`** — batch. There is no real-time constraint, so **quality is the
+  only objective**: the highest-quality engine wins, speed disregarded.
+
+Quality is measured as round-trip **intelligibility** (text→speech→text WER/chrF
+via `vocal-helper`) or, until an engine is measured, an inherited prior — every
+decision reports which (`quality_source`) and a `confidence` flag.
+
+```python
+from speaker_helper import route, RouteRequest, Speaker
+
+decision = route(RouteRequest(condition="online_realtime", language="fr"))
+print(decision.engine, decision.mode, decision.confidence)
+print(decision.justification)
+
+# or build a Speaker straight from a routed operating point:
+spk = Speaker.from_route("offline", language="fr")
+```
+
+```bash
+speaker-helper route --condition online_realtime --language fr
+speaker-helper route --condition offline --json decision.json
+```
+
+New engines are characterised in the companion *study* (measured RTF / MOS /
+speaker-similarity) and folded back here as data — the toolbox routes, the study
+measures.
 
 ---
 
@@ -268,8 +363,9 @@ the `mock` backend in CI or a real engine locally — only `--backend` differs.
 
 For teams standardising on a framework, the `eval` extra adds a
 [DeepEval](https://github.com/confident-ai/deepeval) binding
-(`RealTimeFactorMetric`, `AudioIntegrityMetric`) that reports the same
-measurements as DeepEval custom metrics — deterministic and offline.
+(`RealTimeFactorMetric`, `AudioIntegrityMetric`, and `RoundTripIdempotenceMetric`
+— the text→speech→text chrF check) that reports the same measurements as DeepEval
+custom metrics — deterministic and offline.
 
 ---
 
@@ -282,18 +378,36 @@ variable; `${VAR}` references inside the YAML are expanded from the environment.
 
 ---
 
+## Claude / OpenCode skills
+
+The `skills/` directory holds portable [Claude / OpenCode
+skills](https://docs.claude.com/en/docs/agents-and-tools/agent-skills) so an
+assistant can drive speaker-helper directly:
+
+- `speaker-helper-synthesize` — text → speech (offline + streaming), voices;
+- `speaker-helper-clone-voice` — clone a voice from a reference recording;
+- `speaker-helper-choose-engine` — the router (pick an engine by condition and
+  quality↔speed).
+
+Copy a skill folder into `~/.claude/skills/` (or your project's `.claude/skills/`,
+or OpenCode's skills directory) — no changes needed; the format is shared.
+
+---
+
 ## Development
 
 ```bash
 pip install -e ".[dev,server]"
 pytest -q -m "not slow"       # fast, deterministic suite (no engine needed)
+pytest -q --cov=speaker_helper --cov-report=term-missing   # with coverage
 pytest -q                     # also runs @slow live tests (needs Voicebox)
-ruff check speaker_helper tests
+ruff check speaker_helper tests && ruff format --check speaker_helper tests
 speaker-helper --backend mock eval    # run the evaluation gate locally
 ```
 
-CI runs ruff + the fast suite on Python 3.10–3.13; a failing test blocks merges.
-The fast suite drives the deterministic `mock` backend, so it needs no engine.
+CI runs ruff (lint + format) and the coverage-gated fast suite (`--cov-fail-under=70`)
+on Python 3.10–3.13; a failing check blocks merges. The fast suite drives the
+deterministic `mock` backend, so it needs no engine.
 
 ---
 

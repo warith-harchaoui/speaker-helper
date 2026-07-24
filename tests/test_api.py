@@ -86,6 +86,36 @@ def test_mcp_can_be_disabled() -> None:
     assert not any(p.startswith("/mcp") for p in paths)
 
 
+def test_route_returns_decision() -> None:
+    """/route returns a justified engine + mode for a condition."""
+    with _client() as client:
+        resp = client.post("/route", json={"condition": "online_realtime", "language": "fr"})
+    assert resp.status_code == 200
+    body = resp.json()
+    # The online condition must return a streaming decision with a justification.
+    assert body["mode"] == "streaming"
+    assert body["engine"]
+    assert body["justification"]
+    assert body["confidence"] in {"high", "medium", "low"}
+
+
+def test_route_rejects_bad_condition() -> None:
+    """/route surfaces an unknown condition as a 400 (client error)."""
+    with _client() as client:
+        resp = client.post("/route", json={"condition": "turbo"})
+    assert resp.status_code == 400
+
+
+def test_gui_served_at_root() -> None:
+    """The bundled single-page GUI is served at / (index.html)."""
+    with _client() as client:
+        resp = client.get("/")
+    # The static mount serves the HTML shell; assert it is the GUI page.
+    assert resp.status_code == 200
+    assert "text/html" in resp.headers["content-type"]
+    assert "speaker-helper" in resp.text.lower()
+
+
 def test_synth_stream_emits_ordered_sse_chunks() -> None:
     """/synth/stream emits SSE chunks in sequence, each carrying WAV audio."""
     # Act: stream three sentences and collect the SSE data payloads.

@@ -53,5 +53,11 @@ jobs:
         run: pip install -e ".[dev,server]"
       # The @slow live tests need a running Voicebox engine, which CI has no
       # access to, so they are excluded here; the fast suite gates merges.
-      - name: pytest (fast suite)
-        run: pytest -q -m "not slow"
+      # Coverage is tracked and gated: the floor (70%) sits just under the
+      # current fast-suite total (~74%), which is capped by modules only
+      # exercisable against live services (client / transcription / the
+      # engine-driven CLI branches). Raise the floor as those gain fakes.
+      - name: pytest (fast suite, coverage-gated)
+        run: >-
+          pytest -q -m "not slow"
+          --cov=speaker_helper --cov-report=term-missing --cov-fail-under=70

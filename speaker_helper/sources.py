@@ -41,9 +41,7 @@ Warith HARCHAOUI — https://linkedin.com/in/warith-harchaoui
 
 from __future__ import annotations
 
-import tempfile
 from dataclasses import dataclass
-from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
 import os_helper as osh
@@ -181,7 +179,9 @@ def from_podcast(feed_url: str, *, output_path: str | None = None) -> SourceAudi
         raise ValueError(f"latest episode of {feed_url!r} has no audio enclosure")
     # Default to a fresh temp file so repeated calls do not clobber each other.
     if output_path is None:
-        output_path = str(Path(tempfile.mkdtemp(prefix="speaker-helper-")) / "episode.mp3")
+        output_path = osh.join(
+            osh.make_temporary_directory(prefix="speaker-helper-"), "episode.mp3"
+        )
     osh.info("downloading podcast episode: %s", episode.get("title", enclosure))
     osh.download_file(enclosure, output_path)
     return SourceAudio(path=output_path, origin="podcast", title=episode.get("title", ""))
@@ -245,7 +245,7 @@ async def from_microphone(
 
     # Persist the captured signal to a WAV file (temp file by default).
     if output_path is None:
-        output_path = str(Path(tempfile.mkdtemp(prefix="speaker-helper-")) / "mic.wav")
+        output_path = osh.join(osh.make_temporary_directory(prefix="speaker-helper-"), "mic.wav")
     sf.write(output_path, pcm.astype("float32"), sample_rate)
     return SourceAudio(path=output_path, origin="microphone", title="microphone")
 

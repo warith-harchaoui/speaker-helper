@@ -132,14 +132,26 @@ class LanguageProfile:
 #
 # ``measured_rtf`` / ``measured_quality`` are *reference* operating points for
 # kokoro on the native MLX Voicebox (Apple GPU / Metal, M2 Max), obtained with
-# ``tune_profiles`` — recalibrate for your host with the same call. Quality is
-# the engine prior (no transcriber). Languages without a measurement here ship
-# their hyperparameters only (measured fields ``None``).
+# ``tune_profiles`` — recalibrate for your host with the same call. Both axes are
+# now **measured per language**: RTF from tuning, and quality from a real
+# **UTMOSv2 naturalness MOS** sweep in the ``speak`` study (kokoro sounds most
+# natural in en 0.65, then fr 0.59, then es 0.55 — all below the old 0.75 prior).
+# Languages without a row ship their hyperparameters only (measured fields
+# ``None``).
 _MEASURED_KOKORO_MLX: dict[str, tuple[float, float]] = {
     # language: (mean RTF, quality)   — native MLX, M2 Max, kokoro
-    "fr": (0.162, 0.75),
-    "en": (0.159, 0.75),
-    "es": (0.185, 0.75),
+    # quality = measured UTMOSv2 MOS on [0,1] (see MEASURED_MOS + the speak study).
+    "fr": (0.162, 0.59),
+    "en": (0.159, 0.65),
+    "es": (0.185, 0.55),
+}
+
+# (engine -> languages) whose ``measured_quality`` is a real UTMOSv2 MOS rather
+# than the engine prior. The router reads this to stamp ``quality_source`` as
+# ``"measured_mos"`` vs ``"prior"`` on a per-language decision. Grows as the study
+# measures more (engine, language) pairs; see the ``speak`` study's exp_quality.py.
+MEASURED_MOS: dict[str, set[str]] = {
+    "kokoro": {"fr", "en", "es"},
 }
 DEFAULT_PROFILES: dict[str, LanguageProfile] = {
     lang: LanguageProfile(

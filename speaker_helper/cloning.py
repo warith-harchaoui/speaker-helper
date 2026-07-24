@@ -40,6 +40,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+import os_helper as osh
+
 from speaker_helper.types import VoiceSample
 
 # The bundled default reference voice. Assets live at the repository root (they
@@ -117,7 +119,7 @@ def resolve_samples(clone: dict[str, Any]) -> list[VoiceSample]:
         reference_text = default_reference_text() if is_default_audio else ""
 
     # Guard against a missing bundled asset so the failure is explicit.
-    if is_default_audio and not DEFAULT_CLONE_AUDIO.is_file():
+    if is_default_audio and not osh.file_exists(str(DEFAULT_CLONE_AUDIO)):
         raise ValueError(
             f"default clone reference not found: {DEFAULT_CLONE_AUDIO}. "
             "Provide clone.audio explicitly or restore the bundled asset."
@@ -138,7 +140,6 @@ def _trim_to_bytes(wav_bytes: bytes, max_seconds: float) -> tuple[bytes, bool]:
     through an ``os-helper`` temporary folder.
     """
     import audio_helper as ah
-    import os_helper as osh
 
     with osh.temporary_folder() as tmp:
         src = osh.join(tmp, "reference.wav")

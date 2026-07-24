@@ -139,3 +139,69 @@ class AudioIntegrityMetric(BaseMetric):
     def __name__(self) -> str:  # noqa: A003 - DeepEval reads this for reporting
         """Human-readable metric name DeepEval shows in its report."""
         return "Audio Integrity"
+
+
+class RoundTripIdempotenceMetric(BaseMetric):
+    """DeepEval metric: text → speech → text should recover the text.
+
+    This formalises the **idempotence** view of synthesis quality: if you
+    synthesise a sentence and transcribe the audio back (with ``vocal-helper``,
+    the STT sibling), an intelligible voice yields a transcript close to the
+    original. We score that closeness with **chrF** (character n-gram F-score,
+    robust to the ASR's tokenisation) and pass when it clears a bar.
+
+    What this does and does *not* measure
+    -------------------------------------
+    It measures **intelligibility** — a necessary lower bound on quality — not
+    **naturalness** (a clear-but-robotic voice can still score high). It also
+    couples TTS quality with the ASR's quality, so absolute chrF is best read as
+    a *relative* ranking across engines scored by the *same* ASR (the ASR's
+    error is largely common-mode and cancels when comparing engines). For a
+    naturalness axis, pair this with a MOS predictor (e.g. UTMOSv2) measured in
+    the ``speak`` study.
+
+    Parameters
+    ----------
+    threshold : float
+        Minimum acceptable round-trip chrF in ``[0, 1]``. Defaults to ``0.75``,
+        matching the bundled fidelity bar (``thresholds.yaml``: ``min_mean_chrf``).
+
+    Notes
+    -----
+    Reads ``test_case.metadata['chrf']`` (the round-trip chrF a caller stored
+    from :func:`~speaker_helper.eval.metrics.chrf`); a missing value scores 0.
+    """
+
+    def __init__(self, threshold: float = 0.75) -> None:
+        """Store the chrF bar and initialise DeepEval's result fields."""
+        # ``threshold`` is the minimum chrF to pass; the rest are DeepEval's
+        # standard result slots, filled on the first ``measure`` call.
+        self.threshold = threshold
+        self.score: float = 0.0
+        self.success: bool = False
+        self.reason: str = ""
+
+    def measure(self, test_case: Any) -> float:
+        """Score the round-trip chrF (0 when unmeasured) and gate on the bar."""
+        # chrF is carried in the case metadata; a missing round-trip scores 0 so
+        # an unmeasured case fails rather than passing on an assumption.
+        score = float(_metadata(test_case).get("chrf", 0.0))
+        # DeepEval convention: score IS the chrF; success is score >= threshold.
+        self.score = score
+        self.success = score >= self.threshold
+        rel = ">=" if self.success else "<"
+        self.reason = f"round-trip chrF {score:.3f} {rel} threshold {self.threshold}"
+        return self.score
+
+    async def a_measure(self, test_case: Any) -> float:
+        """Async wrapper around :meth:`measure` (the work is synchronous)."""
+        return self.measure(test_case)
+
+    def is_successful(self) -> bool:
+        """Return whether the last :meth:`measure` cleared the chrF bar."""
+        return self.success
+
+    @property
+    def __name__(self) -> str:  # noqa: A003 - DeepEval reads this for reporting
+        """Human-readable metric name DeepEval shows in its report."""
+        return "Round-Trip Idempotence (chrF)"
