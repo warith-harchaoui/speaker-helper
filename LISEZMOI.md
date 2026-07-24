@@ -55,7 +55,6 @@ Docker.
 Voir [`EXAMPLES.md`](EXAMPLES.md) pour un recueil d'exemples exécutables,
 [`docs/tech-report.fr.md`](docs/tech-report.fr.md) pour le rapport technique
 ([EN](docs/tech-report.en.md)),
-[`PAYSAGE.md`](PAYSAGE.md) pour situer speaker-helper face aux autres projets de synthèse vocale avec une carte de positionnement,
 et [`README.md`](README.md) pour la version
 anglaise.
 

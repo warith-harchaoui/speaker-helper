@@ -49,7 +49,6 @@ minimal web GUI, an MCP server, and Claude/OpenCode skills — runnable locally
 See [`EXAMPLES.md`](https://github.com/warith-harchaoui/speaker-helper/blob/main/EXAMPLES.md) for a runnable cookbook,
 [`docs/tech-report.en.md`](https://github.com/warith-harchaoui/speaker-helper/blob/main/docs/tech-report.en.md) for the technical report
 ([FR](https://github.com/warith-harchaoui/speaker-helper/blob/main/docs/tech-report.fr.md)),
-[`LANDSCAPE.md`](https://github.com/warith-harchaoui/speaker-helper/blob/main/LANDSCAPE.md) for how speaker-helper compares to other TTS projects with a positioning map,
 and [`LISEZMOI.md`](https://github.com/warith-harchaoui/speaker-helper/blob/main/LISEZMOI.md) for the French
 readme.
 
