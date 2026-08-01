@@ -71,7 +71,7 @@ from speaker_helper.eval.priors import engine_quality_prior, pareto_front
 from speaker_helper.profiles import MEASURED_MOS, profile_for
 
 # The two operating conditions the router knows how to plan for. Kept as plain
-# strings (not an enum) so they cross the CLI / JSON / MCP boundaries unchanged.
+# strings (not an enum) so they cross the CLI / JSON boundaries unchanged.
 ONLINE_REALTIME = "online_realtime"
 OFFLINE = "offline"
 CONDITIONS = (ONLINE_REALTIME, OFFLINE)
@@ -225,7 +225,7 @@ class RouteDecision:
         )
 
     def to_dict(self) -> dict:
-        """Return a JSON-serialisable dict of the decision (for API / MCP / CLI)."""
+        """Return a JSON-serialisable dict of the decision (for API / CLI)."""
         return dataclasses.asdict(self)
 
 

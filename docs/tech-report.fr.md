@@ -13,8 +13,8 @@ Speaker Helper transforme du texte en parole sur votre propre machine. C'est le
 pendant « sortie » de Vocal Helper (parole → texte) dans l'écosystème AI
 Helpers [@aihelpers] : il enveloppe un moteur de synthèse vocale *local* —
 Voicebox [@voicebox] exécutant le modèle Kokoro [@kokoro] par défaut — derrière
-une petite API Python typée, une CLI, une API REST et un serveur Model Context
-Protocol [@mcp]. Deux partis pris traversent tout le système. D'abord, **le
+une petite API Python typée, une CLI, une API REST et une GUI web minimale.
+Deux partis pris traversent tout le système. D'abord, **le
 moteur est un détail d'implémentation** : chaque composant parle au protocole
 `TTSEngine`, si bien que Voicebox n'est qu'un backend parmi d'autres et qu'un
 backend `mock` déterministe rend le paquet (et son évaluation) exécutable en CI
@@ -40,9 +40,8 @@ charge.
 ## 1.1 Objectifs
 
 - **Une boîte à outils opérationnelle, prête à l'emploi**, pas une étude : une
-  bibliothèque, une CLI (argparse + click), une API REST, une GUI web minimale,
-  un serveur MCP et des skills Claude/OpenCode qu'un développeur seul ou une
-  petite équipe peut adopter sans contexte privé.
+  bibliothèque, une CLI (argparse + click), une API REST et une GUI web minimale
+  qu'un développeur seul ou une petite équipe peut adopter sans contexte privé.
 - **Indépendance vis-à-vis du moteur.** Rien au-dessus de la frontière backend
   ne doit dépendre d'un moteur concret. Ajouter ou remplacer un backend reste un
   changement local.
@@ -85,7 +84,7 @@ votre texte ──▶ Speaker (hors-ligne · streaming · clone) ──TTSEngine
   `MockEngine` (déterministe, sans serveur).
 - **Façade** (`speaker.py`) : `Speaker` — `say`, `stream`, `clone_voice`,
   `warmup`, `from_profile`.
-- **Interfaces** : CLI (`cli.py`), API REST + MCP (`api.py`, [@fastapi; @fastapimcp]).
+- **Interfaces** : CLI (`cli.py`), API REST (`api.py`, [@fastapi]).
 - **Évaluation** (`eval/`) : jeux de données, métriques, seuils, runner, priors,
   pont DeepEval [@deepeval], pilote multilingue.
 - **Colle écosystème** : journalisation via `os-helper`, découpe et concaténation
@@ -295,13 +294,6 @@ Le même cœur est exposé au travers de cinq surfaces :
 - **GUI web** : une page vanilla-JS + Tailwind minimale et sans dépendance,
   servie à `/`, pour la synthèse, le streaming, les voix, le clonage et le
   routeur.
-- **MCP** [@mcp] : quand `fastapi-mcp` [@fastapimcp] est présent, les mêmes
-  endpoints — y compris `route` — sont montés à `/mcp` comme outils qu'un
-  assistant appelle directement.
-- **Skills Claude/OpenCode** : des dossiers de skills portables dans `skills/`
-  (`speaker-helper-synthesize`, `speaker-helper-clone-voice`,
-  `speaker-helper-choose-engine`) laissent un assistant piloter la boîte
-  à outils directement.
 
 # 7. Limites et travaux futurs
 

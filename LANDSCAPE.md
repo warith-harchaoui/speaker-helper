@@ -52,15 +52,15 @@ never ship: a **router** that turns an operating *condition* (online real-time
 vs. offline) into a concrete engine + mode from measured quality↔speed evidence,
 a **built-in evaluation gate** (real-time factor, audio anomalies, and a
 text→speech→text WER/chrF round-trip), **voice cloning wired to auto-transcription**
-(`vocal-helper` fills in a missing reference transcript), and **five surfaces**
-in lock-step — Python, CLI, REST, a web GUI, and an MCP server for assistants.
+(`vocal-helper` fills in a missing reference transcript), and **four surfaces**
+in lock-step — Python, CLI, REST, and a web GUI.
 
 That is a different centre of gravity from the field:
 
 - The **model projects** — Coqui XTTS, Chatterbox, F5-TTS, OpenVoice, Bark,
   Tortoise — are excellent *engines*. They clone well and run offline, but each
   is a library or checkpoint: no cross-engine router, no committed eval gate, no
-  CLI/REST/GUI/MCP quartet, and a heavy `torch` install. speaker-helper is happy
+  CLI/REST/GUI trio, and a heavy `torch` install. speaker-helper is happy
   to *drive* several of them behind its protocol rather than compete with any one.
 - The **fast, lean engines** — Piper, Kokoro — win on install weight and
   real-time factor (Kokoro synthesises well under real time on CPU, which is why
@@ -80,8 +80,8 @@ Where `speaker-helper` uniquely wins for its niche:
    thresholds fail CI on slow synthesis, audio anomalies, or a broken round-trip.
 3. **Cloning that finishes the job.** Point at a recording; a missing transcript
    is derived and over-long references are trimmed and re-aligned automatically.
-4. **One core, five surfaces.** The same typed `Speaker` is reachable from
-   Python, an argparse *and* a click CLI, a REST API, a web GUI, and MCP — no
+4. **One core, four surfaces.** The same typed `Speaker` is reachable from
+   Python, an argparse *and* a click CLI, a REST API, and a web GUI — no
    drift between them.
 
 The honest cost is **install weight** (⭐⭐⭐): a real engine wants `torch`, plus
@@ -93,7 +93,7 @@ one-file OS shim.
 
 - **`speaker-helper`** — you want offline, streaming, cloneable TTS wired into an
   AI pipeline: a typed `dict`/`path` API, a router that picks the engine for you,
-  an eval gate in CI, and the same thing over CLI / REST / GUI / MCP. Especially
+  an eval gate in CI, and the same thing over CLI / REST / GUI. Especially
   the natural pair for `vocal-helper` (speech→text) — this is the text→speech leg.
 - **Coqui XTTS** — you want one strong, permissive multilingual cloning engine as
   a library and will build your own serving, routing, and evaluation around it

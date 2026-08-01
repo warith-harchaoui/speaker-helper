@@ -18,9 +18,9 @@ voix et évaluation intégrée, par-dessus un moteur de synthèse vocale local
 speaker-helper est le pendant de
 [`vocal-helper`](https://github.com/warith-harchaoui) : vocal-helper
 transforme la *parole en texte*, speaker-helper transforme le **texte en
-parole**. Même cœur, exposé sur **cinq surfaces** : une API
-Python typée, une CLI, une API REST, une GUI web minimale, un serveur MCP et des
-skills Claude/OpenCode. En local (conda + pip) ou comme serveur Docker.
+parole**. Même cœur, exposé sur **quatre surfaces** : une API
+Python typée, une CLI, une API REST et une GUI web minimale. En local
+(conda + pip) ou comme serveur Docker.
 
 - **Deux modes.** *Hors-ligne* (tout le texte → un audio) et *streaming*
   (découpage en phrases, faible temps jusqu'au premier son).
@@ -49,7 +49,7 @@ skills Claude/OpenCode. En local (conda + pip) ou comme serveur Docker.
   moteur et chaque modèle de métrique depuis votre propre serveur ; les
   moteurs tournent alors en environnement clos.
 - **Tout inclus.** Bibliothèque, CLI (argparse + click), API REST, GUI web,
-  serveur MCP, skills Claude/OpenCode, Docker.
+  Docker.
 
 Voir [`EXAMPLES.md`](EXAMPLES.md) pour un recueil d'exemples exécutables,
 [`docs/tech-report.fr.md`](docs/tech-report.fr.md) pour le rapport technique
@@ -70,7 +70,7 @@ anglaise.
 ```mermaid
 flowchart LR
     text["votre texte"]:::input
-    subgraph SH["speaker-helper — 5 surfaces : API · CLI · REST · GUI · MCP · Skills"]
+    subgraph SH["speaker-helper — 4 surfaces : API · CLI · REST · GUI"]
         speaker["Speaker<br/>hors-ligne · streaming · clonage"]:::core
         router["routeur<br/>condition → moteur + mode"]:::core
         eval["évaluation<br/>RTF · anomalies · WER/chrF"]:::eval
@@ -119,11 +119,11 @@ release :
 ```bash
 # cœur
 pip install "git+https://github.com/warith-harchaoui/speaker-helper.git@v0.7.5"
-# avec extras (serveur + MCP, et STT pour clonage/aller-retour d'éval) :
+# avec extras (serveur, et STT pour clonage/aller-retour d'éval) :
 pip install "speaker-helper[server,stt] @ git+https://github.com/warith-harchaoui/speaker-helper.git@v0.7.5"
 ```
 
-Extras disponibles : `server` (API REST + MCP), `stt` (vocal-helper), `youtube`,
+Extras disponibles : `server` (API REST), `stt` (vocal-helper), `youtube`,
 `podcast`, `mic` (sources speech-to-speech), `eval` (DeepEval), `dev`.
 
 Ou, pour le développement local (conda + pip) :
@@ -241,11 +241,7 @@ Le serveur, en plus :
   dépendance pour la synthèse, le streaming, les voix, le clonage et le
   routeur) : ouvrez `http://localhost:8080/` ;
 - expose `POST /route` (le routeur de moteurs) aux côtés de `/synth`,
-  `/synth/stream`, `/voices` et `/clone` ;
-- monte un endpoint **Model Context Protocol** à `/mcp` (via
-  [`fastapi-mcp`](https://github.com/tadata-org/fastapi-mcp), inclus dans l'extra
-  `server`), qui expose `synth`, `synth_stream`, `clone_voice`, `list_voices`,
-  `route` et `health` comme outils MCP qu'un assistant appelle directement.
+  `/synth/stream`, `/voices` et `/clone`.
 
 Ou avec Docker (le serveur pointe vers un Voicebox sur l'hôte) :
 
@@ -396,24 +392,6 @@ Copiez [`settings.yaml.example`](settings.yaml.example) vers `settings.yaml`
 Chaque clé peut être surchargée par une variable d'environnement
 `SPEAKER_HELPER_*` ; les références `${VAR}` dans le YAML sont remplacées depuis
 l'environnement au chargement.
-
----
-
-## Skills Claude / OpenCode
-
-Le répertoire `skills/` contient des [skills Claude /
-OpenCode](https://docs.claude.com/en/docs/agents-and-tools/agent-skills)
-portables, qui laissent un assistant piloter speaker-helper directement :
-
-- `speaker-helper-synthesize` — texte → parole (hors-ligne + streaming), voix ;
-- `speaker-helper-clone-voice` — clone une voix depuis un enregistrement de
-  référence ;
-- `speaker-helper-choose-engine` — le routeur (choisir un moteur par condition
-  et qualité↔vitesse).
-
-Copiez un dossier de skill dans `~/.claude/skills/` (ou dans le
-`.claude/skills/` de votre projet, ou dans le répertoire de skills d'OpenCode).
-Aucune modification nécessaire, le format est partagé.
 
 ---
 

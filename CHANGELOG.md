@@ -6,6 +6,22 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.5] - 2026-08-01
+
+### Removed
+- **MCP surface dropped.** `fastapi-mcp`'s latest release (0.4.0) is
+  incompatible with the latest `mcp` SDK (`Server.__init__()` signature
+  mismatch) — `_mount_mcp` crashed `create_app()` in CI, breaking every API
+  test (not just the MCP-specific ones), with no available version pairing to
+  pin around. Removed `fastapi-mcp` from the `server` extra, `_mount_mcp` and
+  the `enable_mcp` flag from `api.py`, and every doc mention. speaker-helper
+  now ships **four** surfaces instead of five (library, two CLIs, REST API,
+  web GUI).
+- **Agent skills dropped from the public repo.** Without an MCP surface, the
+  three Claude/OpenCode skills (`skills/`) no longer earn their keep as public
+  distribution — moved to the gitignored `.private/skills/` (kept locally as
+  reference, never published).
+
 ### Added
 - **Backend router** (`speaker_helper.router`): choose an engine + mode from
   measured quality↔speed evidence for an operating **condition** —
@@ -19,14 +35,12 @@ to [Semantic Versioning](https://semver.org/).
   `RouteDecision`, `OperatingPoint` are public. New engines are characterised in
   the `speak` study and folded back as data.
 - **Router surfaces**: CLI `speaker-helper route --condition …`, REST
-  `POST /route` (auto-exposed as an MCP tool), and the GUI router panel.
+  `POST /route`, and the GUI router panel.
 - **Click CLI** (`speaker-helper`, primary): grouped sub-commands over the same
   handlers as the argparse CLI, which stays available as `speaker-helper-argparse`.
 - **Minimal web GUI** served at `/` by the API server (`speaker-helper serve`):
   a dependency-free vanilla-JS + Tailwind page for synth (offline + SSE
   streaming), voices, clone, and the router.
-- **Claude/OpenCode Skills** under `skills/`: `speaker-helper-synthesize`,
-  `-clone-voice`, `-choose-engine`, with exhaustive + negative triggers.
 - **`RoundTripIdempotenceMetric`** (DeepEval): text→speech→text intelligibility
   as chrF, formalising the round-trip idempotence view of quality.
 

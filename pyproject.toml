@@ -59,8 +59,6 @@ server = [
     "uvicorn>=0.29",
     "pydantic>=2.6",
     "python-multipart>=0.0.9",
-    # Model Context Protocol: exposes the REST endpoints as MCP tools at /mcp.
-    "fastapi-mcp>=0.4",
 ]
 # Speech-to-text via vocal-helper: auto-transcribe a voice-clone reference and
 # enable the evaluation round-trip (WER/chrF). Optional — cloning with an

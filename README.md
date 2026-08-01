@@ -18,9 +18,8 @@ built-in evaluation gate — over a local Speech Synthesis engine
 speaker-helper is the counterpart of
 [`vocal-helper`](https://github.com/warith-harchaoui): where vocal-helper turns
 *speech into text*, speaker-helper turns **text into speech**. It gives you the
-same core over **five surfaces** — a typed Python API, a CLI, a REST API, a
-minimal web GUI, an MCP server, and Claude/OpenCode skills — runnable locally
-(conda + pip) or as a Docker server.
+same core over **four surfaces** — a typed Python API, a CLI, a REST API, and a
+minimal web GUI — runnable locally (conda + pip) or as a Docker server.
 
 - **Two modes.** *Offline* (whole text → one audio) and *streaming*
   (sentence-split, low time-to-first-audio).
@@ -44,7 +43,7 @@ minimal web GUI, an MCP server, and Claude/OpenCode skills — runnable locally
   [`speaker-engines`](#self-hosted-engines-no-hugging-face) bundle serves every
   engine + metric model from your own server, so the engines run air-gapped.
 - **Batteries included.** Library, CLI (argparse + click), REST API, web GUI,
-  MCP server, Claude/OpenCode skills, Docker.
+  Docker.
 
 See [`EXAMPLES.md`](https://github.com/warith-harchaoui/speaker-helper/blob/main/EXAMPLES.md) for a runnable cookbook,
 [`docs/tech-report.en.md`](https://github.com/warith-harchaoui/speaker-helper/blob/main/docs/tech-report.en.md) for the technical report
@@ -65,7 +64,7 @@ readme.
 ```mermaid
 flowchart LR
     text["your text"]:::input
-    subgraph SH["speaker-helper — 5 surfaces: API · CLI · REST · GUI · MCP · Skills"]
+    subgraph SH["speaker-helper — 4 surfaces: API · CLI · REST · GUI"]
         speaker["Speaker<br/>offline · streaming · clone"]:::core
         router["router<br/>condition → engine + mode"]:::core
         eval["evaluation<br/>RTF · anomalies · WER/chrF"]:::eval
@@ -112,11 +111,11 @@ speaker-helper is **not on PyPI yet** (PyPI release coming soon). Like the other
 ```bash
 # core
 pip install "git+https://github.com/warith-harchaoui/speaker-helper.git@v0.7.5"
-# with extras (server + MCP, and STT for cloning/eval round-trip):
+# with extras (server, and STT for cloning/eval round-trip):
 pip install "speaker-helper[server,stt] @ git+https://github.com/warith-harchaoui/speaker-helper.git@v0.7.5"
 ```
 
-Available extras: `server` (REST API + MCP), `stt` (vocal-helper), `youtube`,
+Available extras: `server` (REST API), `stt` (vocal-helper), `youtube`,
 `podcast`, `mic` (speech-to-speech sources), `eval` (DeepEval), `dev`.
 
 Or, for local development (conda + pip):
@@ -228,11 +227,7 @@ The server also:
   page for synth, streaming, voices, cloning, and the router) — just open
   `http://localhost:8080/`;
 - exposes `POST /route` (the engine router) alongside `/synth`, `/synth/stream`,
-  `/voices`, and `/clone`;
-- mounts a **Model Context Protocol** endpoint at `/mcp` (via
-  [`fastapi-mcp`](https://github.com/tadata-org/fastapi-mcp), bundled with the
-  `server` extra), exposing `synth`, `synth_stream`, `clone_voice`, `list_voices`,
-  `route`, and `health` as MCP tools an assistant can call directly.
+  `/voices`, and `/clone`.
 
 Or with Docker (server points at a Voicebox on the host):
 
@@ -374,22 +369,6 @@ Copy [`settings.yaml.example`](https://github.com/warith-harchaoui/speaker-helpe
 gitignored) or use [`speaker_config.json.example`](https://github.com/warith-harchaoui/speaker-helper/blob/main/speaker_config.json.example)
 as a reference. Every key can be overridden by a `SPEAKER_HELPER_*` environment
 variable; `${VAR}` references inside the YAML are expanded from the environment.
-
----
-
-## Claude / OpenCode skills
-
-The `skills/` directory holds portable [Claude / OpenCode
-skills](https://docs.claude.com/en/docs/agents-and-tools/agent-skills) so an
-assistant can drive speaker-helper directly:
-
-- `speaker-helper-synthesize` — text → speech (offline + streaming), voices;
-- `speaker-helper-clone-voice` — clone a voice from a reference recording;
-- `speaker-helper-choose-engine` — the router (pick an engine by condition and
-  quality↔speed).
-
-Copy a skill folder into `~/.claude/skills/` (or your project's `.claude/skills/`,
-or OpenCode's skills directory) — no changes needed; the format is shared.
 
 ---
 

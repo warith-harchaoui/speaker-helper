@@ -143,8 +143,7 @@ curl -s -X POST localhost:8080/route \
 ```
 
 The server also serves a **minimal web GUI** at `http://localhost:8080/`
-(synth, streaming, voices, clone, and the router) and mounts an MCP server at
-`/mcp`.
+(synth, streaming, voices, clone, and the router).
 
 ---
 

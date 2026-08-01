@@ -18,10 +18,6 @@ for running as a Docker service. It exposes:
   transcripts) to clone a voice; missing transcripts come from ``vocal-helper``.
   The clone becomes the server's active voice for subsequent ``/synth`` calls.
 
-When ``fastapi-mcp`` is installed, a Model Context Protocol server is also
-mounted at ``/mcp``, exposing these endpoints as MCP tools so an assistant can
-synthesise, stream, clone, and list voices directly.
-
 This module imports FastAPI/pydantic/uvicorn at import time, so it is only ever
 imported behind the ``server`` extra (the CLI imports it lazily, and the core
 package never imports it). Keeping the request model at module scope lets
@@ -98,18 +94,13 @@ class RouteRequestBody(BaseModel):
     quality_floor: float | None = Field(None, description="Minimum quality to accept.")
 
 
-def create_app(settings: Settings | None = None, *, enable_mcp: bool = True) -> FastAPI:
+def create_app(settings: Settings | None = None) -> FastAPI:
     """Build the FastAPI application.
 
     Parameters
     ----------
     settings : Settings or None
         Configuration; defaults to :meth:`Settings.load`.
-    enable_mcp : bool
-        When ``True`` (default) and ``fastapi-mcp`` is installed, mount a Model
-        Context Protocol server at ``/mcp`` that exposes the REST endpoints as
-        MCP tools — so an MCP client (an assistant) can synthesise, clone, and
-        list voices directly. Silently skipped if ``fastapi-mcp`` is absent.
 
     Returns
     -------
@@ -286,10 +277,6 @@ def create_app(settings: Settings | None = None, *, enable_mcp: bool = True) -> 
             raise HTTPException(status_code=502, detail=str(exc)) from exc
         return {"voice_id": voice_id}
 
-    # Optionally expose every endpoint above as an MCP tool for assistants.
-    if enable_mcp:
-        _mount_mcp(app)
-
     # Serve the minimal single-page GUI at ``/`` (added last so the explicit API
     # routes above always take precedence over the static catch-all).
     _mount_gui(app)
@@ -320,33 +307,6 @@ def _mount_gui(app: FastAPI) -> None:
     # Mounted at "/" with html=True: "/" -> index.html, "/app.js" -> app.js.
     app.mount("/", StaticFiles(directory=str(gui_dir), html=True), name="gui")
     osh.info("GUI mounted at /")
-
-
-def _mount_mcp(app: FastAPI) -> None:
-    """Mount an MCP server at ``/mcp`` exposing the REST endpoints as tools.
-
-    Uses ``fastapi-mcp`` to turn each operation (``synth``, ``synth_stream``,
-    ``clone_voice``, ``list_voices``, ``health``) into a Model Context Protocol
-    tool, so an assistant can drive speaker-helper directly. A no-op (with a
-    warning) when ``fastapi-mcp`` is not installed.
-    """
-    try:
-        # Import lazily: fastapi-mcp lives behind the optional 'mcp' extra.
-        from fastapi_mcp import FastApiMCP
-    except ImportError:
-        # Absent extra is not an error — the REST API works fine without MCP.
-        osh.warning(
-            "fastapi-mcp not installed; MCP server not mounted "
-            "(install the 'mcp' extra to enable /mcp)"
-        )
-        return
-    mcp = FastApiMCP(
-        app,
-        name="speaker-helper",
-        description="Text-to-speech: synthesise, stream, clone voices, list voices.",
-    )
-    mcp.mount_http()
-    osh.info("MCP server mounted at /mcp")
 
 
 def serve(settings: Settings | None = None, *, host: str = "127.0.0.1", port: int = 8080) -> None:

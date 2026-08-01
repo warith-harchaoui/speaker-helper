@@ -55,16 +55,15 @@ moteur et mode concrets à partir de preuves qualité↔vitesse mesurées, une
 **passerelle d'évaluation intégrée** (facteur temps réel, anomalies audio et un
 aller-retour texte→parole→texte WER/chrF), un **clonage de voix couplé à
 l'auto-transcription** (`vocal-helper` comble une transcription de référence
-manquante) et **cinq surfaces** synchronisées : Python, CLI, REST, une GUI web
-et un serveur MCP pour les assistants.
+manquante) et **quatre surfaces** synchronisées : Python, CLI, REST et une GUI web.
 
 C'est un centre de gravité différent de celui du reste du domaine :
 
 - Les **projets-modèles** — Coqui XTTS, Chatterbox, F5-TTS, OpenVoice, Bark,
   Tortoise — sont d'excellents *moteurs*. Ils clonent bien et tournent
   hors-ligne, mais chacun est une bibliothèque ou un checkpoint : pas de routeur
-  inter-moteurs, pas de passerelle d'éval committée, pas de quatuor
-  CLI/REST/GUI/MCP, et une installation `torch` lourde. speaker-helper préfère en
+  inter-moteurs, pas de passerelle d'éval committée, pas de trio
+  CLI/REST/GUI, et une installation `torch` lourde. speaker-helper préfère en
   *piloter* plusieurs derrière son protocole plutôt que d'en concurrencer un seul.
 - Les **moteurs rapides et légers** — Piper, Kokoro — gagnent sur le poids
   d'installation et le facteur temps réel (Kokoro synthétise bien sous le temps
@@ -89,8 +88,8 @@ Là où `speaker-helper` gagne pour son créneau :
 3. **Un clonage qui va au bout.** Pointez vers un enregistrement : une
    transcription manquante est produite, et les références trop longues sont
    tronquées et ré-alignées automatiquement.
-4. **Un cœur, cinq surfaces.** Le même `Speaker` typé est accessible depuis
-   Python, une CLI argparse *et* une CLI click, une API REST, une GUI web et MCP,
+4. **Un cœur, quatre surfaces.** Le même `Speaker` typé est accessible depuis
+   Python, une CLI argparse *et* une CLI click, une API REST et une GUI web,
    sans dérive entre elles.
 
 Le coût honnête est le **poids d'installation** (⭐⭐⭐) : un vrai moteur réclame
@@ -103,7 +102,7 @@ vrais moteurs neuronaux plutôt qu'un passe-plat OS d'un seul fichier.
 - **`speaker-helper`** — vous voulez une TTS hors-ligne, en streaming et
   clonable, câblée dans un pipeline d'IA : une API typée `dict`/`path`, un routeur
   qui choisit le moteur pour vous, une passerelle d'éval en CI, et la même chose
-  en CLI / REST / GUI / MCP. C'est le pendant naturel de `vocal-helper`
+  en CLI / REST / GUI. C'est le pendant naturel de `vocal-helper`
   (parole→texte) : la jambe texte→parole.
 - **Coqui XTTS** — vous voulez un seul moteur de clonage multilingue solide et
   permissif comme bibliothèque, et vous construirez vous-même le service,

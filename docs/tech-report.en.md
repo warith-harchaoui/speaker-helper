@@ -13,8 +13,8 @@ Speaker Helper turns text into speech on your own machine. It is the output
 counterpart of Vocal Helper (speech → text) in the AI Helpers ecosystem
 [@aihelpers], and it wraps a *local* text-to-speech engine — Voicebox
 [@voicebox] running the Kokoro model [@kokoro] by default — behind a small,
-typed Python API, a CLI, a REST API, and a Model Context Protocol server
-[@mcp]. Two design commitments run through the whole system. First, **the
+typed Python API, a CLI, a REST API, and a minimal web GUI. Two design
+commitments run through the whole system. First, **the
 engine is an implementation detail**: every component speaks to a `TTSEngine`
 protocol, so Voicebox is one backend among others and a deterministic `mock`
 backend makes the package (and its evaluation) runnable in CI without a server.
@@ -38,9 +38,8 @@ same engine on CPU-in-Docker is borderline and load-sensitive.
 ## 1.1 Goals
 
 - **A ready-to-use, operational toolbox**, not a study: a library, a CLI
-  (argparse + click), a REST API, a minimal web GUI, an MCP server, and
-  Claude/OpenCode skills that a solo developer or a small team can adopt without
-  private context.
+  (argparse + click), a REST API, and a minimal web GUI that a solo developer
+  or a small team can adopt without private context.
 - **Engine independence.** Nothing above the backend boundary may depend on a
   concrete engine. Adding or swapping a backend is a local change.
 - **Two synthesis modes.** *Offline* (whole text → one audio, optimising
@@ -78,7 +77,7 @@ your text ──▶ Speaker (offline · streaming · clone) ──TTSEngine─�
   (deterministic, serverless).
 - **Façade** (`speaker.py`): `Speaker` — `say`, `stream`, `clone_voice`,
   `warmup`, `from_profile`.
-- **Interfaces**: CLI (`cli.py`), REST API + MCP (`api.py`, [@fastapi; @fastapimcp]).
+- **Interfaces**: CLI (`cli.py`), REST API (`api.py`, [@fastapi]).
 - **Evaluation** (`eval/`): datasets, metrics, thresholds, runner, priors,
   DeepEval binding [@deepeval], multi-language driver.
 - **Ecosystem glue**: logging via `os-helper`, audio slicing/concatenation via
@@ -274,12 +273,6 @@ The same core is exposed over five surfaces:
   `POST /route` (the backend router).
 - **Web GUI**: a minimal, dependency-free vanilla-JS + Tailwind page served at
   `/` for synth, streaming, voices, cloning, and the router.
-- **MCP** [@mcp]: when `fastapi-mcp` [@fastapimcp] is present, the same
-  endpoints — including `route` — are mounted at `/mcp` as tools an assistant
-  can call directly.
-- **Claude/OpenCode skills**: portable skill folders in `skills/`
-  (`speaker-helper-synthesize`, `speaker-helper-clone-voice`,
-  `speaker-helper-choose-engine`) let an assistant drive the toolbox directly.
 
 # 7. Limitations & future work
 
