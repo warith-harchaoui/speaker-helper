@@ -300,19 +300,21 @@ Pointez vers un enregistrement, speaker-helper clone la voix — dans la
 bibliothèque, la CLI et l'API REST. Si vous ne fournissez pas de transcription
 de la référence, elle est produite automatiquement avec
 [`vocal-helper`](https://github.com/warith-harchaoui) (installez l'extra `stt`).
-Une référence prête à l'emploi (`assets/ref-malo.wav`) sert de défaut.
+Une référence prête à l'emploi — une voix féminine française issue du jeu de
+données CML-TTS (CC BY 4.0, voir `assets/ref-fr-female.NOTICE.md`) — est fournie
+sous `assets/ref-fr-female.wav` et sert de défaut.
 
 ```python
 from speaker_helper import Speaker, Settings, VoiceSample
 
 spk = Speaker(Settings.from_mapping({"engine": "chatterbox", "voicebox": {"port": 17600}}))
 # ne donnez que l'audio — la transcription est produite et alignée pour vous :
-await spk.clone_voice("malo", [VoiceSample("ma_voix.wav", "")])
+await spk.clone_voice("ma-voix", [VoiceSample("ma_voix.wav", "")])
 result = await spk.say("Maintenant je parle avec la voix clonée.")
 ```
 
 ```bash
-speaker-helper --port 17600 clone                        # clone le ref-malo fourni, affiche l'id
+speaker-helper --port 17600 clone                        # clone la référence fournie, affiche l'id
 speaker-helper --port 17600 --clone-audio ma_voix.wav synth "Bonjour." -o out.wav
 ```
 

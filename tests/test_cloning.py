@@ -2,7 +2,7 @@
 Tests for voice cloning: sample resolution, defaults, and the engine surface.
 
 These run without a server (mock backend) and without ``vocal-helper``: the
-bundled ref-malo transcript is committed, so default resolution needs no ASR.
+bundled reference transcript is committed, so default resolution needs no ASR.
 Auto-transcription is covered by monkeypatching the transcription helper.
 
 Author
@@ -37,23 +37,23 @@ def _short_wav(seconds: float = 1.0, sr: int = 16000) -> bytes:
     return buf.getvalue()
 
 
-def test_default_clone_resolves_to_ref_malo() -> None:
-    """An empty clone config resolves to the bundled ref-malo reference."""
+def test_default_clone_resolves_to_bundled_reference() -> None:
+    """An empty clone config resolves to the bundled reference voice."""
     # Act: resolve with no config at all.
     samples = resolve_samples({})
     # Assert: exactly the one bundled reference audio is selected.
     assert len(samples) == 1
     assert samples[0].audio == str(DEFAULT_CLONE_AUDIO)
     # the committed transcript is loaded as the reference text
-    assert samples[0].reference_text.lower().startswith("je m'appelle malorie")
+    assert samples[0].reference_text.lower().startswith("elle voyait l'avenir")
 
 
 def test_clone_name_default_and_override() -> None:
-    """Clone name defaults to ref-malo and honours an explicit override."""
+    """Clone name defaults to ref-fr-female and honours an explicit override."""
     # Empty config -> the bundled default name.
-    assert clone_name({}) == "ref-malo"
+    assert clone_name({}) == "ref-fr-female"
     # An explicit name overrides the default.
-    assert clone_name({"name": "malo"}) == "malo"
+    assert clone_name({"name": "my-voice"}) == "my-voice"
 
 
 def test_resolve_samples_explicit_list() -> None:
@@ -145,8 +145,8 @@ def test_mock_engine_clone_is_idempotent_stub() -> None:
     """The mock's clone_voice returns a stable, name-derived voice id."""
     # The mock does no real cloning; it echoes a deterministic id.
     eng = MockEngine(Settings.from_mapping({"backend": "mock"}))
-    vid = asyncio.run(eng.clone_voice("malo", [VoiceSample(b"RIFF", "hi")]))
-    assert vid == "cloned-malo"
+    vid = asyncio.run(eng.clone_voice("my-voice", [VoiceSample(b"RIFF", "hi")]))
+    assert vid == "cloned-my-voice"
 
 
 def test_mock_engine_clone_rejects_no_samples() -> None:
@@ -154,13 +154,13 @@ def test_mock_engine_clone_rejects_no_samples() -> None:
     # At least one sample is required to clone a voice.
     eng = MockEngine(Settings.from_mapping({"backend": "mock"}))
     with pytest.raises(ValueError):
-        asyncio.run(eng.clone_voice("malo", []))
+        asyncio.run(eng.clone_voice("my-voice", []))
 
 
 def test_speaker_clone_voice_delegates_to_engine() -> None:
     """Speaker.clone_voice resolves defaults and calls the engine."""
     # Arrange: a Speaker whose clone config names the target voice.
-    spk = Speaker(Settings.from_mapping({"backend": "mock", "clone": {"name": "malo"}}))
+    spk = Speaker(Settings.from_mapping({"backend": "mock", "clone": {"name": "my-voice"}}))
     # Act/Assert: the façade delegates to the engine's deterministic id.
     vid = asyncio.run(spk.clone_voice(samples=[VoiceSample(b"RIFF", "hi")]))
-    assert vid == "cloned-malo"
+    assert vid == "cloned-my-voice"

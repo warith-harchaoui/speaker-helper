@@ -21,7 +21,7 @@ imported lazily, and a clear error tells the user how to proceed if it is absent
 Usage example
 -------------
 >>> from speaker_helper.transcription import ensure_transcript
->>> # ensure_transcript("assets/ref-malo.wav")  # -> transcript str (needs vocal-helper)
+>>> # ensure_transcript("assets/ref-fr-female.wav")  # -> transcript str (needs vocal-helper)
 
 Author
 ------

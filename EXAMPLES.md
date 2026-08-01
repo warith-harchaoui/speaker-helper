@@ -177,7 +177,7 @@ async def main() -> None:
     }))
     async with spk:
         # supply only the recording — transcript auto-derived and aligned:
-        voice_id = await spk.clone_voice("malo", [VoiceSample("my_voice.wav", "")])
+        voice_id = await spk.clone_voice("my-voice", [VoiceSample("my_voice.wav", "")])
         print(voice_id)  # e.g. a cloned profile id
         result = await spk.say("Je parle maintenant avec la voix clonée.")
         (open("cloned.wav", "wb")).write(result.wav_bytes)
@@ -190,16 +190,16 @@ Config-driven (works in the CLI and REST server too — set once, clone everywhe
 ```python
 from speaker_helper import Speaker, Settings
 
-# empty clone block -> the bundled ref-malo reference is used
+# empty clone block -> the bundled reference voice is used
 spk = Speaker(Settings.from_mapping({
     "engine": "chatterbox", "voicebox": {"port": 17600},
-    "clone": {"name": "ref-malo"},
+    "clone": {"name": "ref-fr-female"},
 }))
-spk.save("Voix clonée par défaut.", "malo.wav")   # clones on first synthesis
+spk.save("Voix clonée par défaut.", "cloned.wav")   # clones on first synthesis
 ```
 
 ```bash
-# CLI: clone the bundled ref-malo and synthesise with it
+# CLI: clone the bundled reference and synthesise with it
 speaker-helper --port 17600 --clone synth "Bonjour." -o cloned.wav
 # or clone from your own audio (transcript auto-derived):
 speaker-helper --port 17600 --clone-audio my_voice.wav synth "Bonjour." -o out.wav

@@ -9,7 +9,7 @@ Exposes the library as a terminal tool with four sub-commands:
   streaming, printing the measured duration and real-time factor.
 * ``voices`` — list the preset voices of an engine.
 * ``clone`` — register a cloned voice from reference audio (default: the bundled
-  ref-malo) and print its id; missing transcripts come from ``vocal-helper``.
+  ref-fr-female) and print its id; missing transcripts come from ``vocal-helper``.
 * ``eval`` — evaluate the engine against a dataset and gate on versioned
   thresholds (exit code ``0`` pass / ``1`` fail); see :mod:`speaker_helper.eval`.
 * ``speak-from`` — re-voice audio from a YouTube URL, podcast feed, or the
@@ -17,7 +17,7 @@ Exposes the library as a terminal tool with four sub-commands:
 * ``serve`` — run the REST API server (see :mod:`speaker_helper.api`).
 
 The ``--clone`` family of flags works with any command: ``speaker-helper --clone
-synth "Bonjour"`` synthesises in the cloned ref-malo voice.
+synth "Bonjour"`` synthesises in the cloned ref-fr-female voice.
 
 Argument parsing uses the standard-library :mod:`argparse` so the CLI has no
 third-party dependency of its own.
@@ -76,15 +76,17 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--voice", default=None, help="Preset voice id (default: auto).")
     parser.add_argument("--language", default=None, help="Target language (e.g. fr).")
     # Cloning: enable a cloned voice for any command. --clone alone uses the
-    # bundled ref-malo reference; --clone-audio/--clone-text override it. A
+    # bundled ref-fr-female reference; --clone-audio/--clone-text override it. A
     # missing transcript is derived automatically with vocal-helper.
     parser.add_argument(
         "--clone",
         action="store_true",
-        help="Use a cloned voice (default reference: bundled ref-malo).",
+        help="Use a cloned voice (default reference: bundled ref-fr-female).",
     )
     parser.add_argument(
-        "--clone-name", default=None, help="Name for the cloned voice profile (default: ref-malo)."
+        "--clone-name",
+        default=None,
+        help="Name for the cloned voice profile (default: ref-fr-female).",
     )
     parser.add_argument("--clone-audio", default=None, help="Reference audio file to clone from.")
     parser.add_argument(
@@ -417,7 +419,7 @@ def _cmd_clone(args: argparse.Namespace, settings: Settings) -> int:
             ``0`` on success.
         """
         async with Speaker(settings) as spk:
-            # Uses the clone reference resolved from settings (default ref-malo).
+            # Uses the clone reference resolved from settings (default ref-fr-female).
             voice_id = await spk.clone_voice()
         # User-facing: print the id so it can be captured / reused.
         sys.stdout.write(voice_id + "\n")

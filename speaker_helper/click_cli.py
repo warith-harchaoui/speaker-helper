@@ -94,7 +94,7 @@ def _run(ctx: click.Context, command: str, **fields: object) -> None:
 @click.option("--voice", default=None, help="Preset voice id (default: auto).")
 @click.option("--language", default=None, help="Target language (e.g. fr).")
 @click.option(
-    "--clone", is_flag=True, default=False, help="Use a cloned voice (default: ref-malo)."
+    "--clone", is_flag=True, default=False, help="Use a cloned voice (default: ref-fr-female)."
 )
 @click.option("--clone-name", default=None, help="Name for the cloned voice profile.")
 @click.option("--clone-audio", default=None, help="Reference audio file to clone from.")

@@ -6,6 +6,16 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.6] - 2026-08-01
+
+### Changed
+- **Default clone reference replaced.** The previous bundled voice was a real
+  person's recording that had not consented to being distributed as a
+  cloning reference. It is removed (and purged from git history). The new
+  default `assets/ref-fr-female.wav` is a French female voice from the
+  **CML-TTS** dataset under **CC BY 4.0** (attribution in
+  `assets/ref-fr-female.NOTICE.md`). Default clone name is now `ref-fr-female`.
+
 ## [0.7.5] - 2026-08-01
 
 ### Removed
@@ -170,7 +180,7 @@ to [Semantic Versioning](https://semver.org/).
 - **Voice cloning, everywhere** (`Speaker.clone_voice`, CLI `clone` + `--clone*`
   flags, REST `POST /clone`). Give only a recording: over-long audio is trimmed
   with `audio-helper` and the transcript is derived with `vocal-helper`. A
-  bundled reference (`assets/ref-malo.wav`) is the default.
+  bundled reference voice is the default.
 - **AI evaluation layer** (`speaker_helper.eval`): committed French dataset,
   metrics (RTF, audio anomalies, WER, chrF), quality priors + Pareto selection,
   versioned thresholds, and a `speaker-helper eval` command that gates CI via

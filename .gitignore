@@ -23,7 +23,7 @@ htmlcov/
 # Local scratch audio (keep fixtures + the bundled clone reference tracked)
 *.wav
 !tests/fixtures/*.wav
-!assets/ref-malo.wav
+!assets/ref-fr-female.wav
 
 # Real config files — keep only the committed examples.
 *config.json

@@ -8,16 +8,17 @@ module makes that easy and uniform across the library, CLI, and REST API by
 turning a small, permissive *clone configuration* into a concrete list of
 :class:`~speaker_helper.types.VoiceSample`.
 
-A ready-to-use default ships with the project: ``assets/ref-malo.wav`` and its
-transcript ``assets/ref-malo.txt`` (produced with ``vocal-helper``). So enabling
+A ready-to-use default ships with the project: ``assets/ref-fr-female.wav`` and
+its transcript ``assets/ref-fr-female.txt`` — a French female voice from the
+CML-TTS dataset (CC BY 4.0; see ``assets/ref-fr-female.NOTICE.md``). So enabling
 cloning with no further input clones that reference voice; any field can be
 overridden.
 
 The clone configuration is a plain mapping (mirroring ``settings.clone``) so it
 travels unchanged through YAML, environment, CLI flags, and JSON request bodies:
 
-* ``name`` — profile name for the clone (idempotency key). Default ``ref-malo``.
-* ``audio`` — path to a reference recording. Default the bundled ref-malo file.
+* ``name`` — profile name for the clone (idempotency key). Default ``ref-fr-female``.
+* ``audio`` — path to a reference recording. Default the bundled reference file.
 * ``reference_text`` — transcript of ``audio``. Default the bundled transcript.
 * ``samples`` — an explicit list of ``{audio, reference_text}`` objects; when
   present it takes precedence over the single ``audio``/``reference_text`` pair
@@ -26,9 +27,9 @@ travels unchanged through YAML, environment, CLI flags, and JSON request bodies:
 Usage example
 -------------
 >>> from speaker_helper.cloning import resolve_samples
->>> samples = resolve_samples({})          # the bundled ref-malo reference
+>>> samples = resolve_samples({})          # the bundled reference voice
 >>> samples[0].reference_text[:11]
-'Je m'appell'
+'Elle voyait'
 
 Author
 ------
@@ -48,13 +49,13 @@ from speaker_helper.types import VoiceSample
 # are development/operational data, not importable code), so we resolve relative
 # to the package's parent directory.
 _REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_CLONE_NAME = "ref-malo"
-DEFAULT_CLONE_AUDIO = _REPO_ROOT / "assets" / "ref-malo.wav"
-DEFAULT_CLONE_TEXT_FILE = _REPO_ROOT / "assets" / "ref-malo.txt"
+DEFAULT_CLONE_NAME = "ref-fr-female"
+DEFAULT_CLONE_AUDIO = _REPO_ROOT / "assets" / "ref-fr-female.wav"
+DEFAULT_CLONE_TEXT_FILE = _REPO_ROOT / "assets" / "ref-fr-female.txt"
 
 
 def default_reference_text() -> str:
-    """Return the bundled ref-malo transcript, or ``""`` if it is missing."""
+    """Return the bundled reference transcript, or ``""`` if it is missing."""
     # Best-effort read: a missing/unreadable transcript degrades to empty text
     # rather than breaking callers that only wanted a sensible default.
     try:
@@ -64,7 +65,7 @@ def default_reference_text() -> str:
 
 
 def clone_name(clone: dict[str, Any]) -> str:
-    """Return the profile name for a clone configuration (default ``ref-malo``)."""
+    """Return the profile name for a clone configuration (default ``ref-fr-female``)."""
     # An absent or falsy name falls back to the bundled reference's name.
     return str(clone.get("name") or DEFAULT_CLONE_NAME)
 
@@ -76,7 +77,7 @@ def resolve_samples(clone: dict[str, Any]) -> list[VoiceSample]:
     ----------
     clone : dict
         The clone configuration (see the module docstring). An empty mapping
-        yields the single bundled ref-malo reference.
+        yields the single bundled reference voice.
 
     Returns
     -------

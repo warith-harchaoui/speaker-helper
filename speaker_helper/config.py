@@ -156,7 +156,7 @@ class Settings:
     # When non-empty, synthesis uses a cloned voice built from reference audio;
     # keys: name, audio, reference_text, samples. See
     # :mod:`speaker_helper.cloning`. A missing transcript is derived with
-    # ``vocal-helper``; an empty ``audio`` falls back to the bundled ref-malo.
+    # ``vocal-helper``; an empty ``audio`` falls back to the bundled ref-fr-female.
     clone: dict[str, Any] = field(default_factory=dict)
 
     @property

@@ -80,7 +80,7 @@ flowchart TB
 | CLI | `cli.py` / `click_cli.py` | `synth`, `voices`, `clone`, `eval`, `speak-from`, `route`, `serve` — argparse core + click front-end (shared handlers) |
 | API | `api.py` | FastAPI — offline, SSE streaming, cloning upload, `/route`, GUI at `/` |
 | GUI | `gui/` | minimal vanilla-JS + Tailwind single page (synth / stream / voices / clone / route) |
-| Cloning | `cloning.py` | clone defaults (ref-malo), trim + transcript preparation |
+| Cloning | `cloning.py` | clone defaults (ref-fr-female), trim + transcript preparation |
 | Transcription | `transcription.py` | `vocal-helper` adapter (clone transcript + eval round-trip) |
 | Sources | `sources.py` | speech-to-speech in: youtube / podcast / microphone → `revoice` |
 | Evaluation | `eval/` | dataset, metrics, priors/Pareto, thresholds, runner, DeepEval metrics (incl. round-trip idempotence) |

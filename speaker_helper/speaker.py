@@ -269,10 +269,10 @@ class Speaker:
         ----------
         name : str or None
             Profile name for the clone (idempotency key). Defaults to the
-            configured clone name, or ``"ref-malo"``.
+            configured clone name, or ``"ref-fr-female"``.
         samples : list of VoiceSample or None
             Reference recordings. When ``None``, they are resolved from
-            ``settings.clone`` — falling back to the bundled ref-malo reference.
+            ``settings.clone`` — falling back to the bundled ref-fr-female reference.
             A sample without a transcript is transcribed with ``vocal-helper``.
         language : str or None
             Language of the cloned voice (defaults to the configured language).
@@ -287,7 +287,7 @@ class Speaker:
         >>> from speaker_helper import Speaker, Settings, VoiceSample
         >>> spk = Speaker(Settings.from_mapping({"backend": "mock"}))
         >>> # give only the audio; the transcript is derived automatically:
-        >>> # await spk.clone_voice("malo", [VoiceSample("ref.wav", "")])
+        >>> # await spk.clone_voice("my-voice", [VoiceSample("ref.wav", "")])
         """
         from speaker_helper.cloning import clone_name, resolve_samples
 
