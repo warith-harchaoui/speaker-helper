@@ -112,6 +112,27 @@ DEFAULT_VOICE_BY_LANG: dict[str, str] = {
 #: fallback rather than passed off as a choice.
 FALLBACK_VOICE: str = "af_heart"
 
+#: All 54, grouped by the language the first letter encodes (see
+#: :data:`VOICE_PREFIX_LANG`); the second letter is the speaker's gender.
+#:
+#: Written out rather than read from the voice bank, because the question
+#: "which voices are there" is asked *before* anybody has 340 MB on disk —
+#: by someone deciding whether to download them at all. :meth:`list_voices`
+#: prefers the loaded model when there is one and falls back to this, so the
+#: answer is never "load the weights and ask again".
+BUILTIN_VOICES: tuple[str, ...] = (
+    "af_alloy", "af_aoede", "af_bella", "af_heart", "af_jessica", "af_kore",
+    "af_nicole", "af_nova", "af_river", "af_sarah", "af_sky", "am_adam",
+    "am_echo", "am_eric", "am_fenrir", "am_liam", "am_michael", "am_onyx",
+    "am_puck", "am_santa", "bf_alice", "bf_emma", "bf_isabella", "bf_lily",
+    "bm_daniel", "bm_fable", "bm_george", "bm_lewis", "ef_dora", "em_alex",
+    "em_santa", "ff_siwis", "hf_alpha", "hf_beta", "hm_omega", "hm_psi",
+    "if_sara", "im_nicola", "jf_alpha", "jf_gongitsune", "jf_nezumi",
+    "jf_tebukuro", "jm_kumo", "pf_dora", "pm_alex", "pm_santa",
+    "zf_xiaobei", "zf_xiaoni", "zf_xiaoxiao", "zf_xiaoyi", "zm_yunjian",
+    "zm_yunxi", "zm_yunxia", "zm_yunyang",
+)
+
 
 def model_paths() -> tuple[Path, Path] | None:
     """The ONNX graph and voice bank, or ``None`` when they are not fetched."""
@@ -404,8 +425,20 @@ class KokoroEngine:
             )
 
     async def list_voices(self, engine: str | None = None) -> VoiceList:
-        """Every built-in voice, with the language its name implies."""
-        model = await self._model()
+        """Every built-in voice, with the language its name implies.
+
+        Answered from the loaded model when there is one, and from
+        :data:`BUILTIN_VOICES` otherwise. The fallback is the point: somebody
+        choosing a narrator is usually deciding whether to download 340 MB at
+        all, and "fetch the weights, then ask again" is a poor answer to
+        "which voices are there".
+        """
+        names: tuple[str, ...] | list[str] = BUILTIN_VOICES
+        if self._kokoro is not None:
+            names = sorted(self._kokoro.get_voices())
+        elif model_paths() is not None:
+            # The weights are here, so the model is cheap enough to be exact.
+            names = sorted((await self._model()).get_voices())
         voices = [
             Voice(
                 voice_id=name,
@@ -414,7 +447,7 @@ class KokoroEngine:
                 gender="female" if name[1:2] == "f" else "male" if name[1:2] == "m" else "",
                 engine="kokoro",
             )
-            for name in sorted(model.get_voices())
+            for name in names
         ]
         return VoiceList(engine="kokoro", voices=voices)
 

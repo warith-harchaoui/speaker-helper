@@ -177,6 +177,28 @@ async def test_a_narration_with_nothing_to_say_is_an_error() -> None:
             await spk.narrate([Segment(text="»"), Segment(text="…")])
 
 
+@pytest.mark.parametrize("text", ["»", "« ", "—", "...", "…", "“”"])
+def test_punctuation_alone_is_not_speakable(text: str) -> None:
+    """The defect that stopped a narration twelve pages in.
+
+    Handed to the engine, such a block raises "nothing to synthesize,
+    produced no phonemes" and takes the whole run with it — after eleven
+    minutes of audio already made.
+    """
+    assert not Segment(text=text).is_speakable
+
+
+@pytest.mark.parametrize("text", ["1", "Bonjour", "x²", "N9", "été"])
+def test_anything_with_a_letter_or_a_digit_is_speakable(text: str) -> None:
+    """Deliberately broad: the job is to catch punctuation, not to judge."""
+    assert Segment(text=text).is_speakable
+
+
+def test_the_punctuation_pause_is_short_but_not_zero() -> None:
+    """Long enough to exist, short enough to read as punctuation not a gap."""
+    assert 0 < PUNCTUATION_PAUSE_MS <= 400
+
+
 # ── Accepting what callers actually have ───────────────────────────────────
 
 
