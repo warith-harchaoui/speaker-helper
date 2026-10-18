@@ -111,3 +111,34 @@ one-file OS shim.
   are fine and privacy is not a concern.
 - **ElevenLabs (cloud)** — top-tier streaming and cloning quality with no local
   setup, and sending text + reference audio to a paid API is acceptable.
+
+## Why there is no `speaker-helper-rs`
+
+Several packages in this suite have a Rust port — `audio-helper-rs`,
+`youtube-helper-rs` — and the question of a third keeps coming up. The answer
+is no, and the reason is the same one those two give for what they left out.
+
+Their scope rule is: **wrap a system binary, do not reimplement the heavy
+part.** `audio-helper-rs` ports probe, convert, chunk and concatenate on top
+of `ffmpeg`, and explicitly does not port Demucs source separation or MFCC
+similarity, because both need a real ML stack disproportionate to the crate's
+promise. `youtube-helper-rs` wraps `yt-dlp` rather than reimplementing it.
+
+Here, the heavy part is the whole part. Synthesis is ONNX inference plus
+espeak-ng phonemisation, and there is no `kokoro` binary on the system to
+wrap. A Rust port would mean the `ort` crate plus an espeak FFI binding —
+reimplementing exactly what those crates decided not to.
+
+And there is no problem it would solve. Kokoro already synthesises at roughly
+a fifth of real time on a laptop CPU; the measured operating point through
+this package's own façade is a real-time factor of 0.515. The latency that
+matters in a conversation is dominated by endpointing and by the language
+model's first token, not by the vocoder. A faster vocoder buys nothing a user
+can hear.
+
+What a crate *could* usefully own is the half that is not inference: laying a
+timeline out, assembling WAV, writing WebVTT. That is a few hundred lines of
+arithmetic sitting beside `audio-helper-rs`, and calling it a *speaker* helper
+would misname it. If it is ever wanted, it belongs there.
+
+This entry exists so the question is answered once rather than re-litigated.

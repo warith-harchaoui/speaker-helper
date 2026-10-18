@@ -122,3 +122,41 @@ vrais moteurs neuronaux plutôt qu'un passe-plat OS d'un seul fichier.
 - **ElevenLabs (cloud)** — qualité de streaming et de clonage au plus haut niveau
   sans installation locale, et envoyer texte et audio de référence à une API
   payante ne pose pas de problème.
+
+## Pourquoi il n'y a pas de `speaker-helper-rs`
+
+Plusieurs paquets de cette suite ont un portage Rust — `audio-helper-rs`,
+`youtube-helper-rs` — et la question d'un troisième revient régulièrement. La
+réponse est non, pour la raison même que ces deux-là donnent à ce qu'ils ont
+laissé de côté.
+
+Leur règle de périmètre : **envelopper un binaire système, ne pas
+réimplémenter la partie lourde.** `audio-helper-rs` porte le sondage, la
+conversion, le découpage et la concaténation par-dessus `ffmpeg`, et ne porte
+explicitement ni la séparation de sources Demucs ni la similarité MFCC, parce
+que les deux demandent une vraie pile d'apprentissage, disproportionnée à la
+promesse du crate. `youtube-helper-rs` enveloppe `yt-dlp` au lieu de le
+réécrire.
+
+Ici, la partie lourde est la seule partie. La synthèse, c'est de l'inférence
+ONNX plus la phonémisation espeak-ng, et il n'existe aucun binaire `kokoro` à
+envelopper. Un portage voudrait dire le crate `ort` plus une liaison FFI vers
+espeak — réimplémenter précisément ce que ces crates ont décidé de ne pas
+faire.
+
+Et il n'y a aucun problème que ça résoudrait. Kokoro synthétise déjà à environ
+un cinquième du temps réel sur un processeur portable ; le point de
+fonctionnement mesuré à travers la façade de ce paquet est un facteur
+temps-réel de 0,515. La latence qui compte dans une conversation est dominée
+par la détection de fin de tour et par le premier jeton du modèle de langue,
+pas par le vocodeur. Un vocodeur plus rapide n'achète rien qu'une oreille
+perçoive.
+
+Ce qu'un crate pourrait utilement posséder, c'est la moitié qui n'est pas de
+l'inférence : disposer une timeline, assembler du WAV, écrire du WebVTT. Cela
+fait quelques centaines de lignes d'arithmétique, à leur place à côté
+d'`audio-helper-rs` — et les appeler un helper de *voix* serait les mal
+nommer. Si cela se révèle souhaitable un jour, c'est là que ça va.
+
+Cette entrée existe pour que la question soit tranchée une fois plutôt que
+rouverte.
