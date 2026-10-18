@@ -68,6 +68,31 @@ class SynthRequest(BaseModel):
     language: str | None = Field(None, description="Override target language.")
 
 
+class NarrateRequest(BaseModel):
+    """Request body for ``POST /narrate``.
+
+    Parameters
+    ----------
+    segments : list
+        The document's blocks. Each is an object with ``text`` and optionally
+        ``say`` (what to pronounce, when it differs from what the page shows),
+        ``pause_before_ms``, ``pause_after_ms``, ``pace`` and ``emotion``.
+        Plain strings are accepted for the simple case.
+    language : str or None
+        Override the configured target language.
+    voice : str or None
+        Override the configured voice.
+    read_math : str or None
+        Language in which to speak any notation the blocks contain. The cues
+        keep the page's own text either way — that is the point of the pair.
+    """
+
+    segments: list = Field(..., min_length=1, description="The document's blocks.")
+    language: str | None = Field(None, description="Override target language.")
+    voice: str | None = Field(None, description="Override the voice.")
+    read_math: str | None = Field(None, description="Speak notation as words in this language.")
+
+
 class RouteRequestBody(BaseModel):
     """Request body for ``POST /route``.
 
@@ -199,6 +224,49 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         }
         return Response(content=result.wav_bytes, media_type="audio/wav", headers=headers)
 
+    @app.post("/narrate", operation_id="narrate")
+    async def narrate(req: NarrateRequest) -> dict:
+        """Read a document aloud and return the audio *with* its cues.
+
+        JSON rather than ``audio/wav``, unlike ``/synth``: the cues are the
+        reason this route exists, and a caller that only wanted the sound
+        already has ``/synth``. The audio rides along base64-encoded, which
+        costs a third more bytes and keeps the answer one object.
+        """
+        from speaker_helper.narration import coerce_segments, resolve_spoken_math
+
+        try:
+            segments = coerce_segments(req.segments)
+            if req.read_math:
+                segments = resolve_spoken_math(segments, req.read_math)
+            result = await speaker.narrate(
+                segments, language=req.language, voice=req.voice
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except Exception as exc:  # noqa: BLE001 - surface engine failures as 502
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+        return {
+            "audio_wav_base64": base64.b64encode(result.wav_bytes).decode("ascii"),
+            "vtt": result.to_vtt(),
+            "duration_s": round(result.duration_s, 3),
+            "rtf": round(result.rtf, 3),
+            "voice_id": result.voice_id,
+            "language": result.language,
+            "language_fallback": result.language_fallback,
+            "ignored_hints": result.ignored_hints,
+            "cues": [
+                {
+                    "index": cue.index,
+                    "text": cue.text,
+                    "start_seconds": round(cue.start_seconds, 3),
+                    "end_seconds": round(cue.end_seconds, 3),
+                }
+                for cue in result.cues
+            ],
+        }
+
     @app.post("/synth/stream", operation_id="synth_stream")
     async def synth_stream(req: SynthRequest) -> StreamingResponse:
         """Stream synthesis as Server-Sent Events, one per sentence-sized chunk.
@@ -277,11 +345,58 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
         return {"voice_id": voice_id}
 
+    # Republish the routes above as agent tools. Before the GUI, because the
+    # GUI mounts a catch-all at ``/``.
+    _mount_mcp(app)
+
     # Serve the minimal single-page GUI at ``/`` (added last so the explicit API
     # routes above always take precedence over the static catch-all).
     _mount_gui(app)
 
     return app
+
+
+def _mount_mcp(app: FastAPI) -> None:
+    """Mount the MCP endpoint over the routes this app already serves.
+
+    Guarded against ``Exception``, not only ``ImportError``, and that width is
+    the whole lesson of the last attempt. ``fastapi-mcp`` 0.4.0 called the
+    ``mcp`` SDK with an argument count it no longer accepted; the result was a
+    ``TypeError`` out of :func:`create_app`, which a narrower guard let
+    through — so an optional surface took down *every* API test, not only its
+    own. An agent tool nobody can reach is a missing feature; an HTTP API that
+    will not construct is an outage.
+
+    The pin that makes the pairing work lives in the ``mcp`` extra.
+    """
+    try:
+        from fastapi_mcp import FastApiMCP
+    except ImportError:
+        # The ordinary case: installed without the `mcp` extra.
+        return
+
+    try:
+        server = FastApiMCP(
+            app,
+            name="speaker-helper",
+            description=(
+                "Speech synthesis as agent tools: say a sentence, list the "
+                "voices, clone one from a recording, and narrate a document "
+                "with the cues that say where each block is spoken."
+            ),
+        )
+        # Newer releases split mount() into transport-specific mount_http()
+        # and mount_sse(); fall back so a range of versions keeps working.
+        if hasattr(server, "mount_http"):
+            server.mount_http()
+        else:  # pragma: no cover - legacy fastapi-mcp
+            server.mount()
+    except Exception as exc:  # pragma: no cover - version-pairing guard
+        osh.warn(
+            f"MCP surface not mounted ({type(exc).__name__}: {exc}). The HTTP "
+            f"API is unaffected; `pip install 'speaker-helper[mcp]'` installs "
+            f"a pairing known to work."
+        )
 
 
 def _mount_gui(app: FastAPI) -> None:

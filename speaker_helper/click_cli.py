@@ -54,6 +54,9 @@ _HANDLERS = {
     "speak-from": _argcli._cmd_speak_from,
     "route": _argcli._cmd_route,
     "serve": _argcli._cmd_serve,
+    "narrate": _argcli._cmd_narrate,
+    "install-voice": _argcli._cmd_install_voice,
+    "health": _argcli._cmd_health,
 }
 
 
@@ -186,6 +189,48 @@ def route(
         quality_floor=quality_floor,
         json_out=json_out,
     )
+
+
+@cli.command(name="narrate")
+@click.argument("segments", type=click.Path(exists=True, path_type=Path))
+@click.option(
+    "-o",
+    "--out",
+    type=click.Path(path_type=Path),
+    default=Path("narration.wav"),
+    help="Output WAV; the cues are written beside it as .vtt.",
+)
+@click.option(
+    "--read-math",
+    metavar="LANG",
+    default=None,
+    help="Speak the notation as words in LANG, leaving the cues as the page reads.",
+)
+@click.pass_context
+def narrate(ctx: click.Context, segments: Path, out: Path, read_math: str | None) -> None:
+    """Read a document aloud, and write the timed track that follows it.
+
+    SEGMENTS is a JSON list of blocks, each with `text` and optionally `say`,
+    `pause_before_ms`, `pause_after_ms`, `pace` and `emotion`. A list of plain
+    strings works too.
+    """
+    _run(ctx, "narrate", segments=segments, out=out, read_math=read_math)
+
+
+@cli.command(name="install-voice")
+@click.option("--engine", default="kokoro", help="Which engine to prepare.")
+@click.option("--force", is_flag=True, default=False, help="Re-download even if present.")
+@click.pass_context
+def install_voice(ctx: click.Context, engine: str, force: bool) -> None:
+    """Download the weights an engine needs, before anything depends on them."""
+    _run(ctx, "install-voice", engine=engine, force=force)
+
+
+@cli.command(name="health")
+@click.pass_context
+def health(ctx: click.Context) -> None:
+    """Report whether the configured backend can run; exit non-zero if not."""
+    _run(ctx, "health")
 
 
 @cli.command(name="voices")

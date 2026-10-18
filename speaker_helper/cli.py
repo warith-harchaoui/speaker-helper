@@ -119,6 +119,51 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Streaming mode: report time-to-first-audio and cadence.",
     )
 
+    # `narrate`: a document -> one WAV plus the timed track that follows it.
+    p_narrate = sub.add_parser(
+        "narrate",
+        help="Read a document aloud and write the WAV plus its WebVTT cues.",
+    )
+    p_narrate.add_argument(
+        "segments",
+        type=Path,
+        help=(
+            "JSON file: a list of blocks, each with `text` and optionally "
+            "`say`, `pause_before_ms`, `pause_after_ms`, `pace`, `emotion`. "
+            "A list of plain strings is accepted too."
+        ),
+    )
+    p_narrate.add_argument(
+        "-o",
+        "--out",
+        type=Path,
+        default=Path("narration.wav"),
+        help="Output WAV path; the cues are written beside it as .vtt.",
+    )
+    p_narrate.add_argument(
+        "--read-math",
+        metavar="LANG",
+        default=None,
+        help=(
+            "Turn the notation in each block into words in LANG before "
+            "speaking it, leaving the cues showing the page's own text."
+        ),
+    )
+
+    # `install-voice`: fetch the weights before anything depends on them.
+    p_install = sub.add_parser(
+        "install-voice", help="Download the weights an engine needs."
+    )
+    p_install.add_argument(
+        "--engine", default="kokoro", help="Which engine to prepare (default: kokoro)."
+    )
+    p_install.add_argument(
+        "--force", action="store_true", help="Re-download even if already present."
+    )
+
+    # `health`: can this machine synthesise at all, and if not, what is missing.
+    sub.add_parser("health", help="Report whether the configured backend can run.")
+
     # `voices`: enumerate an engine's preset voices.
     p_voices = sub.add_parser("voices", help="List preset voices for an engine.")
     p_voices.add_argument("--engine", default=None, help="Engine id (default: configured).")
@@ -320,6 +365,73 @@ def _cmd_synth(args: argparse.Namespace, settings: Settings) -> int:
                     "wrote %s (%.2fs audio, RTF %.2f)", args.out, result.duration_s, result.rtf
                 )
         return 0
+
+    return asyncio.run(run())
+
+
+def _cmd_narrate(args: argparse.Namespace, settings: Settings) -> int:
+    """Handle the ``narrate`` sub-command; return a process exit code.
+
+    Writes two files, not one. The WAV is the obvious half; the ``.vtt``
+    beside it is what lets a page highlight the block being read, and it costs
+    nothing to produce because the offsets were already computed to lay the
+    audio out.
+    """
+    import json
+
+    from speaker_helper.narration import coerce_segments, resolve_spoken_math
+
+    raw = json.loads(args.segments.read_text(encoding="utf-8"))
+    if not isinstance(raw, list):
+        sys.stderr.write("the segments file must hold a JSON list\n")
+        return 2
+    segments = coerce_segments(raw)
+    if args.read_math:
+        segments = resolve_spoken_math(segments, args.read_math)
+
+    async def run() -> int:
+        async with Speaker(settings) as spk:
+            result = await spk.narrate(segments)
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_bytes(result.wav_bytes)
+        cues_path = args.out.with_suffix(".vtt")
+        cues_path.write_text(result.to_vtt(), encoding="utf-8")
+        sys.stdout.write(
+            f"{args.out}\t{result.duration_s:.2f}s\t{len(result.cues)} cues\t"
+            f"rtf {result.rtf:.2f}\n{cues_path}\n"
+        )
+        if result.ignored_hints:
+            # Not a failure, and not silent either: the document asked for
+            # something this engine has no dial for.
+            sys.stderr.write(
+                f"note: this backend has no dial for "
+                f"{', '.join(result.ignored_hints)}\n"
+            )
+        return 0
+
+    return asyncio.run(run())
+
+
+def _cmd_install_voice(args: argparse.Namespace, settings: Settings) -> int:
+    """Handle the ``install-voice`` sub-command; return a process exit code."""
+    from speaker_helper.install import install_engine
+
+    return install_engine(args.engine, force=args.force)
+
+
+def _cmd_health(args: argparse.Namespace, settings: Settings) -> int:
+    """Handle the ``health`` sub-command; return a process exit code.
+
+    Exits non-zero when the backend could not synthesise, so this works as a
+    gate in a script rather than only as something to read.
+    """
+    import json
+
+    async def run() -> int:
+        async with Speaker(settings) as spk:
+            report = await spk.engine.health()
+        sys.stdout.write(json.dumps(report, indent=2, sort_keys=True) + "\n")
+        return 0 if report.get("status") == "ok" else 1
 
     return asyncio.run(run())
 
@@ -651,6 +763,12 @@ def main(argv: list[str] | None = None) -> int:
     # Each branch delegates to a `_cmd_*` handler that returns the exit code.
     if args.command == "synth":
         return _cmd_synth(args, settings)
+    if args.command == "narrate":
+        return _cmd_narrate(args, settings)
+    if args.command == "install-voice":
+        return _cmd_install_voice(args, settings)
+    if args.command == "health":
+        return _cmd_health(args, settings)
     if args.command == "voices":
         return _cmd_voices(args, settings)
     if args.command == "clone":

@@ -1,27 +1,47 @@
-# speaker-helper REST API server.
+# `docker compose up` is the whole onboarding. The Dockerfile beside this file
+# is a recipe; this is the way in — the port, the volume, the environment and
+# the command, declared rather than reconstructed by the next reader from a
+# `docker run` line in somebody's shell history.
 #
-# This wraps the speaker-helper API around an existing Voicebox engine. Start
-# Voicebox separately (native on :17493, or its own docker-compose on :17600),
-# then:
-#
-#   docker compose up --build
+#   docker compose up -d
+#   curl -s localhost:8080/health
 #   curl -s -X POST localhost:8080/synth -H 'content-type: application/json' \
 #        -d '{"text": "Bonjour."}' -o out.wav
+#   docker compose run --rm api speaker-helper narrate /work/post.json
+#
+# One service, and that is the change worth noting: this file used to declare
+# how to reach a *second* container running the engine. The engine is in this
+# one now.
 
 services:
-  speaker-helper:
+  api:
     build: .
+    image: speaker-helper:local
     container_name: speaker-helper
-    restart: unless-stopped
     ports:
+      # Bound to the loopback on purpose. Synthesis is cheap to ask for and
+      # not free to serve; an open port is somebody else's GPU budget.
       - "127.0.0.1:8080:8080"
     environment:
-      # Reach a Voicebox engine running on the Docker host.
-      - SPEAKER_HELPER_VOICEBOX_HOST=host.docker.internal
-      - SPEAKER_HELPER_VOICEBOX_PORT=17600
-      - SPEAKER_HELPER_ENGINE=kokoro
-      - SPEAKER_HELPER_LANGUAGE=fr
-      - LOG_LEVEL=info
-    extra_hosts:
-      # Lets the container resolve the host on Linux (mac+Windows have it native).
-      - "host.docker.internal:host-gateway"
+      SPEAKER_HELPER_LANGUAGE: fr
+      # Empty means "read the text, detect the language, pick the voice that
+      # speaks it". Set it to pin one, e.g. ff_siwis.
+      SPEAKER_HELPER_VOICE: ""
+      LOG_LEVEL: info
+    volumes:
+      # Documents to narrate, and the audio written beside them. Mounted
+      # rather than copied so the container never holds the only copy.
+      - ./work:/work
+    working_dir: /work
+    restart: unless-stopped
+    # One worker, deliberately. The backend loads its ONNX graph once per
+    # process and keeps it; a second worker does not share that model, it pays
+    # for its own copy. The symptom of getting this wrong is not an error — it
+    # is a container using several times the memory it needs.
+    command:
+      - speaker-helper
+      - serve
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
