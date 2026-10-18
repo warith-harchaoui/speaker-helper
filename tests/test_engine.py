@@ -21,25 +21,46 @@ from speaker_helper import (
     Settings,
     Speaker,
     TTSEngine,
-    VoiceboxClient,
     available_backends,
     create_engine,
     register_backend,
 )
+from speaker_helper.backends.kokoro import KokoroEngine
 
 
 def test_registry_lists_builtin_backends() -> None:
-    """Both in-tree backends are registered."""
-    # The registry must expose the mock and the real Voicebox backend.
-    assert "mock" in available_backends()
-    assert "voicebox" in available_backends()
+    """Every in-tree backend is registered."""
+    registered = available_backends()
+    assert {"kokoro", "openvoice", "chatterbox", "mock"} <= set(registered)
+
+
+def test_the_default_backend_needs_no_server() -> None:
+    """An unconfigured Settings must produce a usable engine.
+
+    The point of the whole in-process move: somebody who has installed this
+    package and configured nothing should get a backend, not a connection
+    error naming a port they have never heard of.
+    """
+    assert isinstance(create_engine(Settings()), KokoroEngine)
 
 
 def test_create_engine_dispatches_on_backend() -> None:
     """The factory returns the class named by ``settings.backend``."""
-    # Each backend name resolves to its concrete engine class.
     assert isinstance(create_engine(Settings.from_mapping({"backend": "mock"})), MockEngine)
-    assert isinstance(create_engine(Settings.from_mapping({"backend": "voicebox"})), VoiceboxClient)
+    assert isinstance(create_engine(Settings.from_mapping({"backend": "kokoro"})), KokoroEngine)
+
+
+def test_building_an_engine_imports_no_model() -> None:
+    """Constructing a backend must not load several hundred megabytes.
+
+    ``create_engine`` is called by the CLI before it knows whether the user
+    asked for `--help`; a factory that imported the ONNX runtime would make
+    every command pay for the one that synthesises.
+    """
+    import sys
+
+    create_engine(Settings.from_mapping({"backend": "kokoro"}))
+    assert "onnxruntime" not in sys.modules
 
 
 def test_create_engine_rejects_unknown_backend() -> None:
@@ -49,11 +70,14 @@ def test_create_engine_rejects_unknown_backend() -> None:
         create_engine(Settings.from_mapping({"backend": "nope"}))
 
 
-def test_both_backends_satisfy_the_protocol() -> None:
-    """Voicebox and mock both structurally implement TTSEngine."""
-    # Structural (duck-typed) conformance to the shared protocol.
-    assert isinstance(create_engine(Settings.from_mapping({"backend": "mock"})), TTSEngine)
-    assert isinstance(create_engine(Settings.from_mapping({"backend": "voicebox"})), TTSEngine)
+@pytest.mark.parametrize("backend", ["kokoro", "openvoice", "chatterbox", "mock"])
+def test_every_backend_satisfies_the_protocol(backend: str) -> None:
+    """Structural conformance, for every backend that ships.
+
+    Parametrised rather than written out: a backend added to the registry and
+    forgotten here would otherwise pass by not being tested.
+    """
+    assert isinstance(create_engine(Settings.from_mapping({"backend": backend})), TTSEngine)
 
 
 def test_register_backend_is_pluggable() -> None:

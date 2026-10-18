@@ -4,19 +4,25 @@ Backend-agnostic text-to-speech engine interface and registry.
 Module summary
 --------------
 speaker-helper's value is a small, typed façade over a *local* TTS engine. The
-concrete engine (Voicebox today) is deliberately an implementation detail: the
+concrete engine is deliberately an implementation detail: the
 rest of the package — :class:`~speaker_helper.speaker.Speaker`, the REST API,
 the CLI, the evaluation layer — talks only to the :class:`TTSEngine` protocol
 defined here. Swapping or adding a backend is therefore a local change: write a
 class with four coroutines and register it.
 
-Two backends ship in-tree:
+Four backends ship in-tree:
 
-* ``voicebox`` — the real engine, :class:`~speaker_helper.client.VoiceboxClient`.
-* ``mock`` — :class:`MockEngine`, a deterministic, dependency-light synthesiser
-  that needs no server. It makes the test suite and the evaluation layer
-  runnable in CI (and proves the abstraction: the same code paths drive any
-  backend).
+* ``kokoro`` — the default. In this process, no server, 54 built-in voices.
+* ``openvoice``, ``chatterbox`` — cloning, from a reference recording.
+* ``mock`` — :class:`MockEngine`, a deterministic, dependency-light
+  synthesiser that needs no server and no model. It makes the test suite and
+  the evaluation layer runnable in CI, and it proves the abstraction: the
+  same code paths drive any backend, narration included.
+
+A fifth used to ship — a REST client for a desktop application on a fixed
+port. It was removed once the default ran in-process: an engine you have to
+install, launch and keep alive, to do what a 300 MB file does here, is not a
+second option but a second way to fail.
 
 :func:`create_engine` dispatches on ``settings.backend``. Third parties can add
 their own backend at runtime with :func:`register_backend`.
@@ -38,6 +44,7 @@ from __future__ import annotations
 
 import io
 import math
+import wave
 from collections.abc import Callable
 from typing import Protocol, runtime_checkable
 
@@ -59,8 +66,23 @@ class TTSEngine(Protocol):
     names are present (not their signatures) — handy in tests and factories.
     """
 
-    async def synthesize(self, text: str, *, language: str | None = None) -> AudioResult:
-        """Synthesise ``text`` into one :class:`AudioResult`."""
+    async def synthesize(
+        self,
+        text: str,
+        *,
+        language: str | None = None,
+        voice: str | None = None,
+        speed: float = 1.0,
+    ) -> AudioResult:
+        """Synthesise ``text`` into one :class:`AudioResult`.
+
+        ``voice`` and ``speed`` arrived with narration, where a document picks
+        a voice once and varies the pace block by block. They are keyword-only
+        and both have defaults, so a backend written against the original
+        two-argument signature still satisfies this protocol —
+        :meth:`~speaker_helper.speaker.Speaker.narrate` offers them and
+        withdraws them when the backend does not declare them.
+        """
         ...
 
     async def list_voices(self, engine: str | None = None) -> VoiceList:
@@ -137,21 +159,47 @@ def create_engine(settings: Settings) -> TTSEngine:
     ValueError
         If ``settings.backend`` names no registered backend.
     """
-    name = (settings.backend or "voicebox").lower()
+    name = (settings.backend or "kokoro").lower()
     factory = _REGISTRY.get(name)
     if factory is None:
         raise ValueError(f"unknown backend {name!r}; available: {', '.join(available_backends())}")
     return factory(settings)
 
 
-def _voicebox_factory(settings: Settings) -> TTSEngine:
-    """Lazily build a :class:`VoiceboxClient` (keeps httpx out of import path)."""
-    from speaker_helper.client import VoiceboxClient
+def _kokoro_factory(settings: Settings) -> TTSEngine:
+    """Lazily build a :class:`~speaker_helper.backends.kokoro.KokoroEngine`.
 
-    return VoiceboxClient(settings)
+    Lazy on purpose: the factory is what ``create_engine`` calls, and this
+    package must stay importable on a machine with no ONNX runtime and no
+    weights. Nothing here touches kokoro-onnx — the engine loads the model on
+    its first synthesis, not on construction.
+    """
+    from speaker_helper.backends.kokoro import KokoroEngine
+
+    return KokoroEngine(settings)
 
 
-register_backend("voicebox", _voicebox_factory)
+register_backend("kokoro", _kokoro_factory)
+
+
+def _openvoice_factory(settings: Settings) -> TTSEngine:
+    """Lazily build the OpenVoice cloning backend."""
+    from speaker_helper.backends.openvoice import OpenVoiceEngine
+
+    return OpenVoiceEngine(settings)
+
+
+register_backend("openvoice", _openvoice_factory)
+
+
+def _chatterbox_factory(settings: Settings) -> TTSEngine:
+    """Lazily build the Chatterbox cloning backend."""
+    from speaker_helper.backends.chatterbox import ChatterboxEngine
+
+    return ChatterboxEngine(settings)
+
+
+register_backend("chatterbox", _chatterbox_factory)
 
 
 # ---------------------------------------------------------------------------
@@ -204,8 +252,20 @@ class MockEngine:
         self.amplitude: float = float(m.get("amplitude", 0.2))
         self.frequency_hz: float = float(m.get("frequency_hz", 220.0))
 
-    async def synthesize(self, text: str, *, language: str | None = None) -> AudioResult:
+    async def synthesize(
+        self,
+        text: str,
+        *,
+        language: str | None = None,
+        voice: str | None = None,
+        speed: float = 1.0,
+    ) -> AudioResult:
         """Synthesise ``text`` into a deterministic sine-tone WAV.
+
+        Honouring ``speed`` is what makes this backend worth narrating with:
+        a pace of ``fast`` has to shorten the audio, or the cues it produces
+        are not the ones a real engine would produce and the timeline tests
+        pass against a shape nothing ships.
 
         Parameters
         ----------
@@ -214,6 +274,10 @@ class MockEngine:
             output duration; content is not spoken.
         language : str or None
             Override the configured language label on the result.
+        voice : str or None
+            Reported back on the result; nothing here varies with it.
+        speed : float
+            Divides the duration, the way a faster reading would.
 
         Returns
         -------
@@ -229,17 +293,28 @@ class MockEngine:
         if not text or not text.strip():
             raise ValueError("cannot synthesise empty text")
         language = language or self.settings.language
-        duration_s = max(0.2, len(text.strip()) / self.chars_per_sec)
+        duration_s = max(0.2, len(text.strip()) / self.chars_per_sec / max(speed, 0.01))
         wav_bytes = self._render_tone(duration_s)
         return AudioResult(
             wav_bytes=wav_bytes,
             sample_rate=self.sample_rate,
-            duration_s=duration_s,
+            # Measured from the rendered bytes, not from the figure above: the
+            # tone is a whole number of samples and `duration_s` is not, so the
+            # two differ by up to a sample. Narration lays audio out by sample
+            # and then checks the timeline against the file, which turns that
+            # rounding into a failure — the check is right and the source of
+            # truth has to be the audio.
+            duration_s=self._rendered_seconds(wav_bytes),
             compute_s=duration_s * self.rtf,
             text=text,
-            voice_id=self.settings.voice_id or "mock-voice",
+            voice_id=voice or self.settings.voice_id or "mock-voice",
             language=language,
         )
+
+    def _rendered_seconds(self, wav_bytes: bytes) -> float:
+        """How long the WAV actually is, read back from its own header."""
+        with wave.open(io.BytesIO(wav_bytes), "rb") as handle:
+            return handle.getnframes() / float(handle.getframerate())
 
     async def list_voices(self, engine: str | None = None) -> VoiceList:
         """Return a small fixed set of fake voices for ``engine``."""

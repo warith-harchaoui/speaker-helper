@@ -3,7 +3,7 @@ Typed data structures exchanged across speaker-helper's public surface.
 
 Module summary
 --------------
-speaker-helper turns text into speech through the Voicebox engine. The values
+speaker-helper turns text into speech. The values
 that cross its API boundaries are described here as dataclasses so callers
 never guess dictionary shapes and editors can autocomplete. Audio is carried
 as an in-memory ``bytes`` WAV payload plus the metadata a caller needs to save,
@@ -34,7 +34,7 @@ Mode = Literal["offline", "streaming"]
 
 @dataclass(frozen=True)
 class Voice:
-    """A preset voice offered by a Voicebox engine.
+    """A preset voice offered by a backend.
 
     Parameters
     ----------

@@ -4,7 +4,7 @@ Run an evaluation over a dataset and gate on versioned thresholds.
 Module summary
 --------------
 The runner ties the pieces together: it drives a
-:class:`~speaker_helper.speaker.Speaker` (any backend — Voicebox, mock, a future
+:class:`~speaker_helper.speaker.Speaker` (any backend — kokoro, mock, a future
 engine) over a list of :class:`~speaker_helper.eval.dataset.EvalCase`, measures
 speed and signal integrity for each, optionally re-transcribes the audio to
 score fidelity, aggregates everything into an :class:`EvalReport`, and compares
@@ -12,7 +12,7 @@ that report to committed :class:`~speaker_helper.eval.thresholds.Thresholds`.
 
 Because it targets the :class:`Speaker` façade, the evaluation is completely
 engine-agnostic: the same run measures the mock backend in CI or the real
-Voicebox engine locally, with no code change — only ``settings.backend`` differs.
+real engine locally, with no code change — only ``settings.backend`` differs.
 
 Fidelity (WER/chrF) is a *round-trip*: it needs a speech-to-text transcriber.
 That is injected through the :class:`Transcriber` protocol (e.g. a ``vocal-helper``

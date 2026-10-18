@@ -21,28 +21,23 @@ def test_synth_parses_text_and_output() -> None:
     assert str(args.out) == "x.wav"
 
 
-def test_top_level_overrides_voicebox() -> None:
-    """Top-level --host/--port map onto the Voicebox connection."""
-    # Act: a top-level --port precedes the sub-command.
-    args = _build_parser().parse_args(["--port", "17600", "synth", "hi"])
+def test_the_voice_flag_reaches_the_settings() -> None:
+    """``--voice`` names the voice that reads, wherever it sits on the line."""
+    args = _build_parser().parse_args(["--voice", "ff_siwis", "synth", "hi"])
     settings = _settings_from_args(args)
-    # Assert: the flag flows through to the Voicebox connection port.
-    assert settings.voicebox.port == 17600
+    assert settings.voice == "ff_siwis"
 
 
-def test_serve_bind_does_not_clobber_voicebox_port(monkeypatch) -> None:
-    """`serve --port` binds the server without changing the Voicebox port.
+def test_serve_bind_is_the_servers_own_socket(monkeypatch) -> None:
+    """``serve --host/--port`` binds this server and configures nothing else.
 
-    Regression: the serve bind flags must not collide with the top-level
-    Voicebox --host/--port, or the server would call itself for /health.
+    These flags used to need separate dests because a top-level --host/--port
+    pointed at a *different* server — the engine's. With the engine in this
+    process there is only one socket in this program, and the regression that
+    made the server call itself for /health cannot recur.
     """
-    # Arrange: configure the Voicebox port via the environment.
-    monkeypatch.setenv("SPEAKER_HELPER_VOICEBOX_PORT", "17600")
-    # Act: parse a serve command whose bind flags reuse --host/--port.
     args = _build_parser().parse_args(["serve", "--host", "0.0.0.0", "--port", "9000"])
-    # Assert: the bind flags feed the server's own listening socket.
     assert args.bind_host == "0.0.0.0"
     assert args.bind_port == 9000
     settings = _settings_from_args(args)
-    # The Voicebox port stays what the environment configured, not 9000.
-    assert settings.voicebox.port == 17600
+    assert settings.backend == "kokoro"

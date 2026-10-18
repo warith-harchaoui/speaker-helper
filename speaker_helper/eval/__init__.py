@@ -10,7 +10,7 @@ first-class, CI-gating layer.
 
 It is **engine-agnostic**: everything runs against the
 :class:`~speaker_helper.speaker.Speaker` façade, so the exact same evaluation
-grades the deterministic ``mock`` backend in CI or the real Voicebox ``kokoro``
+grades the deterministic ``mock`` backend in CI or the real ``kokoro``
 engine locally — only ``settings.backend`` differs.
 
 Public surface

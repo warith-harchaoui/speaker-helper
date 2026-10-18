@@ -69,9 +69,12 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Path to settings.yaml (default: ./settings.yaml if present).",
     )
     # Global overrides: they precede the sub-command and win over settings.yaml.
-    parser.add_argument("--backend", default=None, help="TTS backend: voicebox (default) or mock.")
-    parser.add_argument("--host", default=None, help="Voicebox host override.")
-    parser.add_argument("--port", type=int, default=None, help="Voicebox port override.")
+    parser.add_argument(
+        "--backend",
+        default=None,
+        help="TTS backend: kokoro (default), openvoice, chatterbox or mock.",
+    )
+    parser.add_argument("--voice-sample", default=None, help="Reference recording to clone.")
     parser.add_argument("--engine", default=None, help="Engine/model id (e.g. kokoro).")
     parser.add_argument("--voice", default=None, help="Preset voice id (default: auto).")
     parser.add_argument("--language", default=None, help="Target language (e.g. fr).")
@@ -218,8 +221,9 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Write the full decision JSON to this path.",
     )
 
-    # Distinct dests so the server's *bind* address never collides with the
-    # top-level *Voicebox* --host/--port in the shared argparse namespace.
+    # The server's bind address. These used to need distinct dests because a
+    # top-level --host/--port pointed at the engine's own server; with the
+    # engine in-process there is only one host and port in this program.
     p_serve = sub.add_parser("serve", help="Run the REST API server.")
     p_serve.add_argument("--host", dest="bind_host", default="127.0.0.1", help="Bind host.")
     p_serve.add_argument("--port", dest="bind_port", type=int, default=8080, help="Bind port.")
@@ -234,14 +238,12 @@ def _settings_from_args(args: argparse.Namespace) -> Settings:
     settings = Settings.load(args.config)
     if getattr(args, "backend", None):
         settings.backend = args.backend
-    if getattr(args, "host", None):
-        settings.voicebox.host = args.host
-    if getattr(args, "port", None):
-        settings.voicebox.port = args.port
     if getattr(args, "engine", None):
         settings.engine = args.engine
     if getattr(args, "voice", None):
-        settings.voice_id = args.voice
+        settings.voice = args.voice
+    if getattr(args, "voice_sample", None):
+        settings.voice_sample = args.voice_sample
     if getattr(args, "language", None):
         settings.language = args.language
 

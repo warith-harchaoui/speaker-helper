@@ -30,7 +30,7 @@ Usage example
 >>> from speaker_helper.sources import from_youtube, revoice
 >>> async def demo() -> float:
 ...     src = from_youtube("https://youtu.be/…")            # needs youtube-helper
-...     async with Speaker(Settings.from_mapping({"voicebox": {"port": 17600}})) as spk:
+...     async with Speaker(Settings.from_mapping({"backend": "kokoro"})) as spk:
 ...         out = await revoice(src, spk)                    # needs vocal-helper + engine
 ...     return out.duration_s
 

@@ -101,7 +101,7 @@ class OperatingPoint:
         ``"measured"``, ``"estimate"``, or ``"unknown"`` — how ``mean_rtf`` was
         obtained.
     backend : str
-        The backend that serves this engine (default ``"voicebox"``).
+        The backend that serves this engine (default ``"kokoro"``).
     language : str or None
         Language the measurement pertains to, when language-specific.
     """
@@ -111,7 +111,7 @@ class OperatingPoint:
     mean_rtf: float | None
     quality_source: str = "prior"
     rtf_source: str = "unknown"
-    backend: str = "voicebox"
+    backend: str = "kokoro"
     language: str | None = None
 
 
@@ -323,7 +323,7 @@ def _points_from_reports(reports: Sequence[object]) -> list[OperatingPoint]:
                 mean_rtf=float(r.mean_rtf),
                 quality_source=str(getattr(r, "quality_source", "prior")),
                 rtf_source="measured",
-                backend=str(getattr(r, "backend", "voicebox")),
+                backend=str(getattr(r, "backend", "kokoro")),
             )
         )
     return points

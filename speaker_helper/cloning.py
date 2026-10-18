@@ -128,7 +128,7 @@ def resolve_samples(clone: dict[str, Any]) -> list[VoiceSample]:
     return [VoiceSample(audio=str(audio), reference_text=str(reference_text))]
 
 
-# Cloning engines cap reference-audio length (Voicebox: 30 s). We trim to a
+# Cloning engines cap reference-audio length (30 s is a common ceiling). We trim to a
 # little under that so a longer recording is still usable out of the box.
 DEFAULT_MAX_REFERENCE_SECONDS = 28.0
 

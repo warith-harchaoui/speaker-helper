@@ -131,7 +131,7 @@ class LanguageProfile:
 # time-to-first-audio.
 #
 # ``measured_rtf`` / ``measured_quality`` are *reference* operating points for
-# kokoro on the native MLX Voicebox (Apple GPU / Metal, M2 Max), obtained with
+# kokoro on Apple GPU / Metal (M2 Max), obtained with
 # ``tune_profiles`` — recalibrate for your host with the same call. Both axes are
 # now **measured per language**: RTF from tuning, and quality from a real
 # **UTMOSv2 naturalness MOS** sweep in the ``speak`` study (kokoro sounds most

@@ -4,7 +4,7 @@ Configuration for speaker-helper.
 Module summary
 --------------
 speaker-helper reads a small, typed configuration describing where the
-Voicebox engine lives and which voice / language / mode to use. Values come
+backend reads, and which voice / language / mode to use. Values come
 from (in increasing precedence) dataclass defaults, an optional
 ``settings.yaml``, and ``SPEAKER_HELPER_*`` environment variables. Strings
 spelled ``${VAR}`` inside the YAML are expanded from the environment at load
@@ -16,11 +16,9 @@ repository root for a documented template.
 Usage example
 -------------
 >>> from speaker_helper.config import Settings
->>> s = Settings.from_yaml_text("voicebox: {port: 17600}\\nlanguage: fr")
->>> s.voicebox.port
-17600
->>> s.base_url
-'http://127.0.0.1:17600'
+>>> s = Settings.from_yaml_text("backend: kokoro\\nlanguage: fr\\nvoice: ff_siwis")
+>>> s.backend, s.voice
+('kokoro', 'ff_siwis')
 
 Author
 ------
@@ -77,63 +75,43 @@ def _from_mapping(cls: type, mapping: dict[str, Any] | None) -> Any:
 
 
 @dataclass
-class VoiceboxConfig:
-    """Where the Voicebox REST service lives.
-
-    Parameters
-    ----------
-    host : str
-        Hostname or IP of the Voicebox server. Default ``127.0.0.1``.
-    port : int
-        TCP port. Voicebox's native default is ``17493``; the bundled
-        ``docker-compose`` maps the container to ``17600`` on the host.
-    timeout_s : float
-        Per-request timeout in seconds. The first synthesis of a new engine
-        pays a model download, so keep this generous.
-    max_retries : int
-        How many times to retry a request that fails on a *transient* error
-        (network/transport error or a 5xx from the engine). ``0`` disables
-        retries. Client errors (4xx) are never retried.
-    retry_backoff_s : float
-        Base delay for exponential backoff between retries: attempt ``k`` waits
-        ``retry_backoff_s * 2**(k-1)`` seconds.
-    """
-
-    host: str = "127.0.0.1"
-    port: int = 17493
-    timeout_s: float = 300.0
-    max_retries: int = 2
-    retry_backoff_s: float = 0.5
-
-
-@dataclass
 class Settings:
     """Top-level speaker-helper configuration.
 
     Parameters
     ----------
-    voicebox : VoiceboxConfig
-        Connection details for the Voicebox engine.
     backend : str
-        Which TTS backend to drive: ``"voicebox"`` (the real engine, default)
-        or ``"mock"`` (deterministic, serverless — used by tests and the
-        evaluation layer). The backend is an implementation detail; the rest of
-        the package talks only to the :class:`~speaker_helper.engine.TTSEngine`
-        protocol. See :func:`speaker_helper.engine.available_backends`.
+        Which TTS backend to drive. ``"kokoro"`` (default) runs in this
+        process and needs no server; ``"openvoice"`` and ``"chatterbox"``
+        clone a voice from a recording; ``"mock"`` is deterministic and
+        serverless, for tests and the evaluation layer. The backend is an
+        implementation detail — the rest of the package talks only to the
+        :class:`~speaker_helper.engine.TTSEngine` protocol. See
+        :func:`speaker_helper.engine.available_backends`.
     engine : str
-        Backend-specific engine/model id. For Voicebox, ``kokoro`` is fast
-        enough for real-time on CPU.
+        A label carried on results, for callers that record which model
+        produced what. It does not select the backend; ``backend`` does.
+    voice : str
+        Which built-in voice reads. Empty (default) means "read the text,
+        detect the language, and pick the voice that speaks it" — which is
+        not a convenience: the detected language is what the phonemiser
+        works from, and French read as English is not French in an American
+        accent, it is an American spelling the words out.
+    voice_sample : str
+        Path to a reference recording, for the cloning backends. Kokoro
+        refuses one rather than ignoring it.
     voice_id : str
-        Preset voice id. Empty (default) means "auto-pick a voice whose
-        language matches ``language``".
+        Deprecated spelling of ``voice``, kept because configuration files in
+        the wild use it. ``voice`` wins when both are set.
     language : str
         ISO-639-1 target language (e.g. ``"fr"``).
     normalize : bool
-        Ask Voicebox to loudness-normalise the output.
+        Loudness-normalise the output where the backend can.
     mode : str
         ``"offline"`` or ``"streaming"``.
     first_chunk_sentences : int
-        Streaming only: sentences in the first emitted chunk (1 → lowest TTFA).
+        Streaming only: sentences in the first emitted chunk (1 → lowest
+        time-to-first-audio, which is the number a conversation feels).
 
     Notes
     -----
@@ -141,9 +119,10 @@ class Settings:
     ``SPEAKER_HELPER_*`` environment variables.
     """
 
-    voicebox: VoiceboxConfig = field(default_factory=VoiceboxConfig)
-    backend: str = "voicebox"
+    backend: str = "kokoro"
     engine: str = "kokoro"
+    voice: str = ""
+    voice_sample: str = ""
     voice_id: str = ""
     language: str = "fr"
     normalize: bool = True
@@ -159,10 +138,15 @@ class Settings:
     # ``vocal-helper``; an empty ``audio`` falls back to the bundled ref-fr-female.
     clone: dict[str, Any] = field(default_factory=dict)
 
-    @property
-    def base_url(self) -> str:
-        """Return the Voicebox base URL, e.g. ``http://127.0.0.1:17600``."""
-        return f"http://{self.voicebox.host}:{self.voicebox.port}"
+    def __post_init__(self) -> None:
+        """Let ``voice_id`` stand in for ``voice``.
+
+        ``voice_id`` is what the REST-engine era called it, and settings files
+        written then still say it. Silently ignoring those would start the
+        wrong voice with no error anywhere — the worst shape of a rename.
+        """
+        if not self.voice and self.voice_id:
+            self.voice = self.voice_id
 
     # ----- constructors ---------------------------------------------------
 
@@ -181,9 +165,12 @@ class Settings:
             The populated settings, with environment overrides applied.
         """
         mapping = _expand_env(mapping or {})
-        top = {k: v for k, v in mapping.items() if k != "voicebox"}
-        settings = _from_mapping(cls, top)
-        settings.voicebox = _from_mapping(VoiceboxConfig, mapping.get("voicebox"))
+        # A `voicebox:` section is dropped rather than rejected: settings files
+        # written for the REST engine are still on disk, and refusing to load
+        # one would be a worse welcome than ignoring a key that now means
+        # nothing. `_from_mapping` already drops unknown keys; this comment is
+        # here so the silence is deliberate rather than accidental.
+        settings = _from_mapping(cls, mapping)
         settings._apply_env_overrides()
         return settings
 
@@ -232,16 +219,17 @@ class Settings:
         # so they win over both dataclass defaults and any YAML file. Each key is
         # optional; only present ones override, keeping the rest untouched.
         env = os.environ
-        if "SPEAKER_HELPER_VOICEBOX_HOST" in env:
-            self.voicebox.host = env["SPEAKER_HELPER_VOICEBOX_HOST"]
-        if "SPEAKER_HELPER_VOICEBOX_PORT" in env:
-            # Ports arrive as strings from the environment; coerce to int.
-            self.voicebox.port = int(env["SPEAKER_HELPER_VOICEBOX_PORT"])
+        if "SPEAKER_HELPER_VOICE" in env:
+            self.voice = env["SPEAKER_HELPER_VOICE"]
+        if "SPEAKER_HELPER_VOICE_SAMPLE" in env:
+            self.voice_sample = env["SPEAKER_HELPER_VOICE_SAMPLE"]
         if "SPEAKER_HELPER_BACKEND" in env:
             self.backend = env["SPEAKER_HELPER_BACKEND"]
         if "SPEAKER_HELPER_ENGINE" in env:
             self.engine = env["SPEAKER_HELPER_ENGINE"]
         if "SPEAKER_HELPER_VOICE_ID" in env:
             self.voice_id = env["SPEAKER_HELPER_VOICE_ID"]
+            if not self.voice:
+                self.voice = self.voice_id
         if "SPEAKER_HELPER_LANGUAGE" in env:
             self.language = env["SPEAKER_HELPER_LANGUAGE"]

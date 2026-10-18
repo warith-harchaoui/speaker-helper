@@ -21,7 +21,7 @@ Usage example
 -------------
 >>> from speaker_helper import Speaker
 >>> # sync, offline — the simplest possible call:
->>> # Speaker().save("Bonjour le monde.", "hello.wav")   # requires Voicebox
+>>> # Speaker().save("Bonjour le monde.", "hello.wav")
 
 Author
 ------
@@ -34,11 +34,21 @@ import asyncio
 import time
 from collections.abc import AsyncIterator
 from pathlib import Path
+from typing import Any
 
 import os_helper as osh
 
 from speaker_helper.config import Settings
 from speaker_helper.engine import TTSEngine, create_engine
+from speaker_helper.narration import (
+    PACE_SPEED,
+    PUNCTUATION_PAUSE_MS,
+    NarrationResult,
+    Segment,
+    Timeline,
+    check_timeline_matches_audio,
+    coerce_segments,
+)
 from speaker_helper.text import chunk_for_streaming
 from speaker_helper.types import AudioResult, StreamChunk, VoiceList, VoiceSample
 
@@ -46,7 +56,7 @@ from speaker_helper.types import AudioResult, StreamChunk, VoiceList, VoiceSampl
 class Speaker:
     """Turn text into speech via a pluggable TTS engine, offline or streaming.
 
-    The concrete engine (Voicebox, mock, …) is selected by
+    The concrete engine (kokoro, chatterbox, mock, …) is selected by
     ``settings.backend`` and reached only through the
     :class:`~speaker_helper.engine.TTSEngine` protocol, so :class:`Speaker`
     never depends on a specific backend.
@@ -204,7 +214,7 @@ class Speaker:
         """Backward-compatible alias for :attr:`engine`.
 
         Earlier releases exposed the backend as ``speaker.client`` (it was
-        always a Voicebox client). It is now any :class:`TTSEngine`; this alias
+        always an HTTP client). It is now any :class:`TTSEngine`; this alias
         keeps old call sites working.
         """
         return self.engine
@@ -384,6 +394,159 @@ class Speaker:
                 if not task.done():
                     task.cancel()
 
+    # ----- narration ------------------------------------------------------
+
+    async def narrate(
+        self,
+        segments: list[Any],
+        *,
+        language: str | None = None,
+        voice: str | None = None,
+    ) -> NarrationResult:
+        """Read a document aloud and say where every block landed in the audio.
+
+        The difference from :meth:`stream` is not the engine, it is the
+        bookkeeping: a document has structure — pauses its headings ask for,
+        blocks whose spoken form differs from their printed form — and a
+        caller that wants to *follow* the reading needs to know which stretch
+        of audio speaks which block. See :mod:`speaker_helper.narration`.
+
+        Parameters
+        ----------
+        segments : list
+            :class:`~speaker_helper.narration.Segment` objects, plain dicts,
+            or bare strings — see
+            :func:`~speaker_helper.narration.coerce_segments`.
+        language, voice : str or None
+            Override the configured ones for this reading.
+
+        Returns
+        -------
+        NarrationResult
+            The audio, the cues, and what the backend could not honour.
+
+        Raises
+        ------
+        ValueError
+            When no segment holds anything speakable, or when the laid-out
+            audio and the timeline disagree.
+
+        Notes
+        -----
+        Synthesis happens first, for every speakable block at once (bounded by
+        ``stream_concurrency``), and the layout second. Two passes rather than
+        one because the sample rate is the backend's answer, not ours, and the
+        timeline cannot start counting before it knows what a sample is worth.
+        """
+        import numpy as np
+
+        items: list[Segment] = coerce_segments(segments)
+        speakable = [
+            (i, seg)
+            for i, seg in enumerate(items)
+            if seg.text.strip() and seg.is_speakable
+        ]
+        if not speakable:
+            raise ValueError("no segment holds anything speakable")
+
+        sem = asyncio.Semaphore(self.stream_concurrency)
+        started = time.perf_counter()
+
+        async def _synth(seg: Segment) -> AudioResult:
+            async with sem:
+                return await self.engine.synthesize(
+                    seg.spoken,
+                    language=language,
+                    **self._voice_and_speed(voice, seg),
+                )
+
+        tasks = {index: asyncio.create_task(_synth(seg)) for index, seg in speakable}
+        try:
+            rendered = {index: await task for index, task in tasks.items()}
+        finally:
+            for task in tasks.values():
+                if not task.done():
+                    task.cancel()
+        compute_s = time.perf_counter() - started
+
+        first = rendered[speakable[0][0]]
+        sample_rate = first.sample_rate
+        timeline = Timeline(sample_rate)
+        pieces: list[Any] = []
+        ignored: set[str] = set()
+
+        for index, seg in enumerate(items):
+            if not seg.text.strip():
+                # Nothing on the page either: no cue, no silence, no trace.
+                continue
+            if seg.emotion and seg.emotion != "neutral":
+                ignored.add("emotion")
+                if seg.intensity:
+                    ignored.add("intensity")
+
+            # Skipped on the first piece: a "pause before" with nothing before
+            # it is dead air at the head of the file.
+            if pieces:
+                lead = timeline.silence(seg.pause_before_ms)
+                if lead > 0:
+                    pieces.append(np.zeros(lead, dtype=np.int16))
+
+            if index not in rendered:
+                # Punctuation alone. It cannot be dropped — the page shows it,
+                # so every later cue would be one place out — so it becomes a
+                # short silence that still takes its turn.
+                #
+                # The silence is recorded *as the cue's own span*, not as a gap
+                # before a zero-length one. Both lay the audio out identically;
+                # only the second makes a read-along highlight the block for
+                # 120 ms instead of flashing it for none, which is the whole
+                # reason the block was kept.
+                quiet = int(sample_rate * PUNCTUATION_PAUSE_MS / 1000.0)
+                if quiet > 0:
+                    pieces.append(np.zeros(quiet, dtype=np.int16))
+                timeline.speech(quiet, index=index, text=seg.text)
+                continue
+
+            pcm = _wav_to_pcm16(rendered[index].wav_bytes)
+            timeline.speech(len(pcm), index=index, text=seg.text)
+            pieces.append(pcm)
+
+            trail = timeline.silence(seg.pause_after_ms)
+            if trail > 0:
+                pieces.append(np.zeros(trail, dtype=np.int16))
+
+        full = np.concatenate(pieces) if pieces else np.zeros(0, dtype=np.int16)
+        duration_s = len(full) / float(sample_rate)
+        check_timeline_matches_audio(timeline, duration_s)
+
+        from speaker_helper.backends.kokoro import pcm_to_wav_bytes
+
+        return NarrationResult(
+            wav_bytes=pcm_to_wav_bytes(full, sample_rate),
+            sample_rate=sample_rate,
+            duration_s=duration_s,
+            compute_s=compute_s,
+            cues=timeline.cues,
+            voice_id=first.voice_id,
+            language=first.language,
+            ignored_hints=sorted(ignored),
+        )
+
+    def _voice_and_speed(self, voice: str | None, seg: Segment) -> dict[str, Any]:
+        """The per-segment knobs, passed only to backends that accept them.
+
+        ``synthesize`` grew ``voice`` and ``speed`` for this; a third-party
+        backend written against the older two-argument signature must keep
+        working, so they are offered and withdrawn rather than required.
+        """
+        extra: dict[str, Any] = {}
+        signature = getattr(type(self.engine).synthesize, "__kwdefaults__", None) or {}
+        if "voice" in signature and voice:
+            extra["voice"] = voice
+        if "speed" in signature:
+            extra["speed"] = PACE_SPEED.get(seg.pace, 1.0)
+        return extra
+
     # ----- blocking convenience ------------------------------------------
 
     def say_sync(self, text: str, *, language: str | None = None) -> AudioResult:
@@ -453,6 +616,24 @@ class Speaker:
         Path(path).write_bytes(result.wav_bytes)
         osh.info("wrote %s (%.2fs audio, RTF %.2f)", path, result.duration_s, result.rtf)
         return result
+
+
+def _wav_to_pcm16(wav_bytes: bytes):  # type: ignore[no-untyped-def]
+    """Decode a WAV payload to mono int16 samples.
+
+    ``dtype="int16"`` rather than the float default: the backends produce
+    int16 and the layout writes int16, so a float round trip would be two
+    conversions that can only lose.
+    """
+    import io
+
+    import numpy as np
+    import soundfile as sf
+
+    data, _rate = sf.read(io.BytesIO(wav_bytes), dtype="int16", always_2d=False)
+    if data.ndim > 1:  # pragma: no cover - the backends are mono
+        data = data[:, 0]
+    return np.asarray(data, dtype=np.int16)
 
 
 def _run_sync(coro):  # type: ignore[no-untyped-def]

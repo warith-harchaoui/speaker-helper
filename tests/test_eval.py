@@ -302,14 +302,13 @@ def test_fidelity_round_trip_gates_on_wer_chrf() -> None:
 
 
 @pytest.mark.slow
-async def test_run_eval_live_kokoro(live_port: int) -> None:
-    """The identical gate runs against the real engine when reachable."""
+async def test_run_eval_live_kokoro(needs_kokoro: None) -> None:
+    """The identical gate runs against the real engine when it is installed."""
     settings = Settings.from_mapping(
         {
-            "backend": "voicebox",
+            "backend": "kokoro",
             "engine": "kokoro",
             "language": "fr",
-            "voicebox": {"port": live_port},
         }
     )
     # Act: run the same three-case gate against the live engine.

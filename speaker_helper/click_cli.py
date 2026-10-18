@@ -87,9 +87,12 @@ def _run(ctx: click.Context, command: str, **fields: object) -> None:
 # sub-command — matching the argparse CLI's "globals before sub-command" order.
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
 @click.option("--config", type=click.Path(path_type=Path), default=None, help="settings.yaml path.")
-@click.option("--backend", default=None, help="TTS backend: voicebox (default) or mock.")
-@click.option("--host", default=None, help="Voicebox host override.")
-@click.option("--port", type=int, default=None, help="Voicebox port override.")
+@click.option(
+    "--backend",
+    default=None,
+    help="TTS backend: kokoro (default), openvoice, chatterbox or mock.",
+)
+@click.option("--voice-sample", default=None, help="Reference recording to clone.")
 @click.option("--engine", default=None, help="Engine/model id (e.g. kokoro).")
 @click.option("--voice", default=None, help="Preset voice id (default: auto).")
 @click.option("--language", default=None, help="Target language (e.g. fr).")
@@ -268,10 +271,10 @@ def serve(ctx: click.Context, bind_host: str, bind_port: int) -> None:
 
     The API server's bind address uses ``--bind-host`` / ``--bind-port`` so it
     never collides with the global ``--host`` / ``--port`` (which point at the
-    upstream Voicebox engine the server talks to).
+    backend the server drives).
     """
     # Distinct bind_host/bind_port dests are what let the server bind address and
-    # the Voicebox --host/--port coexist in the one shared namespace.
+    # the server's bind address stays distinct from anything engine-side.
     _run(ctx, "serve", bind_host=bind_host, bind_port=bind_port)
 
 

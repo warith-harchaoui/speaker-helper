@@ -136,7 +136,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/health", operation_id="health")
     async def health() -> dict:
-        """Return server liveness and upstream Voicebox health."""
+        """Return server liveness and the backend's own health."""
         try:
             # Liveness is trivially true (we answered); the interesting signal is
             # whether the upstream engine is reachable, so probe it here.
