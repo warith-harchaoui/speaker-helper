@@ -38,11 +38,16 @@ settings.yaml
 # ASR transcript caches (sidecars next to audio)
 *.wav.txt
 
-# local-only tooling & secrets (root-level helper scripts, git hooks, secrets)
+# local-only tooling & secrets (root-level helper scripts, secrets)
 /*.sh
-/.githooks/
 .secrets/
 .pypirc
+
+# `.githooks/` is NOT ignored, and used to be — grouped with the secrets, in a
+# line whose own comment called it "local-only tooling". It holds no secret: it
+# holds the pre-push gate, whose first instruction is "Enable once per clone:
+# git config core.hooksPath .githooks", which cannot be followed from a clone
+# that does not contain it. Every sibling package in this suite tracks theirs.
 
 # Local secrets (HF token, etc.) — never commit.
 s.yaml

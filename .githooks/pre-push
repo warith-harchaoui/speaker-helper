@@ -1,0 +1,86 @@
+#!/bin/sh
+# pre-push — local gate for the TTS -> STT fidelity round-trip.
+#
+# CI never runs this: it needs a real vocal-helper transcription, which a
+# shared runner has no business doing. On a machine that has the engine and
+# the recogniser it has real teeth: synthesize the French reference set,
+# re-transcribe it with vocal-helper, and gate on WER/chrF
+# (speaker_helper/eval/thresholds.yaml). Everywhere else it skips cleanly.
+#
+# It used to gate on a **Voicebox engine answering on port 17493** — a
+# separate process, from when this package was a thin client of one. Kokoro
+# has run in-process since 0.8.0, so there is nothing listening on that port
+# on any machine any more: the check took its "not reachable" branch and
+# exited 0 on every push, for everyone, forever. A gate that never runs is
+# indistinguishable from a gate that always passes, and this one was the only
+# real check in the file.
+#
+# Enable once per clone:   git config core.hooksPath .githooks
+# Bypass in a pinch:       git push --no-verify
+
+PY="$(command -v python3 || command -v python)"
+CLI="$(command -v speaker-helper)"
+
+if [ -z "$PY" ] || [ -z "$CLI" ]; then
+  echo "pre-push: speaker-helper CLI not on PATH here — skipping the local round-trip gate."
+  exit 0
+fi
+
+if ! "$PY" -c "import vocal_helper" >/dev/null 2>&1; then
+  echo "pre-push: vocal-helper not installed (pip install \"speaker-helper[stt]\") — skipping the round-trip gate."
+  exit 0
+fi
+
+# The engine itself, in this process. `check_install()` returns 0 when Kokoro
+# can synthesise here — weights present, espeak-ng reachable — and a non-zero
+# code with a message otherwise.
+if ! "$PY" -c "import sys; from speaker_helper.backends import kokoro; sys.exit(kokoro.check_install())" >/dev/null 2>&1; then
+  echo "pre-push: the Kokoro engine is not ready here (pip install \"speaker-helper[kokoro]\", then speaker-helper install-voice) — skipping the round-trip gate."
+  exit 0
+fi
+
+# Quality, not speed.
+#
+# `speaker-helper eval` gates on five thresholds, and two of them —
+# `max_mean_rtf` and `max_p95_rtf` — are a *performance* assertion against the
+# machine the command happens to run on. Measured on 2026-10-19 under load
+# average 133 (three agent sessions, a container build, a local model
+# serving): mean RTF 2.41 against a bar of 1.0, with chrF 0.9446. The voice
+# was fine; the laptop was busy.
+#
+# Raising the bar would hide the regressions it exists to catch, so the
+# thresholds file keeps both and `speaker-helper eval` keeps enforcing them —
+# that is the right contract for CI on a quiet runner. Here, where the gate
+# has to say something true about *this commit*, only the fidelity half is
+# read back from the report.
+REPORT="$(mktemp -t speaker-helper-eval)"
+echo "pre-push: running the TTS -> vocal-helper STT round-trip (WER/chrF gate)..."
+"$CLI" eval --transcribe --json "$REPORT" >/dev/null 2>&1
+if ! "$PY" - "$REPORT" <<'CHECK'
+import json, sys
+report = json.load(open(sys.argv[1]))
+limits = report.get("thresholds", {})
+wer = report.get("mean_wer")
+chrf = report.get("mean_chrf")
+if wer is None and chrf is None:
+    print("pre-push: the report carries no fidelity numbers — nothing to gate on.")
+    sys.exit(0)
+bad = []
+if wer is not None and wer > limits.get("max_mean_wer", 0.20):
+    bad.append(f"mean WER {wer:.4f} > {limits.get('max_mean_wer', 0.20)}")
+if chrf is not None and chrf < limits.get("min_mean_chrf", 0.75):
+    bad.append(f"mean chrF {chrf:.4f} < {limits.get('min_mean_chrf', 0.75)}")
+print("pre-push: fidelity " + ("FAILED — " + "; ".join(bad) if bad else "ok"))
+sys.exit(1 if bad else 0)
+CHECK
+then
+  echo ""
+  echo "pre-push: the round-trip fidelity gate FAILED — push aborted."
+  echo "  Speed is deliberately not gated here: it measures the machine."
+  echo "  Fix it, or bypass once with:  git push --no-verify"
+  rm -f "$REPORT"
+  exit 1
+fi
+rm -f "$REPORT"
+echo "pre-push: round-trip fidelity gate passed — pushing."
+exit 0

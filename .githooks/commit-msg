@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# commit-msg hook — refuse any commit message carrying an AI-assistant
+# attribution. Authorship and responsibility stay with the human maintainers
+# (project policy: no Claude / Anthropic trace, anywhere, ever).
+#
+# Install (once per clone):
+#   git config core.hooksPath .githooks
+#
+# It blocks, case-insensitively:
+#   - Co-Authored-By: … <…@anthropic.com> / Co-Authored-By: Claude …
+#   - "Generated with [Claude Code]" / "Generated with Claude"
+#   - the 🤖 robot footer
+set -euo pipefail
+
+msg_file="$1"
+
+if grep -qiE 'co-authored-by:.*(claude|anthropic\.com)|generated with \[?claude|🤖 generated with' "$msg_file"; then
+  echo "commit-msg hook: refused — the message carries a Claude/Anthropic attribution." >&2
+  echo "Remove it (this project attributes only human maintainers) and commit again." >&2
+  exit 1
+fi
+exit 0
