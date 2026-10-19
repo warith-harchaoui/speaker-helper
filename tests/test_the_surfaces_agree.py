@@ -214,3 +214,23 @@ def test_the_skill_names_extras_pip_can_resolve() -> None:
     for group in named:
         for extra in group.split(","):
             assert extra in EXTRAS, f"SKILL.md names [{extra}], pyproject does not declare it"
+
+
+# ── The version says one thing ─────────────────────────────────────────────
+
+
+def test_every_version_source_agrees() -> None:
+    """A wheel that reports a different version than it is.
+
+    Found by installing 0.8.0 into a clean virtualenv and asking it: it
+    answered 0.7.6, because the bump had touched pyproject.toml and not the
+    package. Nothing in the repository could tell — the two numbers are only
+    compared once a wheel exists, and by then it is usually published.
+
+    The consequence is not cosmetic. `--version`, the API's `/health`, and
+    whatever a user pastes into a bug report all read the package, while pip,
+    the floors in a sibling's extra, and the index read the wheel.
+    """
+    import speaker_helper
+
+    assert speaker_helper.__version__ == PYPROJECT["project"]["version"]
