@@ -27,7 +27,6 @@ import pytest
 
 from speaker_helper import speech_text as st
 
-
 # ── The constructs, in both languages the package claims ──────────────────
 
 
