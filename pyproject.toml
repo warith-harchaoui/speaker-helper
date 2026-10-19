@@ -132,6 +132,11 @@ dev = [
     "pytest-cov>=5",
     "ruff>=0.6",
     "mypy>=1.11",
+    # starlette 1.9.0 moved its TestClient onto httpx2. CI installs
+    # `.[dev,server]` and never reads requirements-dev.txt, so putting it
+    # only there left the suite red — the declaration has to be where the
+    # install actually looks.
+    "httpx2>=2.0.0",
 ]
 
 [project.scripts]
