@@ -156,10 +156,26 @@ speaker_helper = ["eval/data/*.jsonl", "eval/*.yaml", "gui/*.html", "gui/*.js"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q"
+# `-m "not slow"`: the slow marker was declared and never excluded, so the one
+# test carrying it ran in every default run — and it is a *performance*
+# assertion, `mean_rtf < 1.0` against the real engine. That measures the
+# machine, not the code. Measured on 2026-10-19 under load average 133 (three
+# agent sessions, a container build, a local model serving): 15.86, a failing
+# suite that says nothing about speaker-helper.
+#
+# Raising the threshold would hide the regressions it exists to catch. Running
+# it deliberately, on a quiet machine, is the answer:
+#
+#     pytest -m slow
+#
+# Same decision the rest of this suite already made for its `eval` marker.
+addopts = "-q -m 'not slow'"
 asyncio_mode = "auto"
 markers = [
-    "slow: integration tests requiring a running Voicebox engine",
+    # Not "a running Voicebox engine" any more — there is no Voicebox. Kokoro
+    # runs in-process since 0.8.0, and what makes this test slow is that it
+    # synthesises for real and times it.
+    "slow: benchmarks the real engine against a real-time-factor threshold; needs a quiet machine",
 ]
 
 [tool.ruff]
