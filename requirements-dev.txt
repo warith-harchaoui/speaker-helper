@@ -12,3 +12,9 @@ pytest-asyncio>=0.23
 pytest-cov>=5
 ruff>=0.6
 mypy>=1.11
+# starlette 1.9.0 moved its TestClient onto httpx2 and nothing declared it:
+# CI resolves the latest starlette, every developer machine had an older
+# one, so nine repositories were one `pip install -U` away from a red
+# suite and speaker-helper reached it first. starlette's own `full` extra
+# lists both, which is why this is additive rather than a pin.
+httpx2>=2.0.0
