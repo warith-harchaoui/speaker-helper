@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "speaker-helper"
-version = "0.8.0"
+version = "0.8.1"
 description = "Speaker Helper — speech synthesis that runs in your process: say a sentence, stream a reply, or narrate a document with the timed track that lets a page follow along. Kokoro by default (no server), voice cloning through OpenVoice and Chatterbox. The inverse of vocal-helper: text in, speech out. Library + two CLIs + REST API + MCP + skill, with a built-in evaluation gate."
 readme = "README.md"
 requires-python = ">=3.10,<3.14"
@@ -110,7 +110,7 @@ mcp = [
 # enable the evaluation round-trip (WER/chrF). Optional — cloning with an
 # explicit transcript and speed/anomaly evaluation work without it.
 stt = [
-    "vocal-helper>=0.4.4",
+    "vocal-helper>=2.0.0,<4",
 ]
 # Speech-to-speech sources (speaker_helper.sources): bring in audio to re-voice.
 youtube = [

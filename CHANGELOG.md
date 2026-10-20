@@ -6,6 +6,109 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-10-20
+
+Everything here is a consequence of 0.8.0 having been published without a
+tag, a release or an entry below — the gaps that shows up as.
+
+### Fixed
+
+- **The 0.8.0 wheel reported itself as 0.7.6.** The bump had touched
+  `pyproject.toml` and not `speaker_helper/__init__.py`, and nothing in the
+  repository could say so: the two numbers only disagree once the wheel is
+  built, by which point it is usually already published. The split matters —
+  `--version`, the API's `/health` and whatever a user pastes into a bug
+  report read the package, while pip, a neighbouring extra's floor and the
+  index read the wheel. A test now holds the two together, verified against a
+  deliberate sabotage.
+
+- **`httpx2` was undeclared where the install actually looks.** starlette
+  1.9.0 moved its `TestClient` onto `httpx2`; CI resolves the newest starlette
+  and every development machine had an older one, so CI failed on a dependency
+  no manifest named. The first attempt put it in `requirements-dev.txt`, which
+  these repositories' CI never reads — it installs `pip install -e ".[dev,…]"`.
+  It is a *test* dependency, so it belongs in the `dev` extra and not in `api`,
+  where it would hand a test client to every user of the HTTP surface. Nine
+  members of the suite use `TestClient` and none declared it; speaker-helper
+  reached the failure first.
+
+- **The `slow` marker was declared and never excluded**, so the default suite
+  ran a *performance* assertion against the real engine — `mean_rtf < 1.0`,
+  which measures the machine rather than the code. Under a load average of 133
+  it reported an RTF of 15.86 against a threshold of 1.0: a red suite saying
+  nothing about speaker-helper. Raising the threshold would hide the
+  regressions the test exists to catch, so it is now opt-in (`pytest -m slow`),
+  which is the call the rest of the suite had already made for its `eval`
+  marker. Its description still said "requiring a running Voicebox engine";
+  there is no Voicebox since 0.8.0.
+
+- **`.githooks/` was gitignored, in this repository alone.** It sat under a
+  line commented "local-only tooling & secrets" and contains no secrets. Two
+  hooks existed only on one machine: the pre-push gate, whose very first
+  instruction is "enable once per clone" — impossible from a clone that does
+  not carry it — and the commit-msg hook that refuses assistant attribution in
+  a commit message, which is a project policy rather than a machine
+  preference, and applies nowhere if it does not travel.
+
+- **The pre-push hook ran neither `ruff check` nor `ruff format --check`**,
+  the only member of the suite not to. Ten files stayed unformatted until an
+  unrelated push turned CI red on them. Both passes now name
+  `speaker_helper tests`, which is exactly what CI reads: since 0.16 ruff also
+  formats fenced code blocks inside Markdown, so a bare `.` would make the gate
+  depend on whichever ruff a developer happens to have, rejecting README
+  examples that CI — pinned to 0.15.21 and scoped to those two paths — never
+  looks at. A local gate that blocks a push CI would accept is worse than none.
+
+### Added
+
+- **Real tests for what the voice says about a formula.** Dropping `slow` from
+  the default run took coverage to 67.30 % against a 70 % floor, and the honest
+  reading is that `speech_text` was never tested — it was *visited* by a slow,
+  unrelated TTS round-trip that lent it coverage by synthesising speech for
+  real. Lowering the bar would have hidden the loss; these tests close it
+  (`speech_text` 40 % → 87 %, total 67 % → 74 %). They assert the distinction
+  the module exists to make: a named operator reads as a sentence — "the
+  expected value of theta given m" — not as a transliteration of its symbols.
+  Plus the refusal that is easiest to lose: a language with no vocabulary
+  raises `SpeechMismatch` rather than serving English operators, because a
+  listener would hear "squared" mid-German-sentence with no way to know the
+  page said something else. And that no backslash or brace ever reaches the
+  voice.
+
+### Changed
+
+- `vocal-helper` in the `stt` extra is capped: `>=2.0.0,<4`. It was
+  `>=0.4.4` with no upper bound, the only uncapped suite dependency here, so
+  vocal-helper 3.0.0 — which changes two defaults — would have resolved in
+  silently. Only `transcribe_pcm` is used, which 3.0.0 leaves untouched, so the
+  cap is widened to admit it rather than held at `<3`.
+
+## [0.8.0] - 2026-10-19
+
+Published to PyPI on 2026-10-19 **without a tag, a GitHub release or this
+entry**; the wheel also misreported its version (see 0.8.1). Documented
+retroactively so the history is not a hole.
+
+### Added
+
+- **Kokoro runs in this process.** speaker-helper was a thin client of a
+  separate Voicebox engine listening on a port; it is now an in-process
+  engine. Nothing to start, nothing to reach, no port to agree on.
+
+- **Narration**: a document goes in and a timed track comes out, so a page can
+  follow along with the voice (`to_vtt()`, speech cues carrying the page's
+  words rather than the spoken ones).
+
+- **The five surfaces**, and a container that finally carries its engine:
+  library, two CLIs, REST API and web GUI.
+
+- **The 54-voice catalogue reads without the weights.** Listing the voices no
+  longer requires downloading a model first, and the tables ship with it.
+
+### Documentation
+
+- `PAYSAGE.md` records why there is no `speaker-helper-rs`.
+
 ## [0.7.6] - 2026-08-01
 
 ### Changed
