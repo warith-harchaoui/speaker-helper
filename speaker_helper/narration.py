@@ -222,9 +222,7 @@ class Timeline:
         start = self._samples / float(self.sample_rate_hz)
         self._samples += int(sample_count)
         end = self._samples / float(self.sample_rate_hz)
-        self._cues.append(
-            SpeechCue(index=index, text=text, start_seconds=start, end_seconds=end)
-        )
+        self._cues.append(SpeechCue(index=index, text=text, start_seconds=start, end_seconds=end))
 
     @property
     def cues(self) -> list[SpeechCue]:
@@ -326,10 +324,7 @@ def cues_to_vtt(cues: list[SpeechCue]) -> str:
     out = ["WEBVTT", ""]
     for cue in cues:
         out.append(str(cue.index))
-        out.append(
-            f"{format_timestamp(cue.start_seconds)} --> "
-            f"{format_timestamp(cue.end_seconds)}"
-        )
+        out.append(f"{format_timestamp(cue.start_seconds)} --> {format_timestamp(cue.end_seconds)}")
         out.append(" ".join(cue.text.split()))
         out.append("")
     return "\n".join(out)

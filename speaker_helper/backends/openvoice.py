@@ -147,9 +147,7 @@ class OpenVoiceEngine:
 
         target = None
         if self._reference is not None:
-            target, _ = se_extractor.get_se(
-                str(self._reference), converter, vad=True
-            )
+            target, _ = se_extractor.get_se(str(self._reference), converter, vad=True)
         return {
             "base": base,
             "converter": converter,

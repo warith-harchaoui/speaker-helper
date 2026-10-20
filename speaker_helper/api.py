@@ -239,9 +239,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             segments = coerce_segments(req.segments)
             if req.read_math:
                 segments = resolve_spoken_math(segments, req.read_math)
-            result = await speaker.narrate(
-                segments, language=req.language, voice=req.voice
-            )
+            result = await speaker.narrate(segments, language=req.language, voice=req.voice)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except Exception as exc:  # noqa: BLE001 - surface engine failures as 502

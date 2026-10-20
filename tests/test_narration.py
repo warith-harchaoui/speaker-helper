@@ -154,7 +154,7 @@ async def test_the_cue_keeps_the_pages_words_not_the_spoken_ones() -> None:
 
 
 async def test_a_dial_the_backend_lacks_is_reported_not_swallowed() -> None:
-    """"You asked for something I cannot do" must not read like "you asked for nothing"."""
+    """ "You asked for something I cannot do" must not read like "you asked for nothing"."""
     async with _speaker() as spk:
         asked = await spk.narrate([Segment(text="Hello.", emotion="cheerful", intensity="high")])
         plain = await spk.narrate([Segment(text="Hello.")])

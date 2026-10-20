@@ -151,9 +151,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
 
     # `install-voice`: fetch the weights before anything depends on them.
-    p_install = sub.add_parser(
-        "install-voice", help="Download the weights an engine needs."
-    )
+    p_install = sub.add_parser("install-voice", help="Download the weights an engine needs.")
     p_install.add_argument(
         "--engine", default="kokoro", help="Which engine to prepare (default: kokoro)."
     )
@@ -404,8 +402,7 @@ def _cmd_narrate(args: argparse.Namespace, settings: Settings) -> int:
             # Not a failure, and not silent either: the document asked for
             # something this engine has no dial for.
             sys.stderr.write(
-                f"note: this backend has no dial for "
-                f"{', '.join(result.ignored_hints)}\n"
+                f"note: this backend has no dial for {', '.join(result.ignored_hints)}\n"
             )
         return 0
 

@@ -72,11 +72,7 @@ def voices_for(language: str, gender: str = "") -> list[Voice]:
     """
     lang = (language or "").lower()[:2]
     gen = (gender or "").lower()
-    return [
-        v
-        for v in PRESET_VOICES
-        if v.language == lang and (not gen or v.gender == gen)
-    ]
+    return [v for v in PRESET_VOICES if v.language == lang and (not gen or v.gender == gen)]
 
 
 def voice_for(language: str, gender: str = "", *, index: int = 0) -> str:

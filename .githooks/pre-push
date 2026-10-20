@@ -18,6 +18,24 @@
 # Enable once per clone:   git config core.hooksPath .githooks
 # Bypass in a pinch:       git push --no-verify
 
+# Lint and formatting first, and they were missing entirely: this hook ran
+# only the round-trip gate, so `ruff format --check` lived in CI and nowhere
+# local. Ten files sat unformatted and the suite went red on them after an
+# unrelated push. Every sibling package in this suite checks both locally.
+#
+# The two paths are spelled out rather than passing `.`, and they are the same
+# two CI passes. Since 0.16 ruff also formats fenced code blocks inside
+# Markdown, so a bare `.` makes the gate depend on which ruff the developer
+# happens to have: 0.16 rejects README/LISEZMOI examples that CI, pinned to
+# 0.15.21 and scoped to these same two paths, never looks at. A local gate
+# that blocks a push CI would accept is worse than no local gate.
+if command -v ruff >/dev/null 2>&1; then
+  echo "pre-push: ruff check..."
+  ruff check speaker_helper tests || { echo "pre-push: ruff check failed - push aborted."; exit 1; }
+  echo "pre-push: ruff format..."
+  ruff format --check speaker_helper tests || { echo "pre-push: ruff format failed - push aborted (run: ruff format speaker_helper tests)"; exit 1; }
+fi
+
 PY="$(command -v python3 || command -v python)"
 CLI="$(command -v speaker-helper)"
 

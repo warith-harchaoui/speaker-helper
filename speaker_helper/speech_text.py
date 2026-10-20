@@ -52,84 +52,179 @@ import re
 
 _SHARED: dict[str, str] = {
     # Greek, which is the same word in both languages often enough to share.
-    r"\alpha": "alpha", r"\beta": "beta", r"\gamma": "gamma",
-    r"\delta": "delta", r"\epsilon": "epsilon", r"\varepsilon": "epsilon",
-    r"\zeta": "zeta", r"\eta": "eta", r"\theta": "theta",
-    r"\iota": "iota", r"\kappa": "kappa", r"\lambda": "lambda",
-    r"\mu": "mu", r"\nu": "nu", r"\xi": "xi", r"\pi": "pi",
-    r"\rho": "rho", r"\sigma": "sigma", r"\tau": "tau",
-    r"\upsilon": "upsilon", r"\phi": "phi", r"\varphi": "phi",
-    r"\chi": "chi", r"\psi": "psi", r"\omega": "omega",
-    r"\Gamma": "Gamma", r"\Delta": "Delta", r"\Theta": "Theta",
-    r"\Lambda": "Lambda", r"\Xi": "Xi", r"\Pi": "Pi", r"\Sigma": "Sigma",
-    r"\Phi": "Phi", r"\Psi": "Psi", r"\Omega": "Omega",
+    r"\alpha": "alpha",
+    r"\beta": "beta",
+    r"\gamma": "gamma",
+    r"\delta": "delta",
+    r"\epsilon": "epsilon",
+    r"\varepsilon": "epsilon",
+    r"\zeta": "zeta",
+    r"\eta": "eta",
+    r"\theta": "theta",
+    r"\iota": "iota",
+    r"\kappa": "kappa",
+    r"\lambda": "lambda",
+    r"\mu": "mu",
+    r"\nu": "nu",
+    r"\xi": "xi",
+    r"\pi": "pi",
+    r"\rho": "rho",
+    r"\sigma": "sigma",
+    r"\tau": "tau",
+    r"\upsilon": "upsilon",
+    r"\phi": "phi",
+    r"\varphi": "phi",
+    r"\chi": "chi",
+    r"\psi": "psi",
+    r"\omega": "omega",
+    r"\Gamma": "Gamma",
+    r"\Delta": "Delta",
+    r"\Theta": "Theta",
+    r"\Lambda": "Lambda",
+    r"\Xi": "Xi",
+    r"\Pi": "Pi",
+    r"\Sigma": "Sigma",
+    r"\Phi": "Phi",
+    r"\Psi": "Psi",
+    r"\Omega": "Omega",
 }
 
 WORDS: dict[str, dict[str, str]] = {
     "en": {
         **_SHARED,
-        "=": "equals", "+": "plus", "<": "is less than", ">": "is greater than",
-        r"\neq": "is not equal to", r"\ne": "is not equal to",
-        r"\approx": "is approximately", r"\sim": "is distributed as",
-        r"\leq": "is at most", r"\le": "is at most",
-        r"\geq": "is at least", r"\ge": "is at least",
-        r"\pm": "plus or minus", r"\mp": "minus or plus",
-        r"\times": "times", r"\cdot": "times", r"\div": "divided by",
-        r"\circ": "composed with", r"\ast": "star",
-        r"\to": "to", r"\rightarrow": "to", r"\mapsto": "maps to",
-        r"\implies": "implies", r"\iff": "if and only if",
-        r"\in": "in", r"\notin": "not in", r"\subset": "is contained in",
-        r"\subseteq": "is contained in", r"\cup": "union", r"\cap": "intersection",
-        r"\forall": "for all", r"\exists": "there exists",
-        r"\sum": "the sum of", r"\prod": "the product of",
-        r"\int": "the integral of", r"\infty": "infinity",
-        r"\partial": "partial", r"\nabla": "gradient",
-        r"\log": "log", r"\ln": "log", r"\exp": "the exponential of",
-        r"\sin": "sine", r"\cos": "cosine", r"\tan": "tangent",
-        r"\max": "the maximum of", r"\min": "the minimum of",
-        r"\arg": "arg", r"\det": "the determinant of",
-        "sqrt": "the square root of", "over": "over",
-        "ratio": "the ratio of", "to": "to", "of": "of",
-        "power": "to the power of", "squared": "squared", "cubed": "cubed",
-        "minus": "minus", "times_implicit": "times", "given": "given",
+        "=": "equals",
+        "+": "plus",
+        "<": "is less than",
+        ">": "is greater than",
+        r"\neq": "is not equal to",
+        r"\ne": "is not equal to",
+        r"\approx": "is approximately",
+        r"\sim": "is distributed as",
+        r"\leq": "is at most",
+        r"\le": "is at most",
+        r"\geq": "is at least",
+        r"\ge": "is at least",
+        r"\pm": "plus or minus",
+        r"\mp": "minus or plus",
+        r"\times": "times",
+        r"\cdot": "times",
+        r"\div": "divided by",
+        r"\circ": "composed with",
+        r"\ast": "star",
+        r"\to": "to",
+        r"\rightarrow": "to",
+        r"\mapsto": "maps to",
+        r"\implies": "implies",
+        r"\iff": "if and only if",
+        r"\in": "in",
+        r"\notin": "not in",
+        r"\subset": "is contained in",
+        r"\subseteq": "is contained in",
+        r"\cup": "union",
+        r"\cap": "intersection",
+        r"\forall": "for all",
+        r"\exists": "there exists",
+        r"\sum": "the sum of",
+        r"\prod": "the product of",
+        r"\int": "the integral of",
+        r"\infty": "infinity",
+        r"\partial": "partial",
+        r"\nabla": "gradient",
+        r"\log": "log",
+        r"\ln": "log",
+        r"\exp": "the exponential of",
+        r"\sin": "sine",
+        r"\cos": "cosine",
+        r"\tan": "tangent",
+        r"\max": "the maximum of",
+        r"\min": "the minimum of",
+        r"\arg": "arg",
+        r"\det": "the determinant of",
+        "sqrt": "the square root of",
+        "over": "over",
+        "ratio": "the ratio of",
+        "to": "to",
+        "of": "of",
+        "power": "to the power of",
+        "squared": "squared",
+        "cubed": "cubed",
+        "minus": "minus",
+        "times_implicit": "times",
+        "given": "given",
         r"\mathbb{E}": "the expected value of",
         r"\mathbb{P}": "the probability of",
         r"\mathbb{V}": "the variance of",
         r"\operatorname{Var}": "the variance of",
-        r"\mid": "given", "|": "given",
+        r"\mid": "given",
+        "|": "given",
     },
     "fr": {
         **_SHARED,
-        "=": "égale", "+": "plus", "<": "est inférieur à", ">": "est supérieur à",
-        r"\neq": "est différent de", r"\ne": "est différent de",
-        r"\approx": "vaut environ", r"\sim": "suit la loi",
-        r"\leq": "est au plus", r"\le": "est au plus",
-        r"\geq": "est au moins", r"\ge": "est au moins",
-        r"\pm": "plus ou moins", r"\mp": "moins ou plus",
-        r"\times": "fois", r"\cdot": "fois", r"\div": "divisé par",
-        r"\circ": "composé avec", r"\ast": "étoile",
-        r"\to": "vers", r"\rightarrow": "vers", r"\mapsto": "envoie sur",
-        r"\implies": "implique", r"\iff": "si et seulement si",
-        r"\in": "dans", r"\notin": "n'est pas dans",
-        r"\subset": "est contenu dans", r"\subseteq": "est contenu dans",
-        r"\cup": "union", r"\cap": "intersection",
-        r"\forall": "pour tout", r"\exists": "il existe",
-        r"\sum": "la somme des", r"\prod": "le produit des",
-        r"\int": "l'intégrale de", r"\infty": "l'infini",
-        r"\partial": "d rond", r"\nabla": "gradient",
-        r"\log": "log", r"\ln": "log", r"\exp": "l'exponentielle de",
-        r"\sin": "sinus", r"\cos": "cosinus", r"\tan": "tangente",
-        r"\max": "le maximum de", r"\min": "le minimum de",
-        r"\arg": "arg", r"\det": "le déterminant de",
-        "sqrt": "la racine carrée de", "over": "sur",
-        "ratio": "le rapport de", "to": "à", "of": "de",
-        "power": "puissance", "squared": "au carré", "cubed": "au cube",
-        "minus": "moins", "times_implicit": "fois", "given": "sachant",
+        "=": "égale",
+        "+": "plus",
+        "<": "est inférieur à",
+        ">": "est supérieur à",
+        r"\neq": "est différent de",
+        r"\ne": "est différent de",
+        r"\approx": "vaut environ",
+        r"\sim": "suit la loi",
+        r"\leq": "est au plus",
+        r"\le": "est au plus",
+        r"\geq": "est au moins",
+        r"\ge": "est au moins",
+        r"\pm": "plus ou moins",
+        r"\mp": "moins ou plus",
+        r"\times": "fois",
+        r"\cdot": "fois",
+        r"\div": "divisé par",
+        r"\circ": "composé avec",
+        r"\ast": "étoile",
+        r"\to": "vers",
+        r"\rightarrow": "vers",
+        r"\mapsto": "envoie sur",
+        r"\implies": "implique",
+        r"\iff": "si et seulement si",
+        r"\in": "dans",
+        r"\notin": "n'est pas dans",
+        r"\subset": "est contenu dans",
+        r"\subseteq": "est contenu dans",
+        r"\cup": "union",
+        r"\cap": "intersection",
+        r"\forall": "pour tout",
+        r"\exists": "il existe",
+        r"\sum": "la somme des",
+        r"\prod": "le produit des",
+        r"\int": "l'intégrale de",
+        r"\infty": "l'infini",
+        r"\partial": "d rond",
+        r"\nabla": "gradient",
+        r"\log": "log",
+        r"\ln": "log",
+        r"\exp": "l'exponentielle de",
+        r"\sin": "sinus",
+        r"\cos": "cosinus",
+        r"\tan": "tangente",
+        r"\max": "le maximum de",
+        r"\min": "le minimum de",
+        r"\arg": "arg",
+        r"\det": "le déterminant de",
+        "sqrt": "la racine carrée de",
+        "over": "sur",
+        "ratio": "le rapport de",
+        "to": "à",
+        "of": "de",
+        "power": "puissance",
+        "squared": "au carré",
+        "cubed": "au cube",
+        "minus": "moins",
+        "times_implicit": "fois",
+        "given": "sachant",
         r"\mathbb{E}": "l'espérance de",
         r"\mathbb{P}": "la probabilité de",
         r"\mathbb{V}": "la variance de",
         r"\operatorname{Var}": "la variance de",
-        r"\mid": "sachant", "|": "sachant",
+        r"\mid": "sachant",
+        "|": "sachant",
     },
 }
 
@@ -140,16 +235,12 @@ _DROPPED = re.compile(
 
 #: `\mathbb{R}`, `\mathrm{d}`, `\text{if}` — the font is a page matter; the
 #: letters inside are what is read.
-_FONT = re.compile(
-    r"\\(?:math(?:bf|cal|rm|sf|it|frak)|text(?:rm|bf|it)?)\s*\{([^{}]*)\}"
-)
+_FONT = re.compile(r"\\(?:math(?:bf|cal|rm|sf|it|frak)|text(?:rm|bf|it)?)\s*\{([^{}]*)\}")
 
 #: Operators written as a letter in a particular font -- `\mathbb{E}`, the
 #: expectation -- which are *named things*, not styled letters. They have to
 #: be recognised before `_FONT` strips the font away and leaves a bare "E".
-_NAMED_OPERATOR = re.compile(
-    r"\\(?:mathbb|operatorname)\s*\{\s*([A-Za-z]+)\s*\}"
-)
+_NAMED_OPERATOR = re.compile(r"\\(?:mathbb|operatorname)\s*\{\s*([A-Za-z]+)\s*\}")
 
 
 class SpeechMismatch(ValueError):
@@ -183,9 +274,9 @@ def _group(text: str, at: int) -> tuple[str, int]:
         elif text[i] == "}":
             depth -= 1
             if depth == 0:
-                return text[at + 1:i], i + 1
+                return text[at + 1 : i], i + 1
         i += 1
-    return text[at + 1:], len(text)
+    return text[at + 1 :], len(text)
 
 
 def speak_math(latex: str, lang: str = "en") -> str:
@@ -249,10 +340,12 @@ def speak_math(latex: str, lang: str = "en") -> str:
                 # and the listener has no parentheses to fall back on. The
                 # ratio phrasing binds, because "to" closes the first half.
                 if _is_compound(top) or _is_compound(bottom):
-                    out.append((
-                        f"{words['ratio']} {said_top} {words['to']} {said_bottom}",
-                        False,
-                    ))
+                    out.append(
+                        (
+                            f"{words['ratio']} {said_top} {words['to']} {said_bottom}",
+                            False,
+                        )
+                    )
                 else:
                     out.append((f"{said_top} {words['over']} {said_bottom}", False))
                 # A fraction followed by a bare symbol is a product, and a
@@ -355,9 +448,9 @@ def _bracketed(text: str, at: int) -> tuple[str, int]:
         elif text[i] == ")":
             depth -= 1
             if depth == 0:
-                return text[at + 1:i], i + 1
+                return text[at + 1 : i], i + 1
         i += 1
-    return text[at + 1:], len(text)
+    return text[at + 1 :], len(text)
 
 
 def _argument(text: str, at: int) -> tuple[str, int]:
@@ -381,9 +474,9 @@ def _argument(text: str, at: int) -> tuple[str, int]:
             elif text[i] == closing:
                 depth -= 1
                 if depth == 0:
-                    return text[offset + 1:i], i + 1
+                    return text[offset + 1 : i], i + 1
             i += 1
-        return text[offset + 1:], len(text)
+        return text[offset + 1 :], len(text)
     return _group(text, offset)
 
 
@@ -448,6 +541,7 @@ def speakable(
     one, every formula gets the deterministic reading — which is the
     baseline, not a degraded mode.
     """
+
     def _replace(match: re.Match) -> str:
         body = next(g for g in match.groups() if g is not None)
         plain = speak_math(body, lang)

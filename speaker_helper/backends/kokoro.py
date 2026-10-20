@@ -79,15 +79,15 @@ CACHE_ROOT: Path = CACHE_CANDIDATES[0]
 #: A voice *is* a language here — the name's first letter says which, and a
 #: ``lang`` that disagrees with the voice produces an accent nobody asked for.
 VOICE_PREFIX_LANG: dict[str, str] = {
-    "a": "en-us",   # American English
-    "b": "en-gb",   # British English
-    "e": "es",      # Spanish
-    "f": "fr-fr",   # French
-    "h": "hi",      # Hindi
-    "i": "it",      # Italian
-    "j": "ja",      # Japanese
-    "p": "pt-br",   # Brazilian Portuguese
-    "z": "cmn",     # Mandarin Chinese
+    "a": "en-us",  # American English
+    "b": "en-gb",  # British English
+    "e": "es",  # Spanish
+    "f": "fr-fr",  # French
+    "h": "hi",  # Hindi
+    "i": "it",  # Italian
+    "j": "ja",  # Japanese
+    "p": "pt-br",  # Brazilian Portuguese
+    "z": "cmn",  # Mandarin Chinese
 }
 
 #: Detected language → the voice that reads it. Within a language the pick is
@@ -98,8 +98,8 @@ VOICE_PREFIX_LANG: dict[str, str] = {
 #: accent, it produces nonsense, because the phonemiser is told the wrong
 #: language and spells the words out as if they were English.
 DEFAULT_VOICE_BY_LANG: dict[str, str] = {
-    "en": "af_heart",     # graded A — the only one the card grades that high
-    "fr": "ff_siwis",     # the sole French voice
+    "en": "af_heart",  # graded A — the only one the card grades that high
+    "fr": "ff_siwis",  # the sole French voice
     "es": "ef_dora",
     "it": "if_sara",
     "pt": "pf_dora",
@@ -121,16 +121,60 @@ FALLBACK_VOICE: str = "af_heart"
 #: prefers the loaded model when there is one and falls back to this, so the
 #: answer is never "load the weights and ask again".
 BUILTIN_VOICES: tuple[str, ...] = (
-    "af_alloy", "af_aoede", "af_bella", "af_heart", "af_jessica", "af_kore",
-    "af_nicole", "af_nova", "af_river", "af_sarah", "af_sky", "am_adam",
-    "am_echo", "am_eric", "am_fenrir", "am_liam", "am_michael", "am_onyx",
-    "am_puck", "am_santa", "bf_alice", "bf_emma", "bf_isabella", "bf_lily",
-    "bm_daniel", "bm_fable", "bm_george", "bm_lewis", "ef_dora", "em_alex",
-    "em_santa", "ff_siwis", "hf_alpha", "hf_beta", "hm_omega", "hm_psi",
-    "if_sara", "im_nicola", "jf_alpha", "jf_gongitsune", "jf_nezumi",
-    "jf_tebukuro", "jm_kumo", "pf_dora", "pm_alex", "pm_santa",
-    "zf_xiaobei", "zf_xiaoni", "zf_xiaoxiao", "zf_xiaoyi", "zm_yunjian",
-    "zm_yunxi", "zm_yunxia", "zm_yunyang",
+    "af_alloy",
+    "af_aoede",
+    "af_bella",
+    "af_heart",
+    "af_jessica",
+    "af_kore",
+    "af_nicole",
+    "af_nova",
+    "af_river",
+    "af_sarah",
+    "af_sky",
+    "am_adam",
+    "am_echo",
+    "am_eric",
+    "am_fenrir",
+    "am_liam",
+    "am_michael",
+    "am_onyx",
+    "am_puck",
+    "am_santa",
+    "bf_alice",
+    "bf_emma",
+    "bf_isabella",
+    "bf_lily",
+    "bm_daniel",
+    "bm_fable",
+    "bm_george",
+    "bm_lewis",
+    "ef_dora",
+    "em_alex",
+    "em_santa",
+    "ff_siwis",
+    "hf_alpha",
+    "hf_beta",
+    "hm_omega",
+    "hm_psi",
+    "if_sara",
+    "im_nicola",
+    "jf_alpha",
+    "jf_gongitsune",
+    "jf_nezumi",
+    "jf_tebukuro",
+    "jm_kumo",
+    "pf_dora",
+    "pm_alex",
+    "pm_santa",
+    "zf_xiaobei",
+    "zf_xiaoni",
+    "zf_xiaoxiao",
+    "zf_xiaoyi",
+    "zm_yunjian",
+    "zm_yunxi",
+    "zm_yunxia",
+    "zm_yunyang",
 )
 
 
@@ -195,8 +239,7 @@ def espeak_config() -> Any:
 #: supported by the espeak backend* and the synthesis fails. A caller who says
 #: ``language="fr"`` is right, and the translation is this module's job.
 LANG_TO_ESPEAK: dict[str, str] = {
-    iso: VOICE_PREFIX_LANG.get(voice[:1], "en-us")
-    for iso, voice in DEFAULT_VOICE_BY_LANG.items()
+    iso: VOICE_PREFIX_LANG.get(voice[:1], "en-us") for iso, voice in DEFAULT_VOICE_BY_LANG.items()
 }
 
 
@@ -420,8 +463,7 @@ class KokoroEngine:
         available = set(model.get_voices())
         if voice not in available:
             raise ValueError(
-                f"unknown voice {voice!r}; this engine has "
-                f"{', '.join(sorted(available))}"
+                f"unknown voice {voice!r}; this engine has {', '.join(sorted(available))}"
             )
 
     async def list_voices(self, engine: str | None = None) -> VoiceList:

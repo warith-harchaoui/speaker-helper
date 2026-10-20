@@ -156,8 +156,7 @@ def install_engine(engine: str, *, force: bool = False) -> int:
         )
         return 1
     print(
-        f"unknown engine {engine!r}; this can install: "
-        f"{', '.join(sorted(INSTALLABLE))}",
+        f"unknown engine {engine!r}; this can install: {', '.join(sorted(INSTALLABLE))}",
         file=sys.stderr,
     )
     return 2

@@ -442,9 +442,7 @@ class Speaker:
 
         items: list[Segment] = coerce_segments(segments)
         speakable = [
-            (i, seg)
-            for i, seg in enumerate(items)
-            if seg.text.strip() and seg.is_speakable
+            (i, seg) for i, seg in enumerate(items) if seg.text.strip() and seg.is_speakable
         ]
         if not speakable:
             raise ValueError("no segment holds anything speakable")
