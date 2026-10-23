@@ -25,7 +25,7 @@ aller-retour WER / chrF [@popovic2015chrf]) verrouillent le projet comme des
 tests unitaires verrouillent du code ordinaire. Ces mêmes preuves mesurées
 alimentent un **routeur de backends** qui transforme une *condition* de
 fonctionnement (temps réel en ligne ou hors-ligne) en moteur et mode concrets
-avec une justification chiffrée, et toute la pile peut tourner avec
+avec une justification chiffrée et toute la pile peut tourner avec
 des **modèles de moteurs et de métriques auto-hébergés** : rien n'est alors
 récupéré depuis Hugging Face à l'exécution. Nous décrivons l'architecture, le
 pipeline de streaming producteur/consommateur, le clonage de voix, les sources
@@ -76,7 +76,7 @@ votre texte ──▶ Speaker (hors-ligne · streaming · clone) ──TTSEngine
 ```
 
 - **Types** (`types.py`) : `Voice`, `AudioResult` (porte `wav_bytes`,
-  `sample_rate`, `duration_s`, `compute_s`, et un `rtf` dérivé), `StreamChunk`,
+  `sample_rate`, `duration_s`, `compute_s` et un `rtf` dérivé), `StreamChunk`,
   `VoiceList`, `VoiceSample`.
 - **Frontière moteur** (`engine.py`) : le protocole `TTSEngine` —
   `synthesize`, `list_voices`, `health`, `clone_voice`, `aclose` — plus un
@@ -106,7 +106,7 @@ est dérivé de l'`AudioResult`, jamais deviné.
 `voicebox` cache trois détails pénibles de l'API REST Voicebox : le bootstrap
 idempotent d'un *profil* (voix preset ou clonée), un chemin synchrone
 `POST /generate/stream` avec repli transparent vers le chemin asynchrone
-`/generate` qui déclenche le téléchargement du modèle au premier appel, et des
+`/generate` qui déclenche le téléchargement du modèle au premier appel et des
 retries avec backoff exponentiel sur les échecs transitoires (transport, 5xx).
 Le backend `mock` rend un signal sinusoïdal déterministe dont la durée suit la
 longueur d'entrée et dont le `compute_s` reproduit un RTF configuré : assez pour
@@ -140,7 +140,7 @@ fonctionnement* par langue du §5.3.
 
 Le clonage est uniforme entre la bibliothèque, la CLI et l'API REST. L'appelant
 fournit un ou plusieurs enregistrements de référence ; l'audio trop long est
-tronqué à la limite du moteur avec `audio-helper`, et une transcription
+tronqué à la limite du moteur avec `audio-helper` et une transcription
 manquante est produite avec Vocal Helper puis mise en cache dans un fichier
 voisin. Une référence prête à l'emploi est livrée par défaut : `--clone` seul
 produit donc une voix clonée. Le clonage passe par le protocole
@@ -150,7 +150,7 @@ silencieusement.
 ## 3.4 Sources speech-to-speech
 
 `sources.py` boucle la chaîne speech-to-speech : `from_youtube` [@ytdlp],
-`from_podcast` et `from_microphone` font entrer de l'audio, et `revoice` le
+`from_podcast` et `from_microphone` font entrer de l'audio et `revoice` le
 transcrit (Vocal Helper) puis reparle la transcription via un `Speaker`, dans
 une voix clonée ou une autre langue. Tous les imports tiers sont paresseux et
 derrière des extras optionnels : le cœur reste léger.
@@ -182,7 +182,7 @@ Toutes les métriques sont en Python pur et sans dépendance au cœur :
 ## 4.2 Seuils, priors et sélection de Pareto
 
 La barre pass/fail vit dans un `thresholds.yaml` committé : RTF `< 1.0` (moyenne
-et p95), taux d'anomalie nul toléré, et, seulement si un transcripteur tourne,
+et p95), taux d'anomalie nul toléré et, seulement si un transcripteur tourne,
 des seuils WER/chrF. Un axe qualité est *toujours* rapporté : chrF mesuré quand
 disponible, sinon un **prior** par moteur dans `[0, 1]` ; la sélection
 vitesse↔qualité fonctionne donc sans transcripteur. `pareto_front` extrait les points
@@ -284,7 +284,7 @@ référence du §5.1 (M2 Max, natif MLX) ; un autre hôte les recalibre en un ap
 Le même cœur est exposé au travers de cinq surfaces :
 
 - **CLI** : un groupe [click](https://click.palletsprojects.com) principal dont
-  les options globales précèdent la sous-commande, et le front-end argparse de la
+  les options globales précèdent la sous-commande et le front-end argparse de la
   bibliothèque standard conservé sous `speaker-helper-argparse`. Sous-commandes :
   `synth`, `voices`, `clone`, `route`, `eval` (avec `--languages` pour une
   matrice), `speak-from` (speech-to-speech), `serve`.
@@ -307,7 +307,7 @@ Le même cœur est exposé au travers de cinq surfaces :
   `speaker-helper eval --transcribe` (l'extra `stt`).
 - La référence de clonage livrée est dans l'arbre source ; son empaquetage dans
   le wheel reste à faire.
-- Prévu : des matrices de Pareto multi-moteurs mesurées par langue, et des
+- Prévu : des matrices de Pareto multi-moteurs mesurées par langue et des
   chaînes speech-to-speech plus riches sur les paquets sources.
 
 # Références

@@ -34,7 +34,7 @@ Python typée, une CLI, une API REST et une GUI web minimale. En local
   que le temps réel (RTF nettement inférieur à 1.0) — sans GPU.
 - **Agnostique du moteur.** Le moteur est un détail d'implémentation derrière le
   protocole `TTSEngine`. Voicebox est le défaut ; un backend `mock` déterministe
-  couvre les tests et la CI, et ajouter un backend est un changement
+  couvre les tests et la CI et ajouter un backend est un changement
   local et minime.
 - **Clonage de voix, partout.** Pointez vers un enregistrement, speaker-helper
   clone la voix — dans la bibliothèque, la CLI, l'API REST et la GUI. Les
@@ -102,7 +102,7 @@ fois, puis pointez speaker-helper dessus.
 
 ## Installation
 
-**Prérequis** — **Python 3.10–3.13** et **git**, **libsndfile**, **ffmpeg**, multiplateforme. `soundfile` nécessite la bibliothèque native `libsndfile`, et `audio-helper` (découpe/concaténation pour le clonage) utilise `ffmpeg` :
+**Prérequis** — **Python 3.10–3.13** et **git**, **libsndfile**, **ffmpeg**, multiplateforme. `soundfile` nécessite la bibliothèque native `libsndfile` et `audio-helper` (découpe/concaténation pour le clonage) utilise `ffmpeg` :
 
 - 🍎 **macOS** ([Homebrew](https://brew.sh)) : `brew install python git libsndfile ffmpeg`
 - 🐧 **Ubuntu/Debian** : `sudo apt update && sudo apt install -y python3 python3-pip git libsndfile1 ffmpeg`
@@ -119,7 +119,7 @@ release :
 ```bash
 # cœur
 pip install "git+https://github.com/warith-harchaoui/speaker-helper.git@v0.7.5"
-# avec extras (serveur, et STT pour clonage/aller-retour d'éval) :
+# avec extras (serveur et STT pour clonage/aller-retour d'éval) :
 pip install "speaker-helper[server,stt] @ git+https://github.com/warith-harchaoui/speaker-helper.git@v0.7.5"
 ```
 
@@ -172,7 +172,7 @@ environnement clos, vous pouvez servir chaque moteur — **et les
 modèles « métriques » de l'évaluation** — depuis des archives auto-hébergées ;
 rien n'est alors récupéré depuis Hugging Face à l'exécution. Le bundle est
 livré en **plusieurs petits zips** (un par moteur TTS, un pour les modèles de
-métriques) : vous ne téléchargez que ce que vous utilisez, et chaque zip se
+métriques) : vous ne téléchargez que ce que vous utilisez et chaque zip se
 décompresse dans la même arborescence `speaker-engines/` :
 
 ```bash
@@ -261,7 +261,7 @@ un moteur et un mode concrets, justifiés par les chiffres, jamais devinés.
   temps réel (RTF)** : le moteur doit synthétiser *plus vite que le temps réel*
   (`RTF < 1`), avec une marge pour le temps jusqu'au premier son et la gigue
   (plafond `0.8`). Parmi les moteurs qui tiennent le rythme, le routeur
-  **maximise la qualité** sur le front de Pareto qualité↔RTF, et sélectionne le
+  **maximise la qualité** sur le front de Pareto qualité↔RTF et sélectionne le
   streaming avec des réglages à faible TTFA.
 - **`offline`** — par lots. Aucune contrainte temps réel, donc **seule la
   qualité compte** : le moteur de plus haute qualité l'emporte, la
