@@ -39,8 +39,20 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
+      # The two ends of `requires-python = ">=3.10,<3.14"`, not every version in
+      # between. Both ends carry information -- 3.10 is the floor a `pip install`
+      # will accept, 3.13 the ceiling -- while 3.11 and 3.12 can only fail in
+      # ways one of the ends already fails. Four jobs for two bits of signal is
+      # the ambition this suite trades away to stay fast.
+      #
+      # Keeping the floor job matters more here than the saving: every member of
+      # the suite declares >=3.10 and this is the only one that runs it, so it
+      # is the suite's single piece of evidence that the promise holds. The
+      # static half is covered everywhere by ruff, which infers py310 from
+      # requires-python, but a missing stdlib module (tomllib on 3.10) is a
+      # runtime fault no linter sees.
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.10", "3.13"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
