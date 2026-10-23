@@ -36,6 +36,25 @@ if command -v ruff >/dev/null 2>&1; then
   ruff format --check speaker_helper tests || { echo "pre-push: ruff format failed - push aborted (run: ruff format speaker_helper tests)"; exit 1; }
 fi
 
+# The fast test suite, with the same coverage floor CI enforces.
+#
+# This was missing, and it made this package the one member of the suite where
+# a developer could push test-breaking code and only learn about it from CI —
+# the exact inversion of the rule every sibling follows (heavy locally, light
+# gate on the server). It also meant the four-version CI matrix was the ONLY
+# thing running tests at all, so a red build cost a round-trip instead of
+# fourteen seconds.
+#
+# `-m "not slow"` and `--cov-fail-under=70` mirror the workflow exactly: a
+# local gate that blocks a push CI would accept is worse than no local gate,
+# and so is one that waves through what CI will reject.
+if command -v pytest >/dev/null 2>&1; then
+  echo "pre-push: pytest (fast suite, coverage-gated)..."
+  pytest -q -m "not slow" \
+    --cov=speaker_helper --cov-report=term-missing --cov-fail-under=70 \
+    || { echo "pre-push: pytest failed - push aborted."; exit 1; }
+fi
+
 PY="$(command -v python3 || command -v python)"
 CLI="$(command -v speaker-helper)"
 
