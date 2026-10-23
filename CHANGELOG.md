@@ -6,6 +6,37 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-10-23
+
+### Fixed
+
+- **The graceful-degradation path for a missing MCP surface crashed instead of
+  degrading.** `api.py` called `osh.warn(...)` — a function that has never
+  existed; it is `osh.warning` — from inside the `except` branch whose entire
+  purpose is to say "the MCP surface did not mount, the HTTP API is
+  unaffected". So a handled, benign condition became an `AttributeError` at
+  application startup, which is the opposite of what the handler was for.
+
+  Nothing caught it because the branch carries `# pragma: no cover`: the
+  pragma excused the error path from coverage, and the error path was where
+  the error lived. A new test resolves **every** `osh.*` reference in the
+  package against the real module at once, rather than trusting call sites one
+  at a time — proven by restoring `osh.warn` and watching it fail.
+
+- **The pre-push gate ran no tests at all**, only `ruff`, while CI runs pytest
+  across four Python versions with a 70% coverage floor. This was the one
+  member of the suite where test-breaking code could be pushed and only caught
+  on the server — the inverse of the rule every sibling follows. The gate now
+  mirrors the workflow exactly (`-m "not slow"`, `--cov-fail-under=70`), which
+  costs fourteen seconds; proven by adding a lint-clean failing test and
+  watching the push abort.
+
+### Verified, not changed
+
+`os-helper>=1.7.2` looked anomalous beside siblings pinned at 2.6.0+, but every
+`os_helper` API this package uses (`download_file`, `init_logging`,
+`temporary_folder`, …) existed at 1.7.2. The floor is honest and stays.
+
 ## [0.8.1] - 2026-10-20
 
 Everything here is a consequence of 0.8.0 having been published without a

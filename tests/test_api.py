@@ -120,3 +120,34 @@ def test_synth_stream_emits_ordered_sse_chunks() -> None:
     assert events[-1]["is_final"] is True
     # every chunk carries decodable WAV audio
     assert base64.b64decode(events[0]["audio"])[:4] == b"RIFF"
+
+
+def test_every_os_helper_reference_resolves() -> None:
+    """A name this package calls on `os_helper` must actually exist there.
+
+    Found the hard way: `api.py` called `osh.warn(...)` — which has never
+    existed, the function is `osh.warning` — from inside the `except` branch
+    that exists to degrade gracefully when the MCP surface cannot mount. So a
+    handled, benign condition ("MCP unavailable, the HTTP API is unaffected")
+    became an `AttributeError` at application startup instead.
+
+    Nothing caught it because the branch carries `# pragma: no cover`: the
+    pragma excused the error path from coverage, and the error path was where
+    the error was. A missing attribute on a sibling package is exactly the
+    kind of thing a static read cannot excuse and an import can confirm, so it
+    is checked here for every reference at once rather than trusted per call
+    site.
+    """
+    import re
+    from pathlib import Path
+
+    import os_helper as osh
+
+    package = Path(__file__).resolve().parent.parent / "speaker_helper"
+    missing = {
+        f"osh.{name} ({path.name})"
+        for path in package.rglob("*.py")
+        for name in re.findall(r"\bosh\.([a-zA-Z_][a-zA-Z0-9_]*)", path.read_text(encoding="utf-8"))
+        if not hasattr(osh, name)
+    }
+    assert not missing, f"these os_helper names do not exist: {sorted(missing)}"
