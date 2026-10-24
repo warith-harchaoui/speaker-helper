@@ -179,7 +179,7 @@ The zips are built once with the scripts in `~/speaker-engines/` (see its
 
 ---
 
-## Quickstart
+## Quick start
 
 ### Python
 
