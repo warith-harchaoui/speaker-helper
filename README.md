@@ -6,9 +6,9 @@
 
 `Speaker Helper` belongs to a collection of libraries called `AI Helpers` developed for building Artificial Intelligence.
 
-[🌍 AI Helpers](https://harchaoui.org/warith/ai-helpers)
+[🌍 AI Helpers](https://deraison.ai/ai-helpers)
 
-[![logo](https://raw.githubusercontent.com/warith-harchaoui/speaker-helper/main/assets/logo.png)](https://harchaoui.org/warith/ai-helpers)
+[![logo](https://raw.githubusercontent.com/warith-harchaoui/speaker-helper/main/assets/logo.png)](https://deraison.ai/ai-helpers)
 
 
 **Professional text-to-speech — offline and streaming, with voice cloning and a
@@ -53,7 +53,7 @@ readme.
 
 ## Documentation
 
-[💻 Documentation](https://harchaoui.org/warith/ai-helpers/docs/speaker-helper-doc/)
+[💻 Documentation](https://deraison.ai/ai-helpers/docs/speaker-helper-doc/)
 
 [🗺️ Landscape](https://github.com/warith-harchaoui/speaker-helper/blob/main/LANDSCAPE.md)
 
