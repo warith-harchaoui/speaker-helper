@@ -129,17 +129,19 @@ d'**évaluation** produit ces preuves.
 
 Travaillez dans un environnement Python dédié. Si vous ne savez pas en configurer un, voir [🥸 Tech tips](https://harchaoui.org/warith/4ml/#install).
 
-### Depuis les sources
-
-speaker-helper n'est **pas encore sur PyPI** (release PyPI à venir). Comme les
-autres projets `*-helper`, il s'installe depuis git, épinglé sur un tag de
-release :
+### Depuis PyPI
 
 ```bash
 # cœur
-pip install "git+https://github.com/warith-harchaoui/speaker-helper.git@v0.7.5"
+pip install speaker-helper
 # avec extras (serveur et STT pour clonage/aller-retour d'éval) :
-pip install "speaker-helper[server,stt] @ git+https://github.com/warith-harchaoui/speaker-helper.git@v0.7.5"
+pip install "speaker-helper[server,stt]"
+```
+
+L'installation depuis git reste possible pour un commit non publié :
+
+```bash
+pip install "git+https://github.com/warith-harchaoui/speaker-helper.git@v0.9.2"
 ```
 
 Extras disponibles : `server` (API REST), `stt` (vocal-helper), `youtube`,

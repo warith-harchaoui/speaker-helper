@@ -121,16 +121,19 @@ an operating condition into a concrete engine + mode from measured evidence; the
 
 We recommend using Python environments. Check this link if you're unfamiliar with setting one up: [🥸 Tech tips](https://harchaoui.org/warith/4ml/#install).
 
-### From source
-
-speaker-helper is **not on PyPI yet** (PyPI release coming soon). Like the other
-`*-helper` projects, it installs from git, pinned to a release tag:
+### From PyPI
 
 ```bash
 # core
-pip install "git+https://github.com/warith-harchaoui/speaker-helper.git@v0.7.5"
+pip install speaker-helper
 # with extras (server, and STT for cloning/eval round-trip):
-pip install "speaker-helper[server,stt] @ git+https://github.com/warith-harchaoui/speaker-helper.git@v0.7.5"
+pip install "speaker-helper[server,stt]"
+```
+
+Installing from git still works if you need an unreleased commit:
+
+```bash
+pip install "git+https://github.com/warith-harchaoui/speaker-helper.git@v0.9.2"
 ```
 
 Available extras: `server` (REST API), `stt` (vocal-helper), `youtube`,
