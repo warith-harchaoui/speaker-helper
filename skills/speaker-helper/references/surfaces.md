@@ -7,7 +7,7 @@ truth and one of them is wrong.
 | # | Surface | How you reach it | Who it is for |
 |---|---|---|---|
 | 1 | **Library** | `import speaker_helper` | another program |
-| 2 | **Command line** | `speaker-helper` (click) and `speaker-helper-argparse` | a human at a terminal |
+| 2 | **Command line** | `speaker-helper` (click) | a human at a terminal |
 | 3 | **HTTP API** | `speaker-helper serve`, or the container | a service, a colleague's stack |
 | 4 | **MCP** | `speaker-helper-mcp`, or `/mcp` on the API | an agent |
 | 5 | **Skill** | the `SKILL.md` beside this file | Claude, OpenCode |
@@ -33,12 +33,12 @@ A bare install imports, reads a settings file, parses segments and writes
 WebVTT — with no ONNX runtime and no torch anywhere. The model arrives with
 `pip install 'speaker-helper[kokoro]'`.
 
-## 2. Two command lines
+## 2. The command line
 
-Both, over the same handlers: `argparse` because it is in the standard library
-and therefore always available, `click` because its sub-commands and types
-carry the richer shapes without hand-rolling them. A handler cannot tell which
-front door called it.
+One `click` group over the `_cmd_*` handlers: its sub-commands and types carry
+the shapes without hand-rolling them. Global options (`--backend`, `--engine`,
+`--language`, the `--clone` family) are declared on the group, so they precede
+the sub-command.
 
 ```bash
 speaker-helper health
@@ -48,13 +48,13 @@ speaker-helper synth --stream "A longer reply."
 speaker-helper narrate post.json -o post.wav --read-math fr
 speaker-helper voices
 speaker-helper eval                     # measure, don't guess
-speaker-helper route --condition online # which engine, and why, in numbers
+speaker-helper route --condition online_realtime   # which engine, in numbers
 ```
 
 ## 3. HTTP API
 
 ```bash
-speaker-helper serve --host 0.0.0.0 --port 8080
+speaker-helper serve --bind-host 0.0.0.0 --bind-port 8080
 ```
 
 | Route | What it does |

@@ -82,7 +82,6 @@ block landed.
 ### The names
 
 - `speaker-helper`
-- `speaker-helper-argparse`
 - `speaker-helper-mcp`
 - `import speaker_helper`
 - `Speaker(...)`

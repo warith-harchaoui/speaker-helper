@@ -37,9 +37,9 @@ same engine on CPU-in-Docker is borderline and load-sensitive.
 
 ## 1.1 Goals
 
-- **A ready-to-use, operational toolbox**, not a study: a library, a CLI
-  (argparse + click), a REST API, and a minimal web GUI that a solo developer
-  or a small team can adopt without private context.
+- **A ready-to-use, operational toolbox**, not a study: a library, a CLI, a
+  REST API, and a minimal web GUI that a solo developer or a small team can
+  adopt without private context.
 - **Engine independence.** Nothing above the backend boundary may depend on a
   concrete engine. Adding or swapping a backend is a local change.
 - **Two synthesis modes.** *Offline* (whole text → one audio, optimising
@@ -263,11 +263,10 @@ different host recalibrates them with one call.
 
 The same core is exposed over five surfaces:
 
-- **CLI**: a primary [click](https://click.palletsprojects.com) group with global
-  options preceding the sub-command, and the standard-library argparse front-end
-  kept as `speaker-helper-argparse`. Sub-commands: `synth`, `voices`, `clone`,
-  `route`, `eval` (with `--languages` for a matrix), `speak-from`
-  (speech-to-speech), `serve`.
+- **CLI**: one [click](https://click.palletsprojects.com) group whose global
+  options precede the sub-command. Sub-commands: `synth`, `narrate`, `voices`,
+  `clone`, `route`, `eval` (with `--languages` for a matrix), `speak-from`
+  (speech-to-speech), `install-voice`, `health`, `serve`.
 - **REST**: `GET /health`, `GET /voices`, `POST /synth`, `POST /synth/stream`
   (Server-Sent Events, one JSON chunk per sentence [@sse]), `POST /clone`, and
   `POST /route` (the backend router).

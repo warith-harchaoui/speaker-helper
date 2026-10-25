@@ -18,7 +18,7 @@ the same prompts made the choice harder rather than finer.
 skills/speaker-helper/
 ├── SKILL.md                  # name + trigger-rich description + instructions
 └── references/
-    ├── surfaces.md           # library, two CLIs, REST, MCP, and the container
+    ├── surfaces.md           # library, CLI, REST, MCP, and the container
     └── triggers.md           # when this is the answer, and when it is not
 ```
 

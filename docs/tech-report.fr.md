@@ -40,8 +40,8 @@ charge.
 ## 1.1 Objectifs
 
 - **Une boîte à outils opérationnelle, prête à l'emploi**, pas une étude : une
-  bibliothèque, une CLI (argparse + click), une API REST et une GUI web minimale
-  qu'un développeur seul ou une petite équipe peut adopter sans contexte privé.
+  bibliothèque, une CLI, une API REST et une GUI web minimale qu'un
+  développeur seul ou une petite équipe peut adopter sans contexte privé.
 - **Indépendance vis-à-vis du moteur.** Rien au-dessus de la frontière backend
   ne doit dépendre d'un moteur concret. Ajouter ou remplacer un backend reste un
   changement local.
@@ -283,11 +283,11 @@ référence du §5.1 (M2 Max, natif MLX) ; un autre hôte les recalibre en un ap
 
 Le même cœur est exposé au travers de cinq surfaces :
 
-- **CLI** : un groupe [click](https://click.palletsprojects.com) principal dont
-  les options globales précèdent la sous-commande et le front-end argparse de la
-  bibliothèque standard conservé sous `speaker-helper-argparse`. Sous-commandes :
-  `synth`, `voices`, `clone`, `route`, `eval` (avec `--languages` pour une
-  matrice), `speak-from` (speech-to-speech), `serve`.
+- **CLI** : un seul groupe [click](https://click.palletsprojects.com) dont les
+  options globales précèdent la sous-commande. Sous-commandes : `synth`,
+  `narrate`, `voices`, `clone`, `route`, `eval` (avec `--languages` pour une
+  matrice), `speak-from` (speech-to-speech), `install-voice`, `health`,
+  `serve`.
 - **REST** : `GET /health`, `GET /voices`, `POST /synth`, `POST /synth/stream`
   (Server-Sent Events, un morceau JSON par phrase [@sse]), `POST /clone` et
   `POST /route` (le routeur de backends).

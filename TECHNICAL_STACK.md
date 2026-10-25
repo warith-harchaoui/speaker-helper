@@ -11,7 +11,7 @@ the **AI Helpers** ecosystem.
 flowchart TB
     subgraph clients["Entry points (4 surfaces)"]
         lib["Python API<br/>Speaker · route"]:::core
-        cli["CLI (argparse + click)<br/>synth · voices · clone · eval · route · serve"]:::core
+        cli["CLI (click)<br/>synth · voices · clone · eval · route · serve"]:::core
         api["REST API<br/>/synth · /synth/stream · /clone · /voices · /route · /health"]:::core
         gui["Web GUI<br/>served at /"]:::core
     end
@@ -77,7 +77,7 @@ flowchart TB
 | Router | `router.py` | condition (`online_realtime` / `offline`) → engine + mode from measured quality↔speed evidence |
 | Profiles | `profiles.py` | per-language hyperparameters (producer/consumer) + measured RTF/quality |
 | Text | `text.py` | sentence splitting for low time-to-first-audio |
-| CLI | `cli.py` / `click_cli.py` | `synth`, `voices`, `clone`, `eval`, `speak-from`, `route`, `serve` — argparse core + click front-end (shared handlers) |
+| CLI | `cli.py` | `synth`, `voices`, `clone`, `eval`, `speak-from`, `route`, `serve` — one click group over the shared `_cmd_*` handlers |
 | API | `api.py` | FastAPI — offline, SSE streaming, cloning upload, `/route`, GUI at `/` |
 | GUI | `gui/` | minimal vanilla-JS + Tailwind single page (synth / stream / voices / clone / route) |
 | Cloning | `cloning.py` | clone defaults (ref-fr-female), trim + transcript preparation |

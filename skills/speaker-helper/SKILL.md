@@ -114,7 +114,7 @@ timbre, it does not teach the model to talk.
 ## The other surfaces
 
 ```bash
-speaker-helper serve --host 0.0.0.0 --port 8080   # REST + the GUI at /
+speaker-helper serve --bind-host 0.0.0.0 --bind-port 8080   # REST + the GUI at /
 speaker-helper-mcp                                 # the same routes as agent tools
 docker compose up -d                               # the whole thing, engine included
 ```

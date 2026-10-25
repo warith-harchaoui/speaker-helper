@@ -91,8 +91,8 @@ Where `speaker-helper` uniquely wins for its niche:
 3. **Cloning that finishes the job.** Point at a recording; a missing transcript
    is derived and over-long references are trimmed and re-aligned automatically.
 4. **One core, four surfaces.** The same typed `Speaker` is reachable from
-   Python, an argparse *and* a click CLI, a REST API, and a web GUI — no
-   drift between them.
+   Python, one click CLI, a REST API, and a web GUI — no drift between
+   them.
 
 **The licence is a routing input, not a footnote.** This is the criterion the
 table was missing until 2026-10-23, and it reorders the field: the engines that

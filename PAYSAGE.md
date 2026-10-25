@@ -99,8 +99,8 @@ Là où `speaker-helper` gagne pour son créneau :
    transcription manquante est produite et les références trop longues sont
    tronquées et ré-alignées automatiquement.
 4. **Un cœur, quatre surfaces.** Le même `Speaker` typé est accessible depuis
-   Python, une CLI argparse *et* une CLI click, une API REST et une GUI web,
-   sans dérive entre elles.
+   Python, une seule CLI click, une API REST et une GUI web, sans dérive
+   entre elles.
 
 **La licence est une entrée de routage, pas une note de bas de page.** C'est le
 critère qui manquait au tableau jusqu'au 2026-10-23 ; il rebat les cartes :

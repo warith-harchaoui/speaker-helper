@@ -96,31 +96,30 @@ asyncio.run(main())
 
 ```bash
 # list French kokoro voices
-speaker-helper --port 17600 voices --engine kokoro
+speaker-helper --engine kokoro voices
 
 # offline synthesis
-speaker-helper --port 17600 synth "Bonjour le monde." -o hello.wav
+speaker-helper synth "Bonjour le monde." -o hello.wav
 
 # from stdin
-echo "Texte lu depuis l'entrée standard." | speaker-helper --port 17600 synth -o out.wav
+echo "Texte lu depuis l'entrée standard." | speaker-helper synth -o out.wav
 
 # streaming (reports TTFA + per-chunk cadence)
-speaker-helper --port 17600 synth "Une. Deux. Trois." -o out.wav --stream
+speaker-helper synth "Une. Deux. Trois." -o out.wav --stream
 
 # pick the best engine + mode for a condition (see §10)
-speaker-helper route --condition online_realtime --language fr
+speaker-helper --language fr route --condition online_realtime
 ```
 
-The primary `speaker-helper` command is a click group; the argparse front-end
-stays available as `speaker-helper-argparse`. Global options (`--port`,
-`--backend`, …) precede the sub-command.
+`speaker-helper` is one click group. Global options (`--backend`, `--engine`,
+`--language`, …) are declared on the group, so they precede the sub-command.
 
 ---
 
 ## 6. REST API server
 
 ```bash
-speaker-helper --port 17600 serve --host 0.0.0.0 --port 8080
+speaker-helper serve --bind-host 0.0.0.0 --bind-port 8080
 ```
 
 ```bash
@@ -200,9 +199,9 @@ spk.save("Voix clonée par défaut.", "cloned.wav")   # clones on first synthesi
 
 ```bash
 # CLI: clone the bundled reference and synthesise with it
-speaker-helper --port 17600 --clone synth "Bonjour." -o cloned.wav
+speaker-helper --clone synth "Bonjour." -o cloned.wav
 # or clone from your own audio (transcript auto-derived):
-speaker-helper --port 17600 --clone-audio my_voice.wav synth "Bonjour." -o out.wav
+speaker-helper --clone-audio my_voice.wav synth "Bonjour." -o out.wav
 ```
 
 ---
@@ -227,7 +226,7 @@ asyncio.run(main())
 ```bash
 # CLI: non-zero exit code when the bar is missed (gates CI)
 speaker-helper --backend mock eval
-speaker-helper --port 17600 --engine kokoro eval --json report.json
+speaker-helper --engine kokoro eval --json report.json
 ```
 
 With a transcriber (from the `stt` extra) you also get a WER/chrF round-trip:
@@ -270,7 +269,7 @@ spk = Speaker.from_route("online_realtime", language="fr")
 ```
 
 ```bash
-speaker-helper route --condition online_realtime --language fr
+speaker-helper --language fr route --condition online_realtime
 speaker-helper route --condition offline --json decision.json
 ```
 
@@ -307,7 +306,7 @@ asyncio.run(main())
 
 ```bash
 # CLI: one matrix, gates on every language (exit 1 if any fails)
-speaker-helper --port 17600 --engine kokoro eval --languages fr,en,es --json matrix.json
+speaker-helper --engine kokoro eval --languages fr,en,es --json matrix.json
 ```
 
 ---

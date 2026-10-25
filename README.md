@@ -42,7 +42,7 @@ minimal web GUI — runnable locally (conda + pip) or as a Docker server.
 - **Self-hosted, no Hugging Face at runtime.** An optional
   [`speaker-engines`](#self-hosted-engines-no-hugging-face) bundle serves every
   engine + metric model from your own server, so the engines run air-gapped.
-- **Batteries included.** Library, CLI (argparse + click), REST API, web GUI,
+- **Batteries included.** Library, CLI, REST API, web GUI,
   Docker.
 
 See [`EXAMPLES.md`](https://github.com/warith-harchaoui/speaker-helper/blob/main/EXAMPLES.md) for a runnable cookbook,
@@ -196,24 +196,24 @@ print(f"{result.duration_s:.2f}s audio, RTF {result.rtf:.2f}")
 
 ### CLI
 
-The primary `speaker-helper` command is a [click](https://click.palletsprojects.com)
-group; the standard-library argparse front-end stays available as
-`speaker-helper-argparse` (same sub-commands). Global options precede the
-sub-command (`speaker-helper --backend mock synth …`).
+`speaker-helper` is one [click](https://click.palletsprojects.com) group, and
+`-h` / `-V` both answer. Global options are declared on the group, so they
+precede the sub-command: `speaker-helper --backend mock synth …`,
+`speaker-helper --engine kokoro voices`.
 
 ```bash
-speaker-helper --port 17600 voices --engine kokoro
-speaker-helper --port 17600 synth "Bonjour le monde." -o hello.wav
-speaker-helper --port 17600 synth "Une. Deux. Trois." -o out.wav --stream
-speaker-helper route --condition online_realtime --language fr    # pick an engine
+speaker-helper --engine kokoro voices
+speaker-helper synth "Bonjour le monde." -o hello.wav
+speaker-helper synth "Une. Deux. Trois." -o out.wav --stream
+speaker-helper --language fr route --condition online_realtime    # pick an engine
 speaker-helper --backend mock eval               # gate quality (no engine needed)
-speaker-helper --port 17600 --clone synth "Bonjour." -o cloned.wav
+speaker-helper --clone synth "Bonjour." -o cloned.wav
 ```
 
 ### REST API server
 
 ```bash
-speaker-helper --port 17600 serve --host 0.0.0.0 --port 8080
+speaker-helper serve --bind-host 0.0.0.0 --bind-port 8080
 curl -s -X POST localhost:8080/synth -H 'content-type: application/json' \
      -d '{"text": "Bonjour."}' -o out.wav
 # streaming (Server-Sent Events, one JSON chunk per sentence):
@@ -267,7 +267,7 @@ spk = Speaker.from_route("offline", language="fr")
 ```
 
 ```bash
-speaker-helper route --condition online_realtime --language fr
+speaker-helper --language fr route --condition online_realtime
 speaker-helper route --condition offline --json decision.json
 ```
 
@@ -296,8 +296,8 @@ result = await spk.say("Maintenant je parle avec la voix clonée.")
 ```
 
 ```bash
-speaker-helper --port 17600 clone                       # clone the bundled reference, print id
-speaker-helper --port 17600 --clone-audio my_voice.wav synth "Bonjour." -o out.wav
+speaker-helper clone                       # clone the bundled reference, print id
+speaker-helper --clone-audio my_voice.wav synth "Bonjour." -o out.wav
 ```
 
 Reference audio longer than the engine's limit (Voicebox: 30 s) is trimmed
@@ -327,9 +327,9 @@ asyncio.run(main())
 ```
 
 ```bash
-speaker-helper --port 17600 speak-from --source youtube --url https://youtu.be/… -o out.wav
-speaker-helper --port 17600 speak-from --source podcast --url https://feed/rss   -o out.wav
-speaker-helper --port 17600 --clone speak-from --source mic --seconds 5          -o out.wav
+speaker-helper speak-from --source youtube --url https://youtu.be/… -o out.wav
+speaker-helper speak-from --source podcast --url https://feed/rss   -o out.wav
+speaker-helper --clone speak-from --source mic --seconds 5          -o out.wav
 ```
 
 Sources are optional extras: `youtube` (`youtube-helper`), `podcast`
@@ -347,7 +347,7 @@ when the bar is missed, so it gates CI.
 
 ```bash
 speaker-helper --backend mock eval                 # deterministic, no engine
-speaker-helper --port 17600 --engine kokoro eval --json report.json
+speaker-helper --engine kokoro eval --json report.json
 # backend=voicebox engine=kokoro cases=12
 # mean_rtf=0.3534 p95_rtf=0.3989 anomaly_rate=0.0 quality=0.75 (prior)
 # PASS

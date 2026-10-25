@@ -48,4 +48,4 @@ EXPOSE 8080
 # Serve what the image was built for. Override with any of the commands:
 #
 #   docker run --rm -v "$PWD:/work" IMAGE speaker-helper narrate /work/post.json
-CMD ["speaker-helper", "serve", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["speaker-helper", "serve", "--bind-host", "0.0.0.0", "--bind-port", "8080"]

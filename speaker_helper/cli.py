@@ -3,24 +3,38 @@ Command-line interface for speaker-helper.
 
 Module summary
 --------------
-Exposes the library as a terminal tool with four sub-commands:
+One command line, built with `click <https://click.palletsprojects.com>`_:
+``speaker-helper``. It exposes the library as a terminal tool whose
+sub-commands cover the three jobs the package exists for and the operations
+around them:
 
-* ``synth`` — synthesise text (or stdin) to a ``.wav`` file, offline or
-  streaming, printing the measured duration and real-time factor.
-* ``voices`` — list the preset voices of an engine.
-* ``clone`` — register a cloned voice from reference audio (default: the bundled
-  ref-fr-female) and print its id; missing transcripts come from ``vocal-helper``.
-* ``eval`` — evaluate the engine against a dataset and gate on versioned
-  thresholds (exit code ``0`` pass / ``1`` fail); see :mod:`speaker_helper.eval`.
-* ``speak-from`` — re-voice audio from a YouTube URL, podcast feed, or the
-  microphone (speech-to-speech); see :mod:`speaker_helper.sources`.
-* ``serve`` — run the REST API server (see :mod:`speaker_helper.api`).
+* ``synth`` — speak text (or stdin) into a ``.wav``, offline or streaming,
+  printing the measured duration and real-time factor.
+* ``narrate`` — read a document aloud and write the WebVTT cues beside the
+  audio, so a page can follow the reading.
+* ``voices`` — list an engine's preset voices.
+* ``clone`` — register a cloned voice from reference audio (default: the
+  bundled ref-fr-female) and print its id; a missing transcript comes from
+  ``vocal-helper``.
+* ``speak-from`` — re-voice audio from a YouTube URL, a podcast feed or the
+  microphone; see :mod:`speaker_helper.sources`.
+* ``route`` — choose engine + mode from measured quality↔speed evidence.
+* ``eval`` — measure the engine against a dataset and gate on versioned
+  thresholds (exit ``0`` pass / ``1`` fail); see :mod:`speaker_helper.eval`.
+* ``install-voice`` — fetch an engine's weights before anything depends on them.
+* ``health`` — report whether the configured backend can run, and exit
+  non-zero when it cannot.
+* ``serve`` — run the REST API server; see :mod:`speaker_helper.api`.
 
-The ``--clone`` family of flags works with any command: ``speaker-helper --clone
-synth "Bonjour"`` synthesises in the cloned ref-fr-female voice.
+Global options (``--backend``, ``--engine``, ``--language``, the ``--clone``
+family, …) sit on the top-level **group**, so they precede the sub-command:
+``speaker-helper --backend mock synth "hi"``, ``speaker-helper --engine kokoro
+voices``. They are stashed on the click context and merged into the flag bag
+each command handler reads.
 
-Argument parsing uses the standard-library :mod:`argparse` so the CLI has no
-third-party dependency of its own.
+Each ``_cmd_*`` handler takes that bag and returns a process exit code, so the
+command logic stays testable without a terminal; the click layer above it only
+parses.
 
 Usage example
 -------------
@@ -28,8 +42,9 @@ Usage example
 
     speaker-helper synth "Bonjour le monde." -o hello.wav --engine kokoro
     echo "Texte depuis stdin." | speaker-helper synth -o out.wav
-    speaker-helper voices --engine kokoro
-    speaker-helper serve --host 0.0.0.0 --port 8080
+    speaker-helper --engine kokoro voices
+    speaker-helper route --condition online_realtime --language fr
+    speaker-helper serve --bind-host 0.0.0.0 --bind-port 8080
 
 Author
 ------
@@ -38,14 +53,16 @@ Warith HARCHAOUI — https://linkedin.com/in/warith-harchaoui
 
 from __future__ import annotations
 
-import argparse
 import asyncio
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
+import click
 import os_helper as osh
 
+from speaker_helper import __version__
 from speaker_helper.config import Settings
 from speaker_helper.speaker import Speaker
 
@@ -56,225 +73,7 @@ if TYPE_CHECKING:
     from speaker_helper.transcription import VocalHelperTranscriber
 
 
-def _build_parser() -> argparse.ArgumentParser:
-    """Construct the top-level argument parser and its sub-commands."""
-    parser = argparse.ArgumentParser(
-        prog="speaker-helper",
-        description="Text-to-speech (offline + streaming) over a local TTS engine.",
-    )
-    parser.add_argument(
-        "--config",
-        type=Path,
-        default=None,
-        help="Path to settings.yaml (default: ./settings.yaml if present).",
-    )
-    # Global overrides: they precede the sub-command and win over settings.yaml.
-    parser.add_argument(
-        "--backend",
-        default=None,
-        help="TTS backend: kokoro (default), openvoice, chatterbox or mock.",
-    )
-    parser.add_argument("--voice-sample", default=None, help="Reference recording to clone.")
-    parser.add_argument("--engine", default=None, help="Engine/model id (e.g. kokoro).")
-    parser.add_argument("--voice", default=None, help="Preset voice id (default: auto).")
-    parser.add_argument("--language", default=None, help="Target language (e.g. fr).")
-    # Cloning: enable a cloned voice for any command. --clone alone uses the
-    # bundled ref-fr-female reference; --clone-audio/--clone-text override it. A
-    # missing transcript is derived automatically with vocal-helper.
-    parser.add_argument(
-        "--clone",
-        action="store_true",
-        help="Use a cloned voice (default reference: bundled ref-fr-female).",
-    )
-    parser.add_argument(
-        "--clone-name",
-        default=None,
-        help="Name for the cloned voice profile (default: ref-fr-female).",
-    )
-    parser.add_argument("--clone-audio", default=None, help="Reference audio file to clone from.")
-    parser.add_argument(
-        "--clone-text",
-        default=None,
-        help="Transcript of --clone-audio (auto-transcribed if omitted).",
-    )
-
-    # One sub-command is mandatory; each gets its own argument group below.
-    sub = parser.add_subparsers(dest="command", required=True)
-
-    # `synth`: text (or stdin) -> WAV, offline or streaming.
-    p_synth = sub.add_parser("synth", help="Synthesise text to a WAV file.")
-    p_synth.add_argument(
-        "text", nargs="?", default=None, help="Text to speak; omit to read from stdin."
-    )
-    p_synth.add_argument(
-        "-o",
-        "--out",
-        type=Path,
-        default=Path("out.wav"),
-        help="Output WAV path (default: out.wav).",
-    )
-    p_synth.add_argument(
-        "--stream",
-        action="store_true",
-        help="Streaming mode: report time-to-first-audio and cadence.",
-    )
-
-    # `narrate`: a document -> one WAV plus the timed track that follows it.
-    p_narrate = sub.add_parser(
-        "narrate",
-        help="Read a document aloud and write the WAV plus its WebVTT cues.",
-    )
-    p_narrate.add_argument(
-        "segments",
-        type=Path,
-        help=(
-            "JSON file: a list of blocks, each with `text` and optionally "
-            "`say`, `pause_before_ms`, `pause_after_ms`, `pace`, `emotion`. "
-            "A list of plain strings is accepted too."
-        ),
-    )
-    p_narrate.add_argument(
-        "-o",
-        "--out",
-        type=Path,
-        default=Path("narration.wav"),
-        help="Output WAV path; the cues are written beside it as .vtt.",
-    )
-    p_narrate.add_argument(
-        "--read-math",
-        metavar="LANG",
-        default=None,
-        help=(
-            "Turn the notation in each block into words in LANG before "
-            "speaking it, leaving the cues showing the page's own text."
-        ),
-    )
-
-    # `install-voice`: fetch the weights before anything depends on them.
-    p_install = sub.add_parser("install-voice", help="Download the weights an engine needs.")
-    p_install.add_argument(
-        "--engine", default="kokoro", help="Which engine to prepare (default: kokoro)."
-    )
-    p_install.add_argument(
-        "--force", action="store_true", help="Re-download even if already present."
-    )
-
-    # `health`: can this machine synthesise at all, and if not, what is missing.
-    sub.add_parser("health", help="Report whether the configured backend can run.")
-
-    # `voices`: enumerate an engine's preset voices.
-    p_voices = sub.add_parser("voices", help="List preset voices for an engine.")
-    p_voices.add_argument("--engine", default=None, help="Engine id (default: configured).")
-
-    # `clone`: register a cloned voice (uses the global --clone* flags) and print its id.
-    sub.add_parser("clone", help="Register a cloned voice from reference audio and print its id.")
-
-    # `eval`: measure the engine against a dataset and gate on thresholds.
-    p_eval = sub.add_parser(
-        "eval", help="Evaluate the engine against a dataset and gate on thresholds."
-    )
-    p_eval.add_argument(
-        "--dataset", type=Path, default=None, help="JSONL dataset (default: built-in French set)."
-    )
-    p_eval.add_argument(
-        "--thresholds", type=Path, default=None, help="Thresholds YAML (default: built-in bar)."
-    )
-    p_eval.add_argument(
-        "--json",
-        dest="json_out",
-        type=Path,
-        default=None,
-        help="Write the full JSON report to this path.",
-    )
-    p_eval.add_argument(
-        "--languages",
-        default=None,
-        help="Comma-separated language codes to measure "
-        "(e.g. fr,en,es); prints a per-language matrix.",
-    )
-    # Opt-in fidelity round-trip: re-transcribe the synthesised audio with
-    # vocal-helper (the ``stt`` extra) and gate on WER/chrF. Off by default
-    # because it needs a real engine and STT, which CI does not have.
-    p_eval.add_argument(
-        "--transcribe",
-        action="store_true",
-        help="Re-transcribe output (vocal-helper) and gate on WER/chrF.",
-    )
-
-    # `speak-from`: speech-to-speech — pull audio from a source and re-voice it.
-    p_from = sub.add_parser(
-        "speak-from", help="Re-voice audio from a source (youtube / podcast / microphone)."
-    )
-    p_from.add_argument(
-        "--source",
-        choices=["youtube", "podcast", "mic"],
-        required=True,
-        help="Where the audio comes from.",
-    )
-    p_from.add_argument("--url", default=None, help="YouTube video URL or podcast feed URL.")
-    p_from.add_argument(
-        "--seconds", type=float, default=5.0, help="Microphone capture duration (mic source)."
-    )
-    p_from.add_argument(
-        "-o",
-        "--out",
-        type=Path,
-        default=Path("out.wav"),
-        help="Output WAV path (default: out.wav).",
-    )
-
-    # `route`: choose an engine + mode from measured quality<->speed evidence.
-    p_route = sub.add_parser(
-        "route",
-        help="Choose the best engine + mode for a condition (online real-time / offline).",
-    )
-    p_route.add_argument(
-        "--condition",
-        choices=["online_realtime", "offline"],
-        required=True,
-        help="online_realtime (delay-bounded streaming; speed=RTF) or offline (quality only).",
-    )
-    p_route.add_argument("--language", default="fr", help="Target language (default: fr).")
-    p_route.add_argument(
-        "--rtf-ceiling",
-        dest="rtf_ceiling",
-        type=float,
-        default=0.8,
-        help="Online only: max mean RTF an engine must beat to keep up (default 0.8).",
-    )
-    p_route.add_argument(
-        "--rtf-budget",
-        dest="rtf_budget",
-        type=float,
-        default=None,
-        help="Offline only: optional patience cap on mean RTF.",
-    )
-    p_route.add_argument(
-        "--quality-floor",
-        dest="quality_floor",
-        type=float,
-        default=None,
-        help="Reject candidates below this quality (0..1).",
-    )
-    p_route.add_argument(
-        "--json",
-        dest="json_out",
-        type=Path,
-        default=None,
-        help="Write the full decision JSON to this path.",
-    )
-
-    # The server's bind address. These used to need distinct dests because a
-    # top-level --host/--port pointed at the engine's own server; with the
-    # engine in-process there is only one host and port in this program.
-    p_serve = sub.add_parser("serve", help="Run the REST API server.")
-    p_serve.add_argument("--host", dest="bind_host", default="127.0.0.1", help="Bind host.")
-    p_serve.add_argument("--port", dest="bind_port", type=int, default=8080, help="Bind port.")
-
-    return parser
-
-
-def _settings_from_args(args: argparse.Namespace) -> Settings:
+def _settings_from_args(args: SimpleNamespace) -> Settings:
     """Load settings from ``--config`` and apply CLI overrides."""
     # Start from the file/defaults, then let any explicitly-passed flag win.
     # `getattr(..., None)` guards flags that only exist on some sub-commands.
@@ -311,7 +110,7 @@ def _settings_from_args(args: argparse.Namespace) -> Settings:
     return settings
 
 
-def _cmd_synth(args: argparse.Namespace, settings: Settings) -> int:
+def _cmd_synth(args: SimpleNamespace, settings: Settings) -> int:
     """Handle the ``synth`` sub-command; return a process exit code."""
     # Text comes from the positional argument, or stdin when it is omitted.
     text = args.text if args.text is not None else sys.stdin.read()
@@ -367,7 +166,7 @@ def _cmd_synth(args: argparse.Namespace, settings: Settings) -> int:
     return asyncio.run(run())
 
 
-def _cmd_narrate(args: argparse.Namespace, settings: Settings) -> int:
+def _cmd_narrate(args: SimpleNamespace, settings: Settings) -> int:
     """Handle the ``narrate`` sub-command; return a process exit code.
 
     Writes two files, not one. The WAV is the obvious half; the ``.vtt``
@@ -409,14 +208,14 @@ def _cmd_narrate(args: argparse.Namespace, settings: Settings) -> int:
     return asyncio.run(run())
 
 
-def _cmd_install_voice(args: argparse.Namespace, settings: Settings) -> int:
+def _cmd_install_voice(args: SimpleNamespace, settings: Settings) -> int:
     """Handle the ``install-voice`` sub-command; return a process exit code."""
     from speaker_helper.install import install_engine
 
     return install_engine(args.engine, force=args.force)
 
 
-def _cmd_health(args: argparse.Namespace, settings: Settings) -> int:
+def _cmd_health(args: SimpleNamespace, settings: Settings) -> int:
     """Handle the ``health`` sub-command; return a process exit code.
 
     Exits non-zero when the backend could not synthesise, so this works as a
@@ -433,7 +232,7 @@ def _cmd_health(args: argparse.Namespace, settings: Settings) -> int:
     return asyncio.run(run())
 
 
-def _cmd_voices(args: argparse.Namespace, settings: Settings) -> int:
+def _cmd_voices(args: SimpleNamespace, settings: Settings) -> int:
     """Handle the ``voices`` sub-command; return a process exit code."""
 
     async def run() -> int:
@@ -456,7 +255,7 @@ def _cmd_voices(args: argparse.Namespace, settings: Settings) -> int:
     return asyncio.run(run())
 
 
-def _cmd_serve(args: argparse.Namespace, settings: Settings) -> int:
+def _cmd_serve(args: SimpleNamespace, settings: Settings) -> int:
     """Handle the ``serve`` sub-command; return a process exit code."""
     from speaker_helper.api import serve
 
@@ -464,13 +263,13 @@ def _cmd_serve(args: argparse.Namespace, settings: Settings) -> int:
     return 0
 
 
-def _cmd_route(args: argparse.Namespace, settings: Settings) -> int:
+def _cmd_route(args: SimpleNamespace, settings: Settings) -> int:
     """Handle the ``route`` sub-command; print the chosen operating point.
 
     Parameters
     ----------
-    args : argparse.Namespace
-        Parsed CLI arguments (``condition``, ``language``, ``rtf_ceiling``,
+    args : types.SimpleNamespace
+        Parsed CLI flags (``condition``, ``language``, ``rtf_ceiling``,
         ``rtf_budget``, ``quality_floor``, ``json_out``).
     settings : Settings
         Unused for the decision itself (kept for a uniform handler signature).
@@ -518,7 +317,7 @@ def _cmd_route(args: argparse.Namespace, settings: Settings) -> int:
     return 0
 
 
-def _cmd_clone(args: argparse.Namespace, settings: Settings) -> int:
+def _cmd_clone(args: SimpleNamespace, settings: Settings) -> int:
     """Handle the ``clone`` sub-command; register a voice and print its id."""
 
     async def run() -> int:
@@ -539,13 +338,13 @@ def _cmd_clone(args: argparse.Namespace, settings: Settings) -> int:
     return asyncio.run(run())
 
 
-def _build_transcriber(args: argparse.Namespace) -> VocalHelperTranscriber | None:
+def _build_transcriber(args: SimpleNamespace) -> VocalHelperTranscriber | None:
     """Return a fidelity transcriber when ``--transcribe`` was passed, else ``None``.
 
     Parameters
     ----------
-    args : argparse.Namespace
-        Parsed CLI arguments; only ``transcribe`` and ``language`` are read.
+    args : types.SimpleNamespace
+        Parsed CLI flags; only ``transcribe`` and ``language`` are read.
 
     Returns
     -------
@@ -567,15 +366,13 @@ def _build_transcriber(args: argparse.Namespace) -> VocalHelperTranscriber | Non
     return VocalHelperTranscriber(getattr(args, "language", None) or "fr")
 
 
-def _cmd_eval_multilang(
-    args: argparse.Namespace, settings: Settings, thresholds: Thresholds
-) -> int:
+def _cmd_eval_multilang(args: SimpleNamespace, settings: Settings, thresholds: Thresholds) -> int:
     """Run the evaluation across ``--languages`` and print a matrix; gate on all.
 
     Parameters
     ----------
-    args : argparse.Namespace
-        Parsed CLI arguments (``languages``, ``json_out``, ``transcribe``).
+    args : types.SimpleNamespace
+        Parsed CLI flags (``languages``, ``json_out``, ``transcribe``).
     settings : Settings
         Base configuration; language/voice are overridden per language.
     thresholds : Thresholds
@@ -623,7 +420,7 @@ def _cmd_eval_multilang(
     return asyncio.run(run())
 
 
-def _cmd_speak_from(args: argparse.Namespace, settings: Settings) -> int:
+def _cmd_speak_from(args: SimpleNamespace, settings: Settings) -> int:
     """Handle ``speak-from``: transcribe a source and re-voice it to a WAV file."""
     from speaker_helper.sources import (
         from_microphone,
@@ -666,7 +463,7 @@ def _cmd_speak_from(args: argparse.Namespace, settings: Settings) -> int:
     return asyncio.run(run())
 
 
-def _cmd_eval(args: argparse.Namespace, settings: Settings) -> int:
+def _cmd_eval(args: SimpleNamespace, settings: Settings) -> int:
     """Handle the ``eval`` sub-command; return 0 if the gate passes, 1 if not."""
     import json
 
@@ -737,50 +534,296 @@ def _concat_wavs(buffers: list[bytes], out: Path) -> None:
         ah.audio_concatenation(parts, output_audio_filename=str(out), overwrite=True)
 
 
-def main(argv: list[str] | None = None) -> int:
-    """CLI entry point.
+# Every sub-command name, mapped to the handler that runs it. Keeping the table
+# explicit rather than dispatching on the click function's own name is what
+# lets a test assert that no command is reachable without a handler behind it.
+_HANDLERS = {
+    "synth": _cmd_synth,
+    "voices": _cmd_voices,
+    "clone": _cmd_clone,
+    "eval": _cmd_eval,
+    "speak-from": _cmd_speak_from,
+    "route": _cmd_route,
+    "serve": _cmd_serve,
+    "narrate": _cmd_narrate,
+    "install-voice": _cmd_install_voice,
+    "health": _cmd_health,
+}
+
+
+def _run(ctx: click.Context, command: str, **fields: object) -> None:
+    """Merge global + command flags, then dispatch to the handler.
 
     Parameters
     ----------
-    argv : list of str or None
-        Argument vector; defaults to ``sys.argv[1:]``.
+    ctx : click.Context
+        The click context; ``ctx.obj`` holds the group-level global options.
+    command : str
+        Sub-command name (``synth``, ``route``, …).
+    **fields
+        Command-specific flag values.
 
-    Returns
-    -------
-    int
-        Process exit code (0 on success).
+    Raises
+    ------
+    SystemExit
+        Always: the handler's integer exit code is propagated to the shell.
     """
-    # Configure the ecosystem's logging surface once, at the entry point, so
-    # INFO-level progress is visible to CLI users.
+    # Globals (from the group) first, then the command's own fields — one flag
+    # bag drives both the settings merge and the handler, so a handler never
+    # needs to know which option sat where on the command line.
+    merged = {**(ctx.obj or {}), **fields}
+    args = SimpleNamespace(command=command, **merged)
+    settings: Settings = _settings_from_args(args)
+    raise SystemExit(_HANDLERS[command](args, settings))
+
+
+# The global options live on the GROUP, not on each command, so they precede
+# the sub-command: `speaker-helper --engine kokoro voices`, never the reverse.
+# `-h` is declared next to `--help` because the short spelling is the first
+# thing a user tries, and `-V` next to `--version` because `-v` is taken by
+# verbosity everywhere in this suite. The version is passed explicitly: reading
+# it from the installed distribution metadata reports whatever was last
+# pip-installed, which an editable checkout then misreports.
+@click.group(context_settings={"help_option_names": ["-h", "--help"]})
+@click.version_option(__version__, "-V", "--version", package_name="speaker-helper")
+@click.option("--config", type=click.Path(path_type=Path), default=None, help="settings.yaml path.")
+@click.option(
+    "--backend",
+    default=None,
+    help="TTS backend: kokoro (default), openvoice, chatterbox or mock.",
+)
+@click.option("--voice-sample", default=None, help="Reference recording to clone.")
+@click.option("--engine", default=None, help="Engine/model id (e.g. kokoro).")
+@click.option("--voice", default=None, help="Preset voice id (default: auto).")
+@click.option("--language", default=None, help="Target language (e.g. fr).")
+@click.option(
+    "--clone", is_flag=True, default=False, help="Use a cloned voice (default: ref-fr-female)."
+)
+@click.option("--clone-name", default=None, help="Name for the cloned voice profile.")
+@click.option("--clone-audio", default=None, help="Reference audio file to clone from.")
+@click.option("--clone-text", default=None, help="Transcript of --clone-audio (auto if omitted).")
+@click.pass_context
+def cli(ctx: click.Context, **globals_: object) -> None:
+    """Text-to-speech (offline + streaming) over a local TTS engine.
+
+    The options above are global: they apply to every sub-command and have to
+    precede it, as in: speaker-helper --backend mock synth "hi"
+    """
+    # Configure the ecosystem logging surface once, at the entry point, so
+    # INFO-level progress is visible rather than swallowed.
     osh.init_logging()
-    parser = _build_parser()
-    args = parser.parse_args(argv)
-    # Merge file config with CLI overrides once, then dispatch on the command.
-    settings = _settings_from_args(args)
-    # Each branch delegates to a `_cmd_*` handler that returns the exit code.
-    if args.command == "synth":
-        return _cmd_synth(args, settings)
-    if args.command == "narrate":
-        return _cmd_narrate(args, settings)
-    if args.command == "install-voice":
-        return _cmd_install_voice(args, settings)
-    if args.command == "health":
-        return _cmd_health(args, settings)
-    if args.command == "voices":
-        return _cmd_voices(args, settings)
-    if args.command == "clone":
-        return _cmd_clone(args, settings)
-    if args.command == "eval":
-        return _cmd_eval(args, settings)
-    if args.command == "speak-from":
-        return _cmd_speak_from(args, settings)
-    if args.command == "route":
-        return _cmd_route(args, settings)
-    if args.command == "serve":
-        return _cmd_serve(args, settings)
-    parser.error(f"unknown command {args.command!r}")
-    return 2
+    # Stash the global options for the sub-command handlers to merge in.
+    ctx.obj = dict(globals_)
+
+
+@cli.command()
+@click.argument("text", required=False, default=None)
+@click.option(
+    "-o",
+    "--out",
+    "out",
+    type=click.Path(path_type=Path),
+    default=Path("out.wav"),
+    help="Output WAV path.",
+)
+@click.option("--stream", is_flag=True, default=False, help="Streaming mode: report TTFA/cadence.")
+@click.pass_context
+def synth(ctx: click.Context, text: str | None, out: Path, stream: bool) -> None:
+    """Synthesise TEXT (or stdin) to a WAV file."""
+    # text=None tells the handler to read the utterance from stdin;
+    # --stream selects the low-TTFA streaming path over whole-text synthesis.
+    _run(ctx, "synth", text=text, out=out, stream=stream)
+
+
+@cli.command()
+@click.pass_context
+def clone(ctx: click.Context) -> None:
+    """Register a cloned voice from reference audio and print its id."""
+    # The clone reference comes from the global --clone/--clone-audio/--clone-name
+    # options (merged from ctx.obj), so this command carries no options of its own.
+    _run(ctx, "clone")
+
+
+@cli.command()
+@click.option(
+    "--condition",
+    type=click.Choice(["online_realtime", "offline"]),
+    required=True,
+    help="online_realtime (speed=RTF) or offline (quality only).",
+)
+@click.option("--rtf-ceiling", "rtf_ceiling", type=float, default=0.8, help="Online: max mean RTF.")
+@click.option("--rtf-budget", "rtf_budget", type=float, default=None, help="Offline: RTF cap.")
+@click.option(
+    "--quality-floor", "quality_floor", type=float, default=None, help="Reject quality below this."
+)
+@click.option(
+    "--json",
+    "json_out",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="Write decision JSON here.",
+)
+@click.pass_context
+def route(
+    ctx: click.Context,
+    condition: str,
+    rtf_ceiling: float,
+    rtf_budget: float | None,
+    quality_floor: float | None,
+    json_out: Path | None,
+) -> None:
+    """Choose the best engine + mode for a condition (online real-time / offline)."""
+    # _cmd_route reads args.language directly; the global --language may be None,
+    # so default it to fr here to match the router's own default.
+    language = (ctx.obj or {}).get("language") or "fr"
+    _run(
+        ctx,
+        "route",
+        condition=condition,
+        language=language,
+        rtf_ceiling=rtf_ceiling,
+        rtf_budget=rtf_budget,
+        quality_floor=quality_floor,
+        json_out=json_out,
+    )
+
+
+@cli.command(name="narrate")
+@click.argument("segments", type=click.Path(exists=True, path_type=Path))
+@click.option(
+    "-o",
+    "--out",
+    type=click.Path(path_type=Path),
+    default=Path("narration.wav"),
+    help="Output WAV; the cues are written beside it as .vtt.",
+)
+@click.option(
+    "--read-math",
+    metavar="LANG",
+    default=None,
+    help="Speak the notation as words in LANG, leaving the cues as the page reads.",
+)
+@click.pass_context
+def narrate(ctx: click.Context, segments: Path, out: Path, read_math: str | None) -> None:
+    """Read a document aloud, and write the timed track that follows it.
+
+    SEGMENTS is a JSON list of blocks, each with `text` and optionally `say`,
+    `pause_before_ms`, `pause_after_ms`, `pace` and `emotion`. A list of plain
+    strings works too.
+    """
+    _run(ctx, "narrate", segments=segments, out=out, read_math=read_math)
+
+
+@cli.command(name="install-voice")
+@click.option("--engine", default="kokoro", help="Which engine to prepare.")
+@click.option("--force", is_flag=True, default=False, help="Re-download even if present.")
+@click.pass_context
+def install_voice(ctx: click.Context, engine: str, force: bool) -> None:
+    """Download the weights an engine needs, before anything depends on them."""
+    _run(ctx, "install-voice", engine=engine, force=force)
+
+
+@cli.command(name="health")
+@click.pass_context
+def health(ctx: click.Context) -> None:
+    """Report whether the configured backend can run; exit non-zero if not."""
+    _run(ctx, "health")
+
+
+@cli.command(name="voices")
+@click.pass_context
+def voices_cmd(ctx: click.Context) -> None:
+    """List preset voices for an engine (uses the global --engine)."""
+    # Named voices_cmd (not voices) to avoid shadowing; registered as "voices".
+    # The engine to list comes from the global --engine, which precedes the
+    # sub-command: `speaker-helper --engine kokoro voices`.
+    _run(ctx, "voices")
+
+
+@cli.command(name="eval")
+@click.option("--dataset", type=click.Path(path_type=Path), default=None, help="JSONL dataset.")
+@click.option(
+    "--thresholds", type=click.Path(path_type=Path), default=None, help="Thresholds YAML."
+)
+@click.option(
+    "--json",
+    "json_out",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="Write JSON report here.",
+)
+@click.option("--languages", default=None, help="Comma-separated languages (e.g. fr,en,es).")
+@click.option(
+    "--transcribe", is_flag=True, default=False, help="Round-trip WER/chrF via vocal-helper."
+)
+@click.pass_context
+def eval_cmd(
+    ctx: click.Context,
+    dataset: Path | None,
+    thresholds: Path | None,
+    json_out: Path | None,
+    languages: str | None,
+    transcribe: bool,
+) -> None:
+    """Evaluate the engine against a dataset and gate on thresholds."""
+    # The handler returns a non-zero exit code when the bar is missed, which
+    # _run propagates as SystemExit — so `eval` gates CI. --languages runs the
+    # per-language matrix; --transcribe adds the WER/chrF round-trip.
+    _run(
+        ctx,
+        "eval",
+        dataset=dataset,
+        thresholds=thresholds,
+        json_out=json_out,
+        languages=languages,
+        transcribe=transcribe,
+    )
+
+
+@cli.command(name="speak-from")
+@click.option(
+    "--source",
+    type=click.Choice(["youtube", "podcast", "mic"]),
+    required=True,
+    help="Audio source.",
+)
+@click.option("--url", default=None, help="YouTube video URL or podcast feed URL.")
+@click.option("--seconds", type=float, default=5.0, help="Microphone capture duration.")
+@click.option(
+    "-o",
+    "--out",
+    "out",
+    type=click.Path(path_type=Path),
+    default=Path("out.wav"),
+    help="Output WAV path.",
+)
+@click.pass_context
+def speak_from(ctx: click.Context, source: str, url: str | None, seconds: float, out: Path) -> None:
+    """Re-voice audio from a source (youtube / podcast / microphone)."""
+    # --url is required for youtube/podcast (the handler validates it); the mic
+    # source uses --seconds instead. The source is transcribed then re-spoken.
+    _run(ctx, "speak-from", source=source, url=url, seconds=seconds, out=out)
+
+
+@cli.command()
+@click.option("--bind-host", "bind_host", default="127.0.0.1", help="API server bind host.")
+@click.option("--bind-port", "bind_port", type=int, default=8080, help="API server bind port.")
+@click.pass_context
+def serve(ctx: click.Context, bind_host: str, bind_port: int) -> None:
+    """Run the REST API server.
+
+    The bind address is spelled --bind-host / --bind-port. The longer spelling
+    is deliberate: this program used to carry a global --host / --port aimed at
+    a REMOTE engine, and two pairs one word apart, on the same line, pointing
+    at different machines, is how a server ends up calling itself for /health.
+    """
+    _run(ctx, "serve", bind_host=bind_host, bind_port=bind_port)
+
+
+def main() -> None:
+    """Console-script entry point: run the click command group."""
+    cli()
 
 
 if __name__ == "__main__":  # pragma: no cover
-    raise SystemExit(main())
+    main()

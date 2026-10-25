@@ -6,6 +6,104 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-25
+
+### Changed
+
+- **One command line, built with click.** There were two front doors over the
+  same handlers — `speaker-helper` (click) and `speaker-helper-argparse` — and
+  a suffix naming the parsing library describes the implementation, not the
+  interface. `speaker_helper/click_cli.py` and the click half of the CLI now
+  live in `speaker_helper/cli.py`, together with the `_cmd_*` handlers that
+  were always shared; the argparse parser and its dispatcher are gone.
+
+  The handlers still take a flag bag and return an exit code, so the command
+  logic stays testable without a terminal. The bag is a
+  `types.SimpleNamespace` rather than an `argparse.Namespace`: nothing in the
+  package needs argparse any more, and a type imported only to be a dumb
+  attribute holder reads as a leftover.
+
+  Parity was checked rather than assumed, by listing both surfaces before
+  deleting either: the same ten sub-commands (`synth`, `narrate`, `voices`,
+  `clone`, `eval`, `speak-from`, `route`, `install-voice`, `health`, `serve`)
+  and the same options, with two spelling differences recorded under
+  *Migration* below. A test now pins the ten names and refuses any
+  re-appearance of a suffixed CLI alias.
+
+### Added
+
+- **`-V` / `--version`.** The CLI could not say what it was. Capital, because
+  `-v` is verbosity everywhere in this suite. The number is handed to click
+  explicitly: read from the installed distribution metadata it reports
+  whatever was last `pip install`ed, which is how an editable checkout comes
+  to announce a stale version.
+
+### Fixed
+
+Each of these was found by running the command, and none of them is visible
+by reading the source.
+
+- **Every documented CLI invocation was broken.** README, LISEZMOI, EXAMPLES
+  and EXEMPLES showed `speaker-helper --port 17600 synth …` on forty lines
+  (eleven each in the two READMEs, nine in each cookbook). That global
+  `--port` pointed at a Voicebox engine in another process
+  and went away when Kokoro moved in-process at 0.8.0; the click door answers
+  `Error: No such option '--port'`. So the first line a reader copied could
+  not work, in either language.
+
+- **The container's own entry point was broken.** `Dockerfile` ended with
+  `CMD ["speaker-helper", "serve", "--host", …]` — the argparse spelling —
+  which the installed `speaker-helper` has not accepted since it became the
+  click group. `docker run` on the published image exited 2. Same line in
+  `SKILL.md` and in the skill's `surfaces.md`.
+
+- **argparse silently dropped two global options.** A sub-parser re-declaring
+  an option its parent also declares parses into a fresh namespace and then
+  copies *every* key back, defaults included. So `speaker-helper-argparse
+  --language en route --condition offline` routed for **fr** (the sub-parser's
+  default overwrote `en`), and `--engine kokoro voices` listed the configured
+  engine rather than kokoro. Both only worked in the other order. The click
+  group has one declaration per option, so the class of bug is gone, not
+  merely fixed here.
+
+- **The group's help text rendered its own markup.** click prints a docstring
+  verbatim, so ```` ``speaker-helper --backend mock synth "hi"`` ```` reached
+  the terminal with the double backticks in it. A test now asserts that
+  `--help` carries no reStructuredText scaffolding and no numpydoc
+  `Parameters` block.
+
+### Migration
+
+- `speaker-helper-argparse <command>` → **`speaker-helper <command>`**. The
+  console script is gone; every sub-command, option and exit code is
+  unchanged.
+
+- `serve --host H --port P` → **`serve --bind-host H --bind-port P`**. This is
+  the one rename with teeth, and it is deliberately *not* aliased. `--host` /
+  `--port` were once global options aiming at a **remote engine**, which is
+  how a server came to call itself for `/health`; accepting those spellings on
+  `serve` again would make an old command line do something different without
+  saying so. click rejects the unknown option and suggests `--bind-host`, so
+  the failure is loud and the fix is one word.
+
+- `voices --engine E` → **`--engine E voices`**, and
+  `route --condition C --language L` → **`--language L route --condition C`**.
+  Global options are declared on the group, so they precede the sub-command —
+  the rule the README always stated and its examples contradicted.
+
+- `pip install speaker-helper` is unchanged: `click` was already a core
+  dependency rather than an extra, so there is no `[cli]` extra to stop
+  asking for. It is now capped `<9`.
+
+### Found, not fixed
+
+The `--port 17600` sweep above only touched command lines. The same dead
+Voicebox engine still appears in the Python snippets
+(`Settings.from_mapping({"voicebox": {"port": 17600}})`), in `BENCHMARKS.md`,
+in `settings.yaml.example`, in `examples/quickstart.py` and as a stale
+`httpx>=0.27` in `requirements.txt` — a documentation rot from 0.8.0 that is
+wider than one command line and wants its own pass.
+
 ## [0.8.2] - 2026-10-23
 
 ### Fixed

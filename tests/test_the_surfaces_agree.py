@@ -101,47 +101,68 @@ def test_every_advertised_name_exists(name: str) -> None:
     assert hasattr(speaker_helper, name)
 
 
-# ── 2. Both command lines ──────────────────────────────────────────────────
+# ── 2. The command line ────────────────────────────────────────────────────
+
+# The ten sub-commands the CLI promises. Spelled out here rather than read
+# back from the group, because a list derived from the code cannot notice a
+# command that quietly stopped being registered in it.
+COMMANDS = {
+    "clone",
+    "eval",
+    "health",
+    "install-voice",
+    "narrate",
+    "route",
+    "serve",
+    "speak-from",
+    "synth",
+    "voices",
+}
 
 
-def test_both_front_doors_are_installed() -> None:
-    """argparse because it is always there, click because it carries shapes."""
+def test_the_console_scripts_are_the_cli_and_the_agent_surface() -> None:
+    """One command line, plus the launcher for a surface that is not one.
+
+    There used to be a second entry point — `speaker-helper-argparse`, the
+    same commands through a different parser. A flag naming the parsing
+    library describes the implementation, not the interface, so it is gone;
+    this asserts it cannot come back under any suffix.
+    """
     assert "speaker-helper" in CONSOLE_SCRIPTS
-    assert "speaker-helper-argparse" in CONSOLE_SCRIPTS
+    # `-mcp` starts the agent tool server: a different surface, not a second
+    # way to type the same commands.
     assert "speaker-helper-mcp" in CONSOLE_SCRIPTS
+    suffixed = {
+        name
+        for name in CONSOLE_SCRIPTS
+        if name.startswith("speaker-helper-") and name != "speaker-helper-mcp"
+    }
+    assert not suffixed, f"the CLI has grown an alias again: {sorted(suffixed)}"
 
 
-def test_the_two_front_doors_offer_the_same_commands() -> None:
-    """A command on one and not the other is the failure a twin invites."""
+def test_the_command_line_offers_every_command_it_promises() -> None:
+    """A command nothing registers any more is the failure to catch here."""
     import click
 
-    from speaker_helper.cli import _build_parser
-    from speaker_helper.click_cli import cli
-
-    argparse_commands = set()
-    for action in _build_parser()._actions:
-        if getattr(action, "choices", None) and isinstance(action.choices, dict):
-            argparse_commands |= set(action.choices)
+    from speaker_helper.cli import cli
 
     with click.Context(cli) as ctx:
-        click_commands = set(cli.list_commands(ctx))
+        registered = set(cli.list_commands(ctx))
 
-    assert argparse_commands == click_commands, (
-        f"only in argparse: {sorted(argparse_commands - click_commands)}; "
-        f"only in click: {sorted(click_commands - argparse_commands)}"
+    assert registered == COMMANDS, (
+        f"missing: {sorted(COMMANDS - registered)}; unannounced: {sorted(registered - COMMANDS)}"
     )
 
 
 def test_every_command_has_a_handler() -> None:
-    """A sub-command the dispatcher does not know is a parse error at runtime."""
-    from speaker_helper.cli import _build_parser
-    from speaker_helper.click_cli import _HANDLERS
+    """A sub-command the handler table does not know is a KeyError at runtime."""
+    import click
 
-    declared = set()
-    for action in _build_parser()._actions:
-        if getattr(action, "choices", None) and isinstance(action.choices, dict):
-            declared |= set(action.choices)
-    assert declared <= set(_HANDLERS), f"no handler for {sorted(declared - set(_HANDLERS))}"
+    from speaker_helper.cli import _HANDLERS, cli
+
+    with click.Context(cli) as ctx:
+        registered = set(cli.list_commands(ctx))
+    assert registered <= set(_HANDLERS), f"no handler for {sorted(registered - set(_HANDLERS))}"
 
 
 # ── 3 & 4. HTTP and MCP ────────────────────────────────────────────────────

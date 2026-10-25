@@ -27,7 +27,7 @@ Usage example
 -------------
 .. code-block:: bash
 
-    speaker-helper serve --host 0.0.0.0 --port 8080
+    speaker-helper serve --bind-host 0.0.0.0 --bind-port 8080
     curl -s -X POST localhost:8080/synth -H 'content-type: application/json' \\
          -d '{"text": "Bonjour."}' -o out.wav
 

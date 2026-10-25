@@ -99,31 +99,31 @@ asyncio.run(main())
 
 ```bash
 # lister les voix kokoro françaises
-speaker-helper --port 17600 voices --engine kokoro
+speaker-helper --engine kokoro voices
 
 # synthèse hors ligne
-speaker-helper --port 17600 synth "Bonjour le monde." -o hello.wav
+speaker-helper synth "Bonjour le monde." -o hello.wav
 
 # depuis l'entrée standard
-echo "Texte lu depuis l'entrée standard." | speaker-helper --port 17600 synth -o out.wav
+echo "Texte lu depuis l'entrée standard." | speaker-helper synth -o out.wav
 
 # diffusion continue (rapporte le TTFA et la cadence par segment)
-speaker-helper --port 17600 synth "Une. Deux. Trois." -o out.wav --stream
+speaker-helper synth "Une. Deux. Trois." -o out.wav --stream
 
 # choisir le meilleur moteur et le meilleur mode pour une condition (voir §10)
-speaker-helper route --condition online_realtime --language fr
+speaker-helper --language fr route --condition online_realtime
 ```
 
-La commande principale `speaker-helper` est un groupe click ; la façade
-argparse reste disponible sous `speaker-helper-argparse`. Les options globales
-(`--port`, `--backend`, …) précèdent la sous-commande.
+`speaker-helper` est un seul groupe click. Les options globales
+(`--backend`, `--engine`, `--language`, …) sont portées par le groupe : elles
+précèdent donc la sous-commande.
 
 ---
 
 ## 6. Serveur d'API REST
 
 ```bash
-speaker-helper --port 17600 serve --host 0.0.0.0 --port 8080
+speaker-helper serve --bind-host 0.0.0.0 --bind-port 8080
 ```
 
 ```bash
@@ -205,9 +205,9 @@ spk.save("Voix clonée par défaut.", "cloned.wav")   # clones on first synthesi
 
 ```bash
 # ligne de commande : cloner la voix de référence fournie et synthétiser avec
-speaker-helper --port 17600 --clone synth "Bonjour." -o cloned.wav
+speaker-helper --clone synth "Bonjour." -o cloned.wav
 # ou cloner depuis votre propre audio (transcription dérivée automatiquement) :
-speaker-helper --port 17600 --clone-audio my_voice.wav synth "Bonjour." -o out.wav
+speaker-helper --clone-audio my_voice.wav synth "Bonjour." -o out.wav
 ```
 
 ---
@@ -232,7 +232,7 @@ asyncio.run(main())
 ```bash
 # ligne de commande : code de sortie non nul quand la barre n'est pas tenue
 speaker-helper --backend mock eval
-speaker-helper --port 17600 --engine kokoro eval --json report.json
+speaker-helper --engine kokoro eval --json report.json
 ```
 
 Avec un transcripteur (extra `stt`), vous obtenez en plus un aller-retour
@@ -276,7 +276,7 @@ spk = Speaker.from_route("online_realtime", language="fr")
 ```
 
 ```bash
-speaker-helper route --condition online_realtime --language fr
+speaker-helper --language fr route --condition online_realtime
 speaker-helper route --condition offline --json decision.json
 ```
 
@@ -314,7 +314,7 @@ asyncio.run(main())
 
 ```bash
 # ligne de commande : une matrice, garde-fou sur chaque langue (sortie 1 si l'une échoue)
-speaker-helper --port 17600 --engine kokoro eval --languages fr,en,es --json matrix.json
+speaker-helper --engine kokoro eval --languages fr,en,es --json matrix.json
 ```
 
 ---

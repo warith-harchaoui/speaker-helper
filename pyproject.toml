@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "speaker-helper"
-version = "0.8.2"
-description = "Speaker Helper — speech synthesis that runs in your process: say a sentence, stream a reply, or narrate a document with the timed track that lets a page follow along. Kokoro by default (no server), voice cloning through OpenVoice and Chatterbox. The inverse of vocal-helper: text in, speech out. Library + two CLIs + REST API + MCP + skill, with a built-in evaluation gate."
+version = "0.9.0"
+description = "Speaker Helper — speech synthesis that runs in your process: say a sentence, stream a reply, or narrate a document with the timed track that lets a page follow along. Kokoro by default (no server), voice cloning through OpenVoice and Chatterbox. The inverse of vocal-helper: text in, speech out. Library + CLI + REST API + MCP + skill, with a built-in evaluation gate."
 readme = "README.md"
 requires-python = ">=3.10,<3.14"
 license = { text = "BSD-3-Clause" }
@@ -50,9 +50,12 @@ dependencies = [
     "pyyaml>=6.0",
     "numpy>=1.24",
     "soundfile>=0.12",
-    # click powers the primary CLI (`speaker-helper`); the standard-library
-    # argparse front-end (`speaker-helper-argparse`) needs no extra dependency.
-    "click>=8.1",
+    # click powers the one command line (`speaker-helper`). Core, not an
+    # extra: the CLI is not optional, so its dependency cannot be either. The
+    # cap is the suite's: click 9 already announces removals (`__version__`
+    # goes in 9.1), and the group/option API here has not been tried against
+    # it.
+    "click>=8.1,<9",
 ]
 
 [project.optional-dependencies]
@@ -140,11 +143,10 @@ dev = [
 ]
 
 [project.scripts]
-# Primary CLI = click (nicer help, grouped sub-commands); the argparse
-# front-end stays available and dependency-free under a distinct name. Both
-# drive the same command handlers in speaker_helper.cli.
-speaker-helper = "speaker_helper.click_cli:main"
-speaker-helper-argparse = "speaker_helper.cli:main"
+# One command line, in click. `speaker-helper-mcp` is kept because it starts
+# a different surface (the agent tool server), not a second way to type the
+# same commands.
+speaker-helper = "speaker_helper.cli:main"
 speaker-helper-mcp = "speaker_helper.mcp:main"
 
 [project.urls]
