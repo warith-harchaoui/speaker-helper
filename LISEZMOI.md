@@ -141,7 +141,7 @@ pip install "speaker-helper[server,stt]"
 L'installation depuis git reste possible pour un commit non publié :
 
 ```bash
-pip install "git+https://github.com/warith-harchaoui/speaker-helper.git@v0.9.2"
+pip install "git+https://github.com/warith-harchaoui/speaker-helper.git@v0.9.3"
 ```
 
 Extras disponibles : `server` (API REST), `stt` (vocal-helper), `youtube`,

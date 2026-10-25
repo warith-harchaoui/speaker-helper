@@ -280,6 +280,48 @@ def test_the_api_constructs_and_mounts_its_agent_surface() -> None:
     assert "/mcp" in paths
 
 
+def test_the_mcp_launcher_returns_its_exit_code_instead_of_raising() -> None:
+    """`speaker-helper-mcp` is `mcp:main`, so the code has to come back as one.
+
+    `[project.scripts]` calls this function and uses whatever it returns as
+    the process status. click exits by raising, which is why `main` drives it
+    with `standalone_mode=False`: without that, `--help` would leave through
+    SystemExit and a bad flag through a UsageError, and the declared `-> int`
+    would be a fiction. Both short and long help, because `-h` is wired by
+    hand through `help_option_names` and is the spelling people type.
+    """
+    from speaker_helper import mcp
+
+    for flag in ("-h", "--help"):
+        assert mcp.main([flag]) == 0, f"{flag} has to return 0, not raise"
+    assert mcp.main(["--no-such-flag"]) == 2, "a bad flag is a usage error, exit 2"
+
+
+def test_the_mcp_launcher_names_the_extra_instead_of_tracebacking() -> None:
+    """Without `[mcp]` the command must say which extra, and return non-zero.
+
+    Simulated rather than uninstalled: the guard is the subject here, not
+    uvicorn. Somebody who typed the command has never heard of uvicorn, so a
+    traceback naming it is not an error message.
+    """
+    import builtins
+
+    from speaker_helper import mcp
+
+    real_import = builtins.__import__
+
+    def without_uvicorn(name, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if name == "uvicorn":
+            raise ImportError("simulated: the [mcp] extra is not installed")
+        return real_import(name, *args, **kwargs)
+
+    builtins.__import__ = without_uvicorn
+    try:
+        assert mcp.main([]) == 2
+    finally:
+        builtins.__import__ = real_import
+
+
 def test_narration_is_reachable_over_http() -> None:
     """The route exists to return cues; returning only audio would be /synth."""
     from fastapi.testclient import TestClient

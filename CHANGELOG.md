@@ -4,6 +4,40 @@ All notable changes to speaker-helper are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project aims to adhere
 to [Semantic Versioning](https://semver.org/).
 
+## [0.9.3] - 2026-10-25
+
+### Changed
+- **The MCP launcher was the last argparse parser in the package.** The command
+  line moved to click in 0.8.0 and `speaker_helper/mcp.py` did not, so one
+  wheel shipped two parsing libraries, two help layouts and two answers to
+  `-h`: `speaker-helper -h` printed help, `speaker-helper-mcp -h` answered
+  `unrecognized arguments`. It is click now, with
+  `help_option_names = ["-h", "--help"]` like every other command in the
+  suite.
+
+  Nothing a reader types changed. `--host`, `--port` and `--config` keep their
+  spellings and their defaults — they are in the README, the skill's
+  `surfaces.md` and the Dockerfile — and `main(argv)` still **returns** an
+  exit code rather than exiting, which is what `[project.scripts]` calls.
+  click is driven with `standalone_mode=False` for exactly that reason: left
+  to itself it exits by raising, and a console script that raises instead of
+  returning its code is a different contract.
+
+  Two improvements come with the move. The environment defaults
+  (`SPEAKER_HELPER_MCP_HOST`, `SPEAKER_HELPER_MCP_PORT`) are now `envvar=`
+  declarations rather than `os.environ.get` calls, so they are read per
+  invocation instead of once at import, and they appear in `--help`. And a
+  non-numeric `SPEAKER_HELPER_MCP_PORT` used to raise `ValueError` out of
+  `int()` while the parser was still being built — before `--help` could
+  print — where it now reports `Invalid value for '--port'` and exits 2.
+
+### Added
+- `tests/test_the_surfaces_agree.py` now covers the MCP launcher, which no
+  test touched at all: that `main` returns `0` for `-h` and `--help` and `2`
+  for an unknown flag rather than raising, and that a missing `[mcp]` extra
+  returns `2` after naming the extra. Both proven by breaking them —
+  `standalone_mode=True` turns the first red.
+
 ## [0.9.2] - 2026-10-25
 
 ### Fixed

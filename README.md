@@ -133,7 +133,7 @@ pip install "speaker-helper[server,stt]"
 Installing from git still works if you need an unreleased commit:
 
 ```bash
-pip install "git+https://github.com/warith-harchaoui/speaker-helper.git@v0.9.2"
+pip install "git+https://github.com/warith-harchaoui/speaker-helper.git@v0.9.3"
 ```
 
 Available extras: `server` (REST API), `stt` (vocal-helper), `youtube`,
