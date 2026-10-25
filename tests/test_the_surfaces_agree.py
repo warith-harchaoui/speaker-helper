@@ -165,6 +165,100 @@ def test_every_command_has_a_handler() -> None:
     assert registered <= set(_HANDLERS), f"no handler for {sorted(registered - set(_HANDLERS))}"
 
 
+# Where a reader copies a command line from.
+DOCUMENTED = [
+    "README.md",
+    "LISEZMOI.md",
+    "EXAMPLES.md",
+    "EXEMPLES.md",
+    "skills/speaker-helper/SKILL.md",
+    "skills/speaker-helper/references/surfaces.md",
+]
+
+
+def _documented_command_lines() -> list[tuple[str, int, list[str]]]:
+    """Return every ``speaker-helper …`` invocation inside a shell code fence.
+
+    Only fenced blocks count: prose sentences open with the program name too
+    ("speaker-helper is the counterpart of …") and they are not command lines.
+    Continuations are joined, trailing comments dropped.
+    """
+    import shlex
+
+    found: list[tuple[str, int, list[str]]] = []
+    for name in DOCUMENTED:
+        inside = False
+        pending = ""
+        start = 0
+        for lineno, raw in enumerate((ROOT / name).read_text(encoding="utf-8").splitlines(), 1):
+            if raw.startswith("```"):
+                inside = raw.startswith(("```bash", "```sh"))
+                pending = ""
+                continue
+            if not inside:
+                continue
+            # A pipeline's `speaker-helper` half is the part under test.
+            text = raw.split("|")[-1].strip()
+            if pending:
+                text = f"{pending} {text}"
+            elif not text.startswith("speaker-helper ") or text.startswith("speaker-helper-"):
+                continue
+            else:
+                start = lineno
+            if text.endswith("\\"):
+                pending = text[:-1].strip()
+                continue
+            pending = ""
+            found.append((name, start, shlex.split(re.sub(r"\s+#.*$", "", text))[1:]))
+    return found
+
+
+def test_every_documented_command_line_is_accepted(tmp_path) -> None:
+    """A command line a reader copies has to be one the CLI still accepts.
+
+    This is the check that was missing, and it was missing expensively. Forty
+    lines across the two READMEs and the two cookbooks read `speaker-helper
+    --port 17600 synth …` — a global option that went away with the
+    out-of-process engine in 0.8.0 — so the first thing a reader copied
+    answered `No such option '--port'`. Nothing noticed, because nothing ran
+    the documentation.
+
+    The handlers are stubbed out: what is under test is whether the *parser*
+    accepts the line, not whether an engine is installed on this machine.
+    """
+    import json
+
+    from click.testing import CliRunner
+
+    from speaker_helper import cli as cli_module
+
+    lines = _documented_command_lines()
+    # A floor, so an extractor that silently stops finding anything fails too.
+    assert len(lines) > 60, f"only {len(lines)} documented command lines found"
+
+    # `narrate` takes an existing path, so the examples' filenames need to
+    # resolve to something; the stub never reads them.
+    fixture = tmp_path / "doc.json"
+    fixture.write_text(json.dumps([{"text": "Un."}]), encoding="utf-8")
+
+    runner = CliRunner()
+    rejected = []
+    for name, lineno, argv in lines:
+        argv = [
+            str(fixture) if arg.endswith(".json") and argv[i - 1] != "--json" else arg
+            for i, arg in enumerate(argv)
+        ]
+        with pytest.MonkeyPatch.context() as patch:
+            patch.setattr(
+                cli_module, "_HANDLERS", dict.fromkeys(cli_module._HANDLERS, lambda a, s: 0)
+            )
+            result = runner.invoke(cli_module.cli, argv, input="texte\n")
+        if result.exit_code != 0:
+            tail = (result.output or "").strip().splitlines()[-1:]
+            rejected.append(f"{name}:{lineno} exit={result.exit_code} {argv} {tail}")
+    assert not rejected, "documented command lines the CLI rejects:\n" + "\n".join(rejected)
+
+
 # ── 3 & 4. HTTP and MCP ────────────────────────────────────────────────────
 
 

@@ -46,10 +46,10 @@ by reading the source.
 - **Every documented CLI invocation was broken.** README, LISEZMOI, EXAMPLES
   and EXEMPLES showed `speaker-helper --port 17600 synth …` on forty lines
   (eleven each in the two READMEs, nine in each cookbook). That global
-  `--port` pointed at a Voicebox engine in another process
-  and went away when Kokoro moved in-process at 0.8.0; the click door answers
-  `Error: No such option '--port'`. So the first line a reader copied could
-  not work, in either language.
+  `--port` pointed at a Voicebox engine in another process and went away when
+  Kokoro moved in-process at 0.8.0; the click door answers `Error: No such
+  option '--port'`. So the first line a reader copied could not work, in
+  either language.
 
 - **The container's own entry point was broken.** `Dockerfile` ended with
   `CMD ["speaker-helper", "serve", "--host", …]` — the argparse spelling —
@@ -65,6 +65,14 @@ by reading the source.
   engine rather than kokoro. Both only worked in the other order. The click
   group has one declaration per option, so the class of bug is gone, not
   merely fixed here.
+
+- **Nothing ran the documentation.** The `--port` rot above survived because
+  every check read the source and none ran a documented line. A test now
+  extracts all seventy-seven `speaker-helper …` invocations from the shell
+  fences of both READMEs, both cookbooks, `SKILL.md` and the skill's
+  `surfaces.md`, and asserts the parser accepts each one (handlers stubbed, so
+  no engine is involved). Proven by putting one `--port 17600` line back and
+  watching it go red.
 
 - **The group's help text rendered its own markup.** click prints a docstring
   verbatim, so ```` ``speaker-helper --backend mock synth "hi"`` ```` reached
