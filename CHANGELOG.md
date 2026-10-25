@@ -31,6 +31,12 @@ to [Semantic Versioning](https://semver.org/).
   `int()` while the parser was still being built — before `--help` could
   print — where it now reports `Invalid value for '--port'` and exits 2.
 
+- The README's licence badge pointed at `LICENSE`, a relative target. PyPI has
+  no repository to resolve one against, so on the project page it linked to
+  `pypi.org/project/speaker-helper/LICENSE` — a 404. README.md is this
+  package's long description; it is absolute now. LISEZMOI.md is read on GitHub
+  only, where relative targets resolve, so its own links are left alone.
+
 ### Added
 - `tests/test_the_surfaces_agree.py` now covers the MCP launcher, which no
   test touched at all: that `main` returns `0` for `-h` and `--help` and `2`
