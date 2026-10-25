@@ -88,12 +88,12 @@ async def run_multilang_eval(
         osh.info("measuring language %s (%d cases)", lang, len(cases))
         # A fresh Speaker per language isolates model/voice state between runs.
         async with Speaker(settings) as spk:
-            # Optionally warm the voice so the numbers reflect steady state, not
-            # a one-off cold model/voice load.
-            if warmup:
-                await spk.warmup()
+            # The warm-up is run_eval's own business now, so it is passed
+            # through rather than done here: warming twice would be harmless
+            # but it is also how the two entry points drifted apart in the
+            # first place, one measuring steady state and the other cold start.
             reports[lang] = await run_eval(
-                spk, cases, thresholds=thresholds, transcriber=transcriber
+                spk, cases, thresholds=thresholds, transcriber=transcriber, warmup=warmup
             )
     return reports
 

@@ -62,20 +62,27 @@ against a short utterance it dominates completely:
 1.19s audio, RTF 0.31      <- every call after it
 ```
 
-This is why `--languages` warms each language up before timing anything, and why
-`Speaker.warmup()` exists. A **single-language** `eval` does *not* warm up, so on
-a cold process its first case carries the load and the verdict reports that
-instead of the engine:
+This is why `run_eval` warms the engine up before timing anything, and why
+`Speaker.warmup()` is public.
+
+Until 0.9.2 it only did so on the `--languages` path. A **single-language**
+`eval` measured the load in its first case and reported it as slow synthesis:
 
 ```
-# speaker-helper --engine kokoro eval   (cold process, no warm-up)
-backend=kokoro engine=kokoro cases=12
+# speaker-helper --engine kokoro eval   (0.9.1 and earlier, cold, no warm-up)
 mean_rtf=0.5219 p95_rtf=1.7617 anomaly_rate=0.0 quality=0.75 (prior)
 FAIL: p95 RTF 1.7617 > 1.0
+
+# speaker-helper --engine kokoro eval   (0.9.2, warmed)
+mean_rtf=0.2288 p95_rtf=0.2921 anomaly_rate=0.0 quality=0.75 (prior)
+PASS
 ```
 
-Same engine, same dataset, same machine, five minutes apart. Benchmark the warm
-path unless cold start is what you are measuring.
+Same engine, same dataset, same machine — a 6x error on the p95, and the kind
+that reads as a busy laptop rather than a measurement fault. Worse, the two
+entry points disagreed: the same engine passed under `--languages` and failed
+under `eval`. The warm-up now lives in `run_eval`, so every caller measures the
+same thing; pass `warmup=False` when cold start is deliberately what you want.
 
 ## Takeaways
 

@@ -173,6 +173,47 @@ def test_run_eval_mock_passes() -> None:
     asyncio.run(go())
 
 
+def test_run_eval_warms_the_engine_before_measuring_anything() -> None:
+    """``run_eval`` primes the engine, so no case pays for the model load.
+
+    Without this, the first case is billed the one-time load and the gate reads
+    it as slow synthesis: on an idle M2 Max the real engine reported
+    ``p95_rtf`` 1.7617 (FAIL) cold against 0.261 (PASS) warm. The mock cannot
+    reproduce that cost, so what is asserted here is the *mechanism* — that
+    a warm-up happens, before the first synthesis, and that it is opt-out.
+    """
+
+    async def go() -> None:
+        """Count warm-ups and record whether one preceded the first case."""
+        async with Speaker(Settings.from_mapping({"backend": "mock"})) as spk:
+            calls: list[str] = []
+            original_warmup = spk.warmup
+            original_say = spk.say
+
+            async def traced_warmup() -> None:
+                calls.append("warmup")
+                await original_warmup()
+
+            async def traced_say(*a: object, **k: object):  # noqa: ANN401 - passthrough
+                calls.append("say")
+                return await original_say(*a, **k)
+
+            spk.warmup = traced_warmup  # type: ignore[method-assign]
+            spk.say = traced_say  # type: ignore[method-assign]
+
+            await run_eval(spk, load_dataset()[:2])
+            # The warm-up must come first, exactly once, then the cases.
+            assert calls[0] == "warmup", calls[:3]
+            assert calls.count("warmup") == 1, calls
+
+            # And a caller measuring cold start deliberately can still opt out.
+            calls.clear()
+            await run_eval(spk, load_dataset()[:2], warmup=False)
+            assert "warmup" not in calls, calls
+
+    asyncio.run(go())
+
+
 def test_run_eval_flags_clipping_and_fails() -> None:
     """A clipping mock fails the gate on a 100% anomaly rate."""
 

@@ -4,6 +4,41 @@ All notable changes to speaker-helper are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project aims to adhere
 to [Semantic Versioning](https://semver.org/).
 
+## [0.9.2] - 2026-10-25
+
+### Fixed
+- **`eval` measured the model load and called it slow synthesis.** `run_eval`
+  did not warm the engine, so on a cold process the first case paid the ~5 s
+  ONNX session build and the gate reported it as real-time factor. Measured on
+  an idle M2 Max: `mean_rtf=0.5219 p95_rtf=1.7617 → FAIL` cold against
+  `mean_rtf=0.2288 p95_rtf=0.2921 → PASS` warmed. A 6x error on the p95, on an
+  engine that was never slow — the kind that reads as a busy laptop.
+
+  Worse, the two entry points disagreed. `run_multilang_eval` warmed each
+  language before timing and `run_eval` did not, so **the same engine passed
+  under `--languages` and failed under `eval`**. A gate whose verdict depends
+  on which door you came through is not a gate.
+
+  The warm-up now lives in `run_eval`, where every caller gets it, and
+  `run_multilang_eval` passes its own `warmup` flag through instead of doing it
+  itself. `warmup=False` remains for callers who mean to measure cold start.
+
+  This changes what the gate reports for every caller, deliberately: from the
+  initialisation cost to the synthesis speed the thresholds were written about.
+
+### Added
+- `tests/test_eval.py::test_run_eval_warms_the_engine_before_measuring_anything`
+  — asserts the warm-up happens, exactly once, **before** the first synthesis,
+  and that it is opt-out. Proven by removing the warm-up and watching it go red.
+  The mock cannot reproduce a 5 s model load, so the test asserts the mechanism
+  rather than the timing.
+
+### Changed
+- `BENCHMARKS.md` and §5.2 of both tech reports carried the defect as current
+  behaviour, with the failing numbers. They now carry both measurements and
+  date the fix. Both READMEs already said the gate warms up before timing —
+  which only becomes true with this release.
+
 ## [Unreleased]
 
 ## [0.9.1] - 2026-10-25

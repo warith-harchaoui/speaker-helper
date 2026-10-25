@@ -266,12 +266,18 @@ contrast it with.
 
 Building the ONNX session costs ≈ 5 s, once per process. Against a 1.19 s
 utterance it dominates completely: the first call measures RTF **4.42**, every
-call after it **0.31**. A single-language `eval` does not warm up, so on a cold
-process its first case carries that load and the gate reports
-`mean_rtf=0.5219 p95_rtf=1.7617 → FAIL` — same engine, same dataset, same
-machine as §5.1, minutes apart. This is why `run_multilang_eval` warms each
-language up before timing and why `Speaker.warmup()` is public: a benchmark that
-includes a one-off initialisation measures the initialisation.
+call after it **0.31**.
+
+Until 0.9.2 a single-language `eval` did not warm up, so on a cold process its
+first case carried that load and the gate reported
+`mean_rtf=0.5219 p95_rtf=1.7617 → FAIL` where the warmed run reports
+`mean_rtf=0.2288 p95_rtf=0.2921 → PASS` — same engine, same dataset, same
+machine as §5.1. A 6x error on the p95, and the two entry points disagreed:
+`run_multilang_eval` warmed up, `run_eval` did not, so the same engine passed
+or failed depending on which one you called. The warm-up now lives in
+`run_eval` itself, with `warmup=False` for callers who mean to measure cold
+start. A benchmark that includes a one-off initialisation measures the
+initialisation.
 
 ## 5.3 Per-language operating profiles
 

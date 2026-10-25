@@ -286,13 +286,18 @@ GPU dans le build ONNX à lui opposer.
 
 Construire la session ONNX coûte environ 5 s, une fois par processus. Face à un
 énoncé de 1,19 s, cela domine complètement : le premier appel mesure un RTF de
-**4,42**, tous les suivants **0,31**. Un `eval` mono-langue ne préchauffe pas :
-sur un processus froid, son premier cas porte ce chargement et la passerelle
-rapporte `mean_rtf=0.5219 p95_rtf=1.7617 → FAIL` — même moteur, même jeu de
-données, même machine qu'au §5.1, à quelques minutes d'intervalle. C'est pour
-cela que `run_multilang_eval` préchauffe chaque langue avant de chronométrer et
-que `Speaker.warmup()` est public : un banc d'essai qui inclut une
-initialisation unique mesure l'initialisation.
+**4,42**, tous les suivants **0,31**.
+
+Jusqu'à la 0.9.2, un `eval` mono-langue ne préchauffait pas : sur un processus
+froid, son premier cas portait ce chargement et la passerelle rapportait
+`mean_rtf=0.5219 p95_rtf=1.7617 → FAIL` là où la mesure à chaud donne
+`mean_rtf=0.2288 p95_rtf=0.2921 → PASS` — même moteur, même jeu de données,
+même machine qu'au §5.1. Une erreur de 6x sur le p95, et les deux portes se
+contredisaient : `run_multilang_eval` préchauffait, `run_eval` non, donc le même
+moteur passait ou échouait selon celle qu'on appelait. Le préchauffage vit
+désormais dans `run_eval`, avec `warmup=False` pour qui veut justement mesurer
+le démarrage à froid. Un banc d'essai qui inclut une initialisation unique
+mesure l'initialisation.
 
 ## 5.3 Profils de fonctionnement par langue
 

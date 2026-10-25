@@ -171,6 +171,7 @@ async def run_eval(
     *,
     thresholds: Thresholds | None = None,
     transcriber: Transcriber | None = None,
+    warmup: bool = True,
 ) -> EvalReport:
     """Evaluate ``speaker`` over ``cases`` and gate on ``thresholds``.
 
@@ -185,16 +186,39 @@ async def run_eval(
     transcriber : Transcriber or None
         Optional STT enabling the WER/chrF round-trip. When ``None``, fidelity
         metrics are skipped (and their thresholds are not gated).
+    warmup : bool
+        Prime the engine before the first case, so RTF measures synthesis and
+        not the one-time model load. Pass ``False`` only to measure cold start
+        deliberately — see the note below.
 
     Returns
     -------
     EvalReport
         The aggregated report and verdict.
+
+    Notes
+    -----
+    The warm-up is on by default because without it the **first case pays for
+    loading the model** and the gate reads that as slow synthesis. Measured on
+    an idle M2 Max: ``p95_rtf`` came out at 1.7617 (FAIL) cold against 0.261
+    (PASS) warm — a 6x error on an engine that was never slow, and the kind
+    that gets misread as a busy machine.
+
+    It also removes an incoherence. :func:`speaker_helper.eval.multilang`
+    warmed up and this function did not, so the same engine passed or failed
+    depending on which entry point you used. The warm-up belongs here, where
+    every caller gets it, rather than in one caller out of two.
     """
     # Fall back to the bundled dataset and threshold bar when the caller omits
     # them, so ``run_eval(speaker)`` is a valid, fully-defaulted invocation.
     cases = cases if cases is not None else load_dataset()
     thresholds = thresholds or Thresholds.load()
+
+    # Prime the engine before measuring anything. Speaker.warmup is itself
+    # best-effort: a failure is logged and swallowed, so a cold-start hiccup
+    # cannot turn an evaluation into a crash.
+    if warmup:
+        await speaker.warmup()
 
     # Run cases sequentially so RTF is measured under a single, uncontended
     # engine rather than distorted by concurrent synthesis load.
