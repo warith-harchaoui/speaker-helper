@@ -131,19 +131,30 @@ class LanguageProfile:
 # time-to-first-audio.
 #
 # ``measured_rtf`` / ``measured_quality`` are *reference* operating points for
-# kokoro on Apple GPU / Metal (M2 Max), obtained with
-# ``tune_profiles`` — recalibrate for your host with the same call. Both axes are
-# now **measured per language**: RTF from tuning, and quality from a real
-# **UTMOSv2 naturalness MOS** sweep in the ``speak`` study (kokoro sounds most
-# natural in en 0.65, then fr 0.59, then es 0.55 — all below the old 0.75 prior).
+# kokoro — recalibrate for your host with ``tune_profiles``. Both axes are
+# measured per language, and the two were measured by different runs, so they
+# carry their provenance separately rather than being presented as one sweep:
+#
+# * **RTF** — re-measured 2026-10-25 on Apple M2 Max with
+#   ``speaker-helper eval --languages fr,en,es`` against the *in-process* ONNX
+#   engine, warmed up. The numbers these replaced were taken against the REST
+#   engine removed in 0.8.0 (an MLX build on the Apple GPU); that engine is not
+#   in this package any more, so keeping its timings here would have attributed
+#   someone else's measurement to this code. See ``BENCHMARKS.md``, which keeps
+#   the old figures in a dated historical section.
+# * **quality** — a **UTMOSv2 naturalness MOS** sweep in the ``speak`` study
+#   (kokoro sounds most natural in en 0.65, then fr 0.59, then es 0.55 — all
+#   below the old 0.75 prior). Not re-run here, and not re-labelled.
+#
 # Languages without a row ship their hyperparameters only (measured fields
 # ``None``).
-_MEASURED_KOKORO_MLX: dict[str, tuple[float, float]] = {
-    # language: (mean RTF, quality)   — native MLX, M2 Max, kokoro
-    # quality = measured UTMOSv2 MOS on [0,1] (see MEASURED_MOS + the speak study).
-    "fr": (0.162, 0.59),
-    "en": (0.159, 0.65),
-    "es": (0.185, 0.55),
+_MEASURED_KOKORO: dict[str, tuple[float, float]] = {
+    # language: (mean RTF, quality)
+    # RTF: in-process kokoro-onnx on CPU, M2 Max, 2026-10-25, warmed.
+    # quality: measured UTMOSv2 MOS on [0,1] (see MEASURED_MOS + the speak study).
+    "fr": (0.223, 0.59),
+    "en": (0.237, 0.65),
+    "es": (0.206, 0.55),
 }
 
 # (engine -> languages) whose ``measured_quality`` is a real UTMOSv2 MOS rather
@@ -156,8 +167,8 @@ MEASURED_MOS: dict[str, set[str]] = {
 DEFAULT_PROFILES: dict[str, LanguageProfile] = {
     lang: LanguageProfile(
         language=lang,
-        measured_rtf=_MEASURED_KOKORO_MLX.get(lang, (None, None))[0],
-        measured_quality=_MEASURED_KOKORO_MLX.get(lang, (None, None))[1],
+        measured_rtf=_MEASURED_KOKORO.get(lang, (None, None))[0],
+        measured_quality=_MEASURED_KOKORO.get(lang, (None, None))[1],
     )
     for lang in ("fr", "en", "es", "it", "pt", "de")
 }

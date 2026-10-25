@@ -36,9 +36,10 @@ Where does the evidence come from? In order of confidence:
    (from ``run_eval`` / ``run_multilang_eval`` / ``tune_profiles``). Both axes are
    then measured on *your* host → highest confidence.
 2. **The built-in operating-point catalogue** (:func:`default_operating_points`)
-   — seeded from the per-language profiles (kokoro RTF measured on native-MLX)
-   and the engine quality priors. RTF is known only where it was measured; other
-   engines carry a quality prior and an *unknown* RTF, and are therefore excluded
+   — seeded from the per-language profiles (kokoro RTF measured in-process on
+   this suite's reference host) and the engine quality priors. RTF is known only
+   where it was measured; other engines carry a quality prior and an *unknown*
+   RTF, and are therefore excluded
    from online routing (we will not claim an engine keeps up if we never timed
    it). Confidence is flagged on every decision.
 
@@ -233,7 +234,7 @@ def default_operating_points(language: str = "fr") -> list[OperatingPoint]:
     """Build the fallback candidate set for ``language`` from profiles + priors.
 
     The per-language profile supplies the *measured* kokoro operating point (RTF
-    from native-MLX tuning; quality is the engine prior until a round-trip
+    from in-process tuning; quality is the engine prior until a round-trip
     recalibrates it). Every other engine in the priors table contributes a
     *quality-only* candidate with an unknown RTF — enough to reason about offline
     quality, but deliberately not enough to claim it keeps up online.
@@ -251,7 +252,7 @@ def default_operating_points(language: str = "fr") -> list[OperatingPoint]:
     points: list[OperatingPoint] = []
 
     # 1) The measured kokoro point for this language, straight off the profile.
-    #    ``measured_rtf`` is real (native-MLX tuning); quality is still the prior
+    #    ``measured_rtf`` is real (in-process tuning); quality is still the prior
     #    until a WER/chrF round-trip recalibrates it, so flag the axes honestly.
     prof = profile_for(language)
     kokoro_rtf = prof.measured_rtf

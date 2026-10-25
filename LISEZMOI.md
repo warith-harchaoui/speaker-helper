@@ -12,8 +12,10 @@
 
 
 **Synthèse vocale professionnelle, hors-ligne et en streaming, avec clonage de
-voix et évaluation intégrée, par-dessus un moteur de synthèse vocale local
-([Voicebox](https://github.com/jamiepine/voicebox) par défaut).**
+voix et évaluation intégrée, synthétisée *dans votre propre processus* : aucun
+serveur à lancer, aucun port à configurer.
+[Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) est le moteur par défaut,
+avec 54 voix dans neuf langues.**
 
 speaker-helper est le pendant de
 [`vocal-helper`](https://github.com/warith-harchaoui) : vocal-helper
@@ -32,10 +34,12 @@ Python typée, une CLI, une API REST et une GUI web minimale. En local
   justification chiffrée. Rien n'est deviné.
 - **Temps réel sur CPU.** Le moteur `kokoro` par défaut synthétise plus vite
   que le temps réel (RTF nettement inférieur à 1.0) — sans GPU.
-- **Agnostique du moteur.** Le moteur est un détail d'implémentation derrière le
-  protocole `TTSEngine`. Voicebox est le défaut ; un backend `mock` déterministe
-  couvre les tests et la CI et ajouter un backend est un changement
-  local et minime.
+- **Agnostique du moteur et rien à lancer.** Le moteur est un détail
+  d'implémentation derrière le protocole `TTSEngine` et chaque backend tourne
+  **dans ce processus**. Quatre sont livrés : `kokoro` (le défaut — ONNX
+  Runtime, 54 voix), `openvoice` et `chatterbox` (clonage depuis un
+  enregistrement) et un `mock` déterministe pour les tests et la CI. Ajouter un
+  backend, c'est un seul appel à `register_backend`.
 - **Clonage de voix, partout.** Pointez vers un enregistrement, speaker-helper
   clone la voix — dans la bibliothèque, la CLI, l'API REST et la GUI. Les
   transcriptions manquantes sont produites automatiquement avec
@@ -44,10 +48,12 @@ Python typée, une CLI, une API REST et une GUI web minimale. En local
   et des métriques de vitesse, d'anomalie et de fidélité verrouillent la qualité en CI :
   pas de « vibe checks ». La qualité se mesure comme l'**intelligibilité** en
   aller-retour (texte→parole→texte WER/chrF).
-- **Auto-hébergé, sans Hugging Face à l'exécution.** Un bundle optionnel
-  [`speaker-engines`](#moteurs-auto-hébergés-sans-hugging-face) sert chaque
-  moteur et chaque modèle de métrique depuis votre propre serveur ; les
-  moteurs tournent alors en environnement clos.
+- **Aucun téléchargement de modèle pendant la synthèse.** Les poids du moteur
+  par défaut sont récupérés une fois, en amont, par
+  [`speaker-helper install-voice`](#moteurs-auto-hébergés-sans-hugging-face) :
+  depuis une release épinglée, vers un cache local. Rien n'est récupéré pendant
+  que vous parlez, si bien qu'une machine en environnement clos n'a besoin que
+  de ce cache.
 - **Tout inclus.** Bibliothèque, CLI, API REST, GUI web,
   Docker.
 
@@ -70,18 +76,28 @@ anglaise.
 ```mermaid
 flowchart LR
     text["votre texte"]:::input
-    subgraph SH["speaker-helper — 4 surfaces : API · CLI · REST · GUI"]
+    subgraph SH["speaker-helper — un seul processus, 4 surfaces : API · CLI · REST · GUI"]
         speaker["Speaker<br/>hors-ligne · streaming · clonage"]:::core
         router["routeur<br/>condition → moteur + mode"]:::core
         eval["évaluation<br/>RTF · anomalies · WER/chrF"]:::eval
+        subgraph BE["backends, choisis par settings.backend"]
+            kokoro["kokoro — défaut<br/>ONNX Runtime · 54 voix"]:::engine
+            clone["openvoice · chatterbox<br/>clonage"]:::engine
+            mock["mock<br/>déterministe · sans modèle"]:::engine
+        end
     end
-    engine["moteur de synthèse vocale<br/>voicebox · mock · …"]:::engine
+    weights[("cache des poids<br/>~/.cache/speaker-helper")]:::store
     audio["audio WAV"]:::output
 
     text --> speaker
     router -.->|choisit| speaker
-    speaker -- "protocole TTSEngine" --> engine
-    engine --> audio
+    speaker -- "protocole TTSEngine" --> kokoro
+    speaker -- "protocole TTSEngine" --> clone
+    speaker -- "protocole TTSEngine" --> mock
+    weights -.->|chargé une fois| kokoro
+    kokoro --> audio
+    clone --> audio
+    mock --> audio
     speaker -.->|mesuré par| eval
     eval -.->|preuves| router
 
@@ -89,14 +105,17 @@ flowchart LR
     classDef core fill:#CCE4FF,stroke:#007AFF,color:#000000
     classDef eval fill:#D4F5D9,stroke:#28CD41,color:#000000
     classDef engine fill:#EFDCF8,stroke:#AF52DE,color:#000000
+    classDef store fill:#E8E8ED,stroke:#8E8E93,color:#000000
     classDef output fill:#FFEACC,stroke:#FF9500,color:#000000
 ```
 
-speaker-helper ne parle qu'au protocole `TTSEngine`, donc le moteur concret
-(Voicebox par défaut) est interchangeable. Le **routeur** transforme une
-condition de fonctionnement en moteur et mode concrets à partir de preuves
-mesurées ; la couche d'**évaluation** produit ces preuves. Lancez un moteur une
-fois, puis pointez speaker-helper dessus.
+speaker-helper ne parle qu'au protocole `TTSEngine`, donc le moteur concret est
+interchangeable : `create_engine(settings)` cherche `settings.backend` dans un
+registre et renvoie l'objet correspondant. Tout cela tourne **dans votre
+processus** — il n'y a pas de moteur ailleurs, pas de port et pas de connexion
+qui puisse échouer. Le **routeur** transforme une condition de fonctionnement en
+moteur et mode concrets à partir de preuves mesurées ; la couche
+d'**évaluation** produit ces preuves.
 
 ---
 
@@ -143,52 +162,60 @@ automatiquement [`os-helper`](https://github.com/warith-harchaoui/os-helper)
 [`vocal-helper`](https://github.com/warith-harchaoui/vocal-helper) pour
 transcrire les références de clonage et l'aller-retour d'évaluation.
 
-### Un moteur Voicebox
+### La voix par défaut (Kokoro)
 
-speaker-helper a besoin d'un Voicebox en fonctionnement.
-
-- **Apple Silicon (recommandé) : Voicebox natif MLX sur `:17493`.** Il utilise
-  le **GPU** Apple et va nettement plus vite (bien sous le temps réel). C'est
-  le port par défaut de speaker-helper, aucun override nécessaire. À noter :
-  Docker sur macOS n'a **pas de passthrough GPU/Metal**, seul le build natif
-  profite du GPU.
-- **CPU / Docker sur `:17600`** (portable, sans GPU) : suffisant pour la
-  fonctionnalité ; sur CPU, le facteur temps réel est à la limite et sensible à la charge
-  (voir [`BENCHMARKS.md`](BENCHMARKS.md)).
+Il n'y a aucun moteur à lancer. `kokoro` tourne dans le même processus que votre
+code : les deux seules choses dont il a besoin sont un paquet et un fichier.
 
 ```bash
-git clone https://github.com/jamiepine/voicebox && cd voicebox
-docker compose up --build            # écoute sur 127.0.0.1:17600
+pip install "speaker-helper[kokoro]"   # ONNX Runtime + le phonémiseur
+speaker-helper install-voice           # ~340 Mo de poids, récupérés une fois
+speaker-helper health                  # dit s'il pourrait synthétiser maintenant
 ```
 
-Indiquez ensuite à speaker-helper où il se trouve (`--port`, `settings.yaml`,
-ou `SPEAKER_HELPER_VOICEBOX_PORT`).
+- **`espeak-ng`** fait la phonémisation. Préférez le paquet système —
+  `brew install espeak-ng` sur macOS, `sudo apt install espeak-ng` sur
+  Debian/Ubuntu. La copie embarquée dans la roue `espeakng-loader` cherche ses
+  données dans le répertoire personnel de la machine qui l'a construite et,
+  quand elle ne les trouve pas, appelle `exit(1)` depuis le C : pas de trace,
+  rien à rattraper.
+- **Les poids** (~340 Mo : un graphe ONNX et une banque de voix) sont tirés une
+  fois d'une release épinglée de
+  [`kokoro-onnx`](https://github.com/thewh1teagle/kokoro-onnx) vers
+  `~/.cache/speaker-helper/kokoro`. `install-voice` vérifie les tailles exactes,
+  si bien qu'un téléchargement coupé est réparé au lieu d'être pris pour une
+  installation.
+- **La vitesse**, mesurée sur cette machine (Apple M2 Max, préchauffée, zéro
+  anomalie) : facteur temps réel moyen de **0,22** en français, **0,24** en
+  anglais, **0,21** en espagnol — quatre à cinq fois plus vite que le temps
+  réel, sur CPU, sans GPU. Voir [`BENCHMARKS.md`](BENCHMARKS.md).
+
+Les backends de clonage s'installent à part, parce que tous deux tirent torch et
+que lire une page à voix haute ne devrait pas exiger une pile d'apprentissage
+profond : `pip install "speaker-helper[chatterbox]"` (ou `[openvoice]`).
 
 ### Moteurs auto-hébergés (sans Hugging Face)
 
-Par défaut, le serveur de moteurs télécharge les poids des modèles depuis
-Hugging Face à la première utilisation. Pour une machine de production ou en
-environnement clos, vous pouvez servir chaque moteur — **et les
-modèles « métriques » de l'évaluation** — depuis des archives auto-hébergées ;
-rien n'est alors récupéré depuis Hugging Face à l'exécution. Le bundle est
-livré en **plusieurs petits zips** (un par moteur TTS, un pour les modèles de
-métriques) : vous ne téléchargez que ce que vous utilisez et chaque zip se
-décompresse dans la même arborescence `speaker-engines/` :
+Le moteur par défaut ne touche jamais à Hugging Face. Ses deux fichiers viennent
+d'une release GitHub épinglée puis vivent dans un cache local et rien n'est
+récupéré pendant la synthèse — si bien que mettre `kokoro` en environnement clos
+revient à posséder ce cache, et rien d'autre :
 
 ```bash
-cd "$HOME"
-for z in tts-hexgrad-kokoro-82m metrics; do                 # ajoutez les moteurs voulus
-  curl -L "https://harchaoui.org/warith/speaker-engines/speaker-engines-${z}.zip" -o "se-${z}.zip"
-  unzip -oq "se-${z}.zip"                                    # -> ~/speaker-engines/…
-done
-export VOICEBOX_MODELS_DIR="$HOME/speaker-engines/tts"       # Voicebox lit ceci
-export HF_HUB_OFFLINE=1                                      # ne contacte jamais l'extérieur
-# démarrez le moteur comme d'habitude — il charge maintenant kokoro/chatterbox/… depuis le bundle
+speaker-helper install-voice            # sur une machine qui a le réseau
+# -> ~/.cache/speaker-helper/kokoro/{kokoro-v1.0.onnx,voices-v1.0.bin}
 ```
 
-Les zips se construisent une fois avec les scripts de `~/speaker-engines/` (voir
-son `README.md`) ; à l'exécution, seules les deux variables d'environnement
-ci-dessus sont nécessaires.
+Copiez ce répertoire vers la machine fermée (ou montez-le) et `speaker-helper
+health` rapporte `status: ok` sans aucun réseau. Un second emplacement,
+`~/.cache/sprezzature-skill/kokoro`, est lu lui aussi : une machine qui a déjà
+téléchargé les deux mêmes fichiers pour cette suite ne se voit pas redemander
+340 Mo.
+
+Les backends de **clonage** sont ceux qui sortent encore : `chatterbox` va
+chercher ses propres checkpoints à la première utilisation et `openvoice` réclame
+ceux que publie MyShell. `speaker-helper install-voice --engine openvoice` le dit
+plutôt que de prétendre le faire à votre place.
 
 ---
 
@@ -199,13 +226,17 @@ ci-dessus sont nécessaires.
 ```python
 from speaker_helper import Speaker, Settings
 
-spk = Speaker(Settings.from_mapping({
-    "engine": "kokoro", "language": "fr", "voicebox": {"port": 17600},
-}))
+spk = Speaker(Settings.from_mapping({"backend": "kokoro", "language": "fr"}))
 result = spk.save("Bonjour le monde.", "hello.wav")
 print(f"{result.duration_s:.2f}s d'audio, RTF {result.rtf:.2f}")
-# 2.80s d'audio, RTF 0.43
+# 1.19s d'audio, RTF 4.42    <- premier appel : la session ONNX se construit ici
+# 1.19s d'audio, RTF 0.31    <- tous les appels suivants
 ```
+
+La première synthèse charge le modèle : son facteur temps réel mesure donc le
+*chargement*, pas le moteur. `Speaker.warmup()` déplace ce coût là où vous le
+voulez — c'est pour cela que la passerelle d'évaluation préchauffe avant de
+chronométrer quoi que ce soit.
 
 ### CLI
 
@@ -243,7 +274,8 @@ Le serveur, en plus :
 - expose `POST /route` (le routeur de moteurs) aux côtés de `/synth`,
   `/synth/stream`, `/voices` et `/clone`.
 
-Ou avec Docker (le serveur pointe vers un Voicebox sur l'hôte) :
+Ou avec Docker — le moteur tourne **dans** le conteneur, il n'y a donc rien à
+trouver sur l'hôte :
 
 ```bash
 docker compose up --build            # API speaker-helper sur :8080
@@ -307,7 +339,8 @@ sous `assets/ref-fr-female.wav` et sert de défaut.
 ```python
 from speaker_helper import Speaker, Settings, VoiceSample
 
-spk = Speaker(Settings.from_mapping({"engine": "chatterbox", "voicebox": {"port": 17600}}))
+# C'est `backend` qui choisit le moteur ; `engine` n'est qu'une étiquette.
+spk = Speaker(Settings.from_mapping({"backend": "chatterbox"}))
 # ne donnez que l'audio — la transcription est produite et alignée pour vous :
 await spk.clone_voice("ma-voix", [VoiceSample("ma_voix.wav", "")])
 result = await spk.say("Maintenant je parle avec la voix clonée.")
@@ -318,10 +351,13 @@ speaker-helper clone                        # clone la référence fournie, affi
 speaker-helper --clone-audio ma_voix.wav synth "Bonjour." -o out.wav
 ```
 
-Un audio de référence plus long que la limite du moteur (Voicebox : 30 s) est
-tronqué automatiquement (via
+Un audio de référence plus long que la limite des moteurs de clonage (30 s est
+le plafond courant, speaker-helper tronque donc à 28 s) est coupé
+automatiquement (via
 [`audio-helper`](https://github.com/warith-harchaoui/audio-helper)) puis
-re-transcrit, pour que l'audio et le texte restent alignés.
+re-transcrit, pour que l'audio et le texte restent alignés. `kokoro` ne clone
+pas du tout et le dit en nommant les deux backends qui le font, plutôt que de
+lever un `NotImplementedError` nu.
 
 ---
 
@@ -339,7 +375,7 @@ from speaker_helper.sources import from_youtube, revoice
 
 async def main() -> None:
     src = from_youtube("https://youtu.be/…")                 # extra : youtube
-    async with Speaker(Settings.from_mapping({"voicebox": {"port": 17600}})) as spk:
+    async with Speaker(Settings.from_mapping({"language": "fr"})) as spk:
         out = await revoice(src, spk)                        # transcrit + re-parle
     open("revoiced.wav", "wb").write(out.wav_bytes)
 
@@ -367,12 +403,22 @@ sort avec un code non nul quand la barre n'est pas atteinte, ce qui verrouille l
 CI.
 
 ```bash
-speaker-helper --backend mock eval                 # déterministe, sans moteur
-speaker-helper --engine kokoro eval --json report.json
-# backend=voicebox engine=kokoro cases=12
-# mean_rtf=0.3534 p95_rtf=0.3989 anomaly_rate=0.0 quality=0.75 (prior)
+speaker-helper --backend mock eval                 # déterministe, sans modèle
+# backend=mock engine=kokoro cases=12
+# mean_rtf=0.3 p95_rtf=0.3 anomaly_rate=0.0 quality=1.0 (prior)
 # PASS
+
+speaker-helper eval --languages fr,en,es --json report.json    # le vrai moteur
+# lang   cases  mean_rtf  p95_rtf  anomaly  quality  verdict
+# fr        12     0.223    0.261    0.000    0.750  PASS
+# en        10     0.237    0.299    0.000    0.750  PASS
+# es        10     0.206    0.230    0.000    0.750  PASS
 ```
+
+`--languages` préchauffe le moteur langue par langue avant de chronométrer,
+c'est-à-dire ce qu'on attend d'un banc d'essai. Un `eval` mono-langue ne le fait
+pas : sur un processus froid, son premier cas porte le chargement du modèle et
+son p95 rapporte cela plutôt que le moteur.
 
 L'évaluation cible le `Speaker` agnostique du moteur, donc la même passerelle
 évalue le backend `mock` en CI ou un vrai moteur en local ; seul `--backend`
@@ -403,7 +449,7 @@ l'environnement au chargement.
 pip install -e ".[dev,server]"
 pytest -q -m "not slow"       # suite rapide et déterministe (sans moteur)
 pytest -q --cov=speaker_helper --cov-report=term-missing   # avec couverture
-pytest -q                     # inclut les tests live @slow (nécessite Voicebox)
+pytest -m slow                # le banc d'essai facteur temps réel ; machine au repos
 ruff check speaker_helper tests && ruff format --check speaker_helper tests
 speaker-helper --backend mock eval    # exécute la passerelle d'évaluation en local
 ```
@@ -423,8 +469,11 @@ aucun moteur.
 
 Merci aux contributrices, contributeurs, relectrices,
 relecteurs et utilisateurs qui ont aidé à améliorer ce projet, ainsi qu'aux
-auteurs de [Voicebox](https://github.com/jamiepine/voicebox), le moteur sur
-lequel speaker-helper s'appuie.
+auteurs des pièces dont la voix par défaut est faite :
+[Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) (hexgrad) pour le modèle,
+[`kokoro-onnx`](https://github.com/thewh1teagle/kokoro-onnx) pour l'export ONNX
+et les poids publiés et
+[espeak-ng](https://github.com/espeak-ng/espeak-ng) pour la phonémisation.
 
 ## Licence
 

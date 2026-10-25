@@ -303,7 +303,18 @@ def test_fidelity_round_trip_gates_on_wer_chrf() -> None:
 
 @pytest.mark.slow
 async def test_run_eval_live_kokoro(needs_kokoro: None) -> None:
-    """The identical gate runs against the real engine when it is installed."""
+    """The identical gate runs against the real engine when it is installed.
+
+    The warm-up is load-bearing, not hygiene. Building the ONNX session costs
+    about five seconds, once; spread over three short utterances that single
+    cost alone puts ``mean_rtf`` above 1.0 no matter how fast the machine is,
+    so without it this assertion measured the *model load* and called the
+    engine slower than real time. It failed at 1.2235 on an idle M2 Max that
+    synthesises at 0.223 warm — a six-fold error, and the reason it was read as
+    "this test needs a quiet machine" rather than as a wrong measurement.
+
+    Warm up before you time, or do not claim to be timing the engine.
+    """
     settings = Settings.from_mapping(
         {
             "backend": "kokoro",
@@ -311,8 +322,10 @@ async def test_run_eval_live_kokoro(needs_kokoro: None) -> None:
             "language": "fr",
         }
     )
-    # Act: run the same three-case gate against the live engine.
+    # Act: run the same three-case gate against the live engine, warmed up, so
+    # the one-off session build is not billed to the first case.
     async with Speaker(settings) as spk:
+        await spk.warmup()
         report = await run_eval(spk, load_dataset()[:3])
     # Assert: all three cases ran fast and clean, matching the CI contract.
     assert report.n_cases == 3

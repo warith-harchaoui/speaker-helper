@@ -349,3 +349,32 @@ def test_every_version_source_agrees() -> None:
     import speaker_helper
 
     assert speaker_helper.__version__ == PYPROJECT["project"]["version"]
+
+
+# ── The dependency floors say one thing ────────────────────────────────────
+
+
+def test_requirements_txt_mirrors_the_package_metadata() -> None:
+    """Two files declaring the runtime floor, and nobody comparing them.
+
+    `requirements.txt` says it "mirrors pyproject [project.dependencies]", and
+    for a while it did not: it pinned `httpx>=0.27` for a REST client removed
+    in 0.8.0, while `pyproject.toml` carried a comment saying that very
+    dependency was gone. Both were installed by different readers — `pip
+    install -r requirements.txt` against the file, `pip install -e .` against
+    the metadata — so the two got different environments and neither could
+    notice.
+
+    Nothing catches this by reading, because a surplus requirement installs
+    cleanly. Comparing the two lists does.
+    """
+    declared = set(PYPROJECT["project"]["dependencies"])
+    pinned = {
+        line.strip()
+        for line in (ROOT / "requirements.txt").read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    }
+    assert pinned == declared, (
+        f"requirements.txt only: {sorted(pinned - declared)}; "
+        f"pyproject only: {sorted(declared - pinned)}"
+    )

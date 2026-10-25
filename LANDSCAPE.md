@@ -53,9 +53,10 @@ The upper left quadrant showcases a different set of strengths, with Piper, Koko
 ## Positioning
 
 `speaker-helper` is not another TTS model — it is the **toolbox around** the
-models. It talks to a concrete engine (Voicebox by default) only through a
-`TTSEngine` protocol, so Kokoro, Chatterbox, XTTS-class engines and a
-deterministic `mock` all sit behind the same typed `Speaker`. On top of that
+models. It reaches a concrete engine only through a `TTSEngine` protocol, so
+Kokoro, Chatterbox, OpenVoice and a deterministic `mock` all sit behind the same
+typed `Speaker`, and all of them run in the calling process: `settings.backend`
+picks one out of a registry, and there is no server to start. On top of that
 neutral core it adds the things a research checkpoint or a bare inference script
 never ship: a **router** that turns an operating *condition* (online real-time
 vs. offline) into a concrete engine + mode from measured quality↔speed evidence,
@@ -107,10 +108,12 @@ Community License, permissive until you are very large. A router that optimised
 quality alone would hand you a licence violation with a justification attached,
 which is why `commercial` belongs beside `condition` as a stated constraint.
 
-The honest cost is **install weight** (⭐⭐⭐): a real engine wants `torch`, plus
-`ffmpeg` and `libsndfile` for the audio plumbing, and a running Voicebox. That
-is the price of being the pipeline layer over real neural engines rather than a
-one-file OS shim.
+The honest cost is **install weight** (⭐⭐⭐). The default voice is the cheap end
+of it — ONNX Runtime, `espeak-ng`, and ~340 MB of weights fetched once — but
+`ffmpeg` and `libsndfile` are still required for the audio plumbing, and the
+*cloning* half pulls `torch` and `torchaudio` behind the `[openvoice]` /
+`[chatterbox]` extras. That is the price of being the pipeline layer over real
+neural engines rather than a one-file OS shim.
 
 ## When to pick what
 

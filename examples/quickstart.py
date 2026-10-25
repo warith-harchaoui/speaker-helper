@@ -1,9 +1,13 @@
 """
 Quickstart — offline and streaming synthesis with speaker-helper.
 
-Run it against a live Voicebox engine::
+Run it. There is no engine to start first — the backend synthesises in this
+same process::
 
-    SPEAKER_HELPER_VOICEBOX_PORT=17600 python examples/quickstart.py
+    speaker-helper install-voice          # once: ~340 MB of Kokoro weights
+    python examples/quickstart.py
+
+    SPEAKER_HELPER_BACKEND=mock python examples/quickstart.py   # no model at all
 
 Author
 ------

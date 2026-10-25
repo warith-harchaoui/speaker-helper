@@ -6,7 +6,7 @@ Module summary
 A thin FastAPI façade over :class:`~speaker_helper.speaker.Speaker`, suitable
 for running as a Docker service. It exposes:
 
-* ``GET  /health`` — liveness plus the upstream engine health.
+* ``GET  /health`` — liveness plus the in-process engine's own health.
 * ``GET  /voices`` — preset voices for the configured (or requested) engine.
 * ``POST /synth`` — synthesise ``{"text": ..., "language": ...}`` and return a
   ``audio/wav`` body (offline: whole text in one response).
@@ -153,7 +153,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # that pays the model download / load.
         await speaker.warmup()
         yield
-        # On shutdown, release the pooled HTTP client and engine resources.
+        # On shutdown, release whatever the engine holds (ONNX session, …).
         await speaker.aclose()
 
     # Wire the lifespan into the app so warmup/teardown run around serving.
@@ -164,11 +164,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         """Return server liveness and the backend's own health."""
         try:
             # Liveness is trivially true (we answered); the interesting signal is
-            # whether the upstream engine is reachable, so probe it here.
+            # whether the backend could synthesise right now — a missing package
+            # or absent weights, not a missing socket — so ask it.
             upstream = await speaker.engine.health()
-        except Exception as exc:  # noqa: BLE001 - report upstream failure verbatim
+        except Exception as exc:  # noqa: BLE001 - report the failure verbatim
             # We are up but the engine is not: report "degraded" rather than 5xx
-            # so callers can distinguish "server dead" from "engine dead".
+            # so callers can distinguish "server dead" from "engine unusable".
             return {"status": "degraded", "backend": settings.backend, "engine_error": str(exc)}
         return {"status": "ok", "backend": settings.backend, "engine": upstream}
 

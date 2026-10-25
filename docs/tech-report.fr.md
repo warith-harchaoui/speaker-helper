@@ -11,14 +11,14 @@ lang: fr
 
 Speaker Helper transforme du texte en parole sur votre propre machine. C'est le
 pendant « sortie » de Vocal Helper (parole → texte) dans l'écosystème AI
-Helpers [@aihelpers] : il enveloppe un moteur de synthèse vocale *local* —
-Voicebox [@voicebox] exécutant le modèle Kokoro [@kokoro] par défaut — derrière
-une petite API Python typée, une CLI, une API REST et une GUI web minimale.
-Deux partis pris traversent tout le système. D'abord, **le
-moteur est un détail d'implémentation** : chaque composant parle au protocole
-`TTSEngine`, si bien que Voicebox n'est qu'un backend parmi d'autres et qu'un
-backend `mock` déterministe rend le paquet (et son évaluation) exécutable en CI
-sans serveur. Ensuite, **la qualité se mesure, elle ne se décrète pas** : un jeu
+Helpers [@aihelpers] : il exécute un moteur de synthèse vocale **dans le
+processus appelant** — le modèle Kokoro [@kokoro] via ONNX Runtime par défaut —
+derrière une petite API Python typée, une CLI, une API REST et une GUI web
+minimale. Deux partis pris traversent tout le système. D'abord, **le moteur est
+un détail d'implémentation** : chaque composant parle au protocole `TTSEngine`
+et `create_engine(settings)` résout `settings.backend` dans un registre, si bien
+que le moteur concret est interchangeable et qu'un backend `mock` déterministe
+rend le paquet (et son évaluation) exécutable en CI sans aucun modèle. Ensuite, **la qualité se mesure, elle ne se décrète pas** : un jeu
 de données committé, des seuils versionnés et des métriques propres à l'audio
 (facteur temps réel, anomalies de signal et, avec un transcripteur, un
 aller-retour WER / chrF [@popovic2015chrf]) verrouillent le projet comme des
@@ -80,8 +80,9 @@ votre texte ──▶ Speaker (hors-ligne · streaming · clone) ──TTSEngine
   `VoiceList`, `VoiceSample`.
 - **Frontière moteur** (`engine.py`) : le protocole `TTSEngine` —
   `synthesize`, `list_voices`, `health`, `clone_voice`, `aclose` — plus un
-  registre de backends. Deux backends sont livrés : `VoiceboxClient` (réel) et
-  `MockEngine` (déterministe, sans serveur).
+  registre de backends. Quatre backends sont livrés, tous dans le processus :
+  `KokoroEngine` (`backends/kokoro.py`, le défaut), `OpenVoiceEngine` et
+  `ChatterboxEngine` (clonage) et `MockEngine` (déterministe, sans modèle).
 - **Façade** (`speaker.py`) : `Speaker` — `say`, `stream`, `clone_voice`,
   `warmup`, `from_profile`.
 - **Interfaces** : CLI (`cli.py`), API REST (`api.py`, [@fastapi]).
@@ -102,13 +103,30 @@ est dérivé de l'`AudioResult`, jamais deviné.
 
 ## 3.1 La frontière moteur
 
-`create_engine(settings)` aiguille selon `settings.backend`. Le backend
-`voicebox` cache trois détails pénibles de l'API REST Voicebox : le bootstrap
-idempotent d'un *profil* (voix preset ou clonée), un chemin synchrone
-`POST /generate/stream` avec repli transparent vers le chemin asynchrone
-`/generate` qui déclenche le téléchargement du modèle au premier appel et des
-retries avec backoff exponentiel sur les échecs transitoires (transport, 5xx).
-Le backend `mock` rend un signal sinusoïdal déterministe dont la durée suit la
+`create_engine(settings)` aiguille selon `settings.backend` dans un registre de
+niveau module et `register_backend` permet à un tiers d'y ajouter le sien à
+l'exécution. Chaque fabrique enregistrée est paresseuse : le paquet reste donc
+importable sur une machine sans runtime ONNX ni poids, rien ne touche à un
+modèle avant la première synthèse.
+
+Le backend `kokoro` cache trois détails pénibles de l'exécution d'un modèle dans
+le processus : les poids sont cherchés dans deux caches et leur absence est
+rapportée par `health()` comme une *raison accompagnée d'un remède* plutôt que
+comme une exception à la première phrase ; la voix **est** la langue (la
+première lettre du nom l'encode), si bien qu'une voix non renseignée est résolue
+depuis la langue détectée au lieu de retomber sur une voix qui phonémiserait le
+texte comme s'il était anglais ; et `espeak-ng` est résolu depuis
+l'installation système d'abord, parce que la copie embarquée dans la roue
+`espeakng-loader` quitte le processus depuis le C quand elle ne trouve pas ses
+données. Le clonage, il le refuse franchement en nommant `openvoice` et
+`chatterbox` — la réponse utile à une demande qu'il ne peut pas servir.
+
+Un cinquième backend était livré jusqu'à 0.8.0 : un client REST vers un moteur
+hors processus sur un port fixe [@voicebox], avec bootstrap idempotent de
+profil, repli sync/async et retries à backoff exponentiel sur les échecs
+transitoires. Il a été retiré quand le défaut est passé dans le processus, et
+avec lui la dépendance HTTP, les erreurs de connexion et le port. Le backend
+`mock` rend un signal sinusoïdal déterministe dont la durée suit la
 longueur d'entrée et dont le `compute_s` reproduit un RTF configuré : assez pour
 exercer chaque chemin de code, y compris les détections d'anomalies de
 l'évaluation, sans serveur.
@@ -228,56 +246,76 @@ aucun changement de code.
 
 ## 4.5 Moteurs auto-hébergés (sans Hugging Face)
 
-Par défaut, le serveur de moteurs télécharge les poids des modèles depuis
-Hugging Face à la première utilisation. Pour un hôte de production ou en
-environnement clos, un bundle optionnel `speaker-engines` (hébergé à
-`https://harchaoui.org/warith/speaker-engines/`) sert chaque moteur TTS — **et les
-modèles de métriques de l'évaluation** — depuis une seule archive auto-hébergée.
-Le consommateur le télécharge et le décompresse, puis pointe l'exécution dessus
-avec `VOICEBOX_MODELS_DIR=$HOME/speaker-engines/tts` et `HF_HUB_OFFLINE=1` : rien
-n'est alors récupéré depuis Hugging Face à l'exécution.
+Le moteur par défaut n'atteint jamais Hugging Face. Ses deux fichiers — un
+graphe ONNX d'environ 325 Mo et une banque de voix d'environ 28 Mo — viennent
+d'une release `kokoro-onnx` épinglée puis vivent dans
+`~/.cache/speaker-helper/kokoro` ; `install.py` épingle leurs tailles exactes en
+octets, si bien qu'un téléchargement coupé est réparé au lieu d'être pris pour
+une installation et que deux machines installant à une semaine d'écart
+obtiennent le même narrateur. Rien n'est récupéré pendant la synthèse : mettre
+le moteur en environnement clos revient donc à posséder ce répertoire, qu'il
+suffit de recopier pour que `health()` rapporte `status: ok` sans réseau. Seuls
+les backends de clonage vont encore chercher leurs propres checkpoints et
+`install_engine` dit lesquels il ne tirera pas à votre place.
 
 # 5. Mesures
 
-Matériel : Apple M2 Max. Moteur : Kokoro [@kokoro] sur Voicebox [@voicebox].
-Jeux de données : 10 à 12 énoncés de référence committés par langue, voix
-choisie automatiquement par langue et préchauffée. La qualité est le prior du
-moteur (pas de transcripteur ici) ; le taux d'anomalie est nul dans toutes les
-mesures ci-dessous.
+Mesuré le 2026-10-25. Matériel : Apple M2 Max, macOS 26.5.2. Moteur : Kokoro
+[@kokoro] via `kokoro-onnx` 0.6.1 sur onnxruntime 1.26.0, dans le processus, sur
+le `CPUExecutionProvider` (sans GPU). Jeux de données : 10 à 12 énoncés de
+référence committés par langue, voix choisie automatiquement par langue et
+préchauffée. La qualité est le prior du moteur (pas de transcripteur ici) ; le
+taux d'anomalie est nul dans toutes les mesures ci-dessous.
 
-## 5.1 Natif MLX (GPU Apple / Metal) — le point de fonctionnement recommandé
+## 5.1 Kokoro dans le processus, préchauffé
 
 | langue | cas | RTF moyen | RTF p95 | verdict |
 | ------ | --: | --------: | ------: | ------- |
-| fr     | 12  | **0.151** | 0.201   | PASS    |
-| en     | 10  | **0.133** | 0.150   | PASS    |
-| es     | 10  | **0.141** | 0.170   | PASS    |
+| fr     | 12  | **0.223** | 0.261   | PASS    |
+| en     | 10  | **0.237** | 0.299   | PASS    |
+| es     | 10  | **0.206** | 0.230   | PASS    |
 
-Le backend natif sur le GPU Apple synthétise **6 à 8× plus vite que le temps
-réel** dans chaque langue. C'est le port par défaut de Speaker Helper (`:17493`).
+Quatre à cinq fois plus vite que le temps réel dans chaque langue, sur CPU, avec
+zéro anomalie — confortablement sous le plafond `online_realtime` de `0.8` du
+routeur. Il y a un seul point de fonctionnement à rapporter plutôt qu'une
+comparaison, et c'est précisément le résultat architectural : le moteur est un
+backend de ce processus, il n'y a donc ni second processus, ni port, ni chemin
+GPU dans le build ONNX à lui opposer.
 
-## 5.2 CPU dans Docker — pour contraste
+## 5.2 Le chargement du modèle n'est pas le moteur
 
-| langue | cas | RTF moyen | RTF p95 | verdict          |
-| ------ | --: | --------: | ------: | ---------------- |
-| fr     | 12  | 1.341     | 1.723   | FAIL (RTF > 1.0) |
-| en     | 10  | 1.131     | 1.470   | FAIL (RTF > 1.0) |
-| es     | 10  | 1.287     | 1.678   | FAIL (RTF > 1.0) |
-
-La synthèse CPU est à la limite et sensible à la charge : à vide, le français
-mesure ≈ 0,32–0,37 (réussite), mais sous contention il grimpe au-dessus de 1,0.
-Docker sur macOS n'a **pas de passthrough GPU/Metal**, ce qui explique l'écart
-d'environ ×8 avec le §5.1. Point crucial : *la qualité et l'intégrité tiennent
-dans les deux régimes* (zéro anomalie partout) ; seule la vitesse manque la
-barre sur CPU chargé, exactement ce que la passerelle doit détecter.
+Construire la session ONNX coûte environ 5 s, une fois par processus. Face à un
+énoncé de 1,19 s, cela domine complètement : le premier appel mesure un RTF de
+**4,42**, tous les suivants **0,31**. Un `eval` mono-langue ne préchauffe pas :
+sur un processus froid, son premier cas porte ce chargement et la passerelle
+rapporte `mean_rtf=0.5219 p95_rtf=1.7617 → FAIL` — même moteur, même jeu de
+données, même machine qu'au §5.1, à quelques minutes d'intervalle. C'est pour
+cela que `run_multilang_eval` préchauffe chaque langue avant de chronométrer et
+que `Speaker.warmup()` est public : un banc d'essai qui inclut une
+initialisation unique mesure l'initialisation.
 
 ## 5.3 Profils de fonctionnement par langue
 
 `LanguageProfile` regroupe la voix et le moteur d'une langue et ses boutons
 producteur/consommateur avec un **point de fonctionnement mesuré**.
 `tune_profiles` mesure un ensemble de langues et réinjecte le RTF et la qualité de
-chaque rapport dans son profil. Les défauts livrés portent les chiffres de
-référence du §5.1 (M2 Max, natif MLX) ; un autre hôte les recalibre en un appel.
+chaque rapport dans son profil. Les défauts livrés portent les RTF du §5.1 ;
+leur `measured_quality` vient d'une campagne de naturalité UTMOSv2 distincte,
+menée dans l'étude compagne, et reste assortie de sa propre provenance plutôt
+que fondue dans la même exécution. Un autre hôte recalibre les deux en un appel.
+
+## 5.4 Historique : le moteur qui a été retiré
+
+Jusqu'à 0.8.0, les mesures de cette page décrivaient un moteur REST hors
+processus [@voicebox] piloté en HTTP : un build MLX sur le GPU Apple atteignait
+un RTF moyen de 0,151 / 0,133 / 0,141 (fr / en / es), tandis que le build CPU du
+même moteur dans Docker mesurait 1,341 / 1,131 / 1,287 et manquait la barre,
+macOS n'offrant aucun passthrough GPU/Metal vers le conteneur. Ces chiffres sont
+conservés, datés et étiquetés, dans `BENCHMARKS.md` ; ils ne sont **pas**
+réattribués au moteur mesuré ci-dessus et ni l'un ni l'autre n'est reproductible
+depuis ce dépôt. La comparaison reste instructive sur un point : le moteur ONNX
+du §5.1 tourne lui aussi sur CPU et il est quatre à six fois plus rapide que ce
+conteneur CPU, sans avoir besoin d'un second processus.
 
 # 6. Interfaces
 

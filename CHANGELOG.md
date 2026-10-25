@@ -6,6 +6,125 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-10-25
+
+### Fixed
+
+- **Sixty-one mentions of an engine that is not in the code.** The REST client
+  for an out-of-process engine went away in 0.8.0 and the documentation did
+  not. It was not stale footnotes: the two READMEs presented that engine as
+  **the default** ("talks to a concrete engine (Voicebox by default)") and drew
+  it as a node in their architecture diagrams; both cookbooks opened by telling
+  the reader to have one running on `:17493` or `:17600`, passed
+  `{"voicebox": {"port": 17600}}` into `Settings.from_mapping` and showed a
+  `/health` response with a `"voicebox"` key that the endpoint has never
+  returned; `TECHNICAL_STACK.md` drew a `VoiceboxClient` node with an `HTTP`
+  edge; `LANDSCAPE`/`PAYSAGE` listed "a running Voicebox" as part of the
+  install cost; and both example configuration files invited the reader to copy
+  a dead `voicebox:` section.
+
+  What the code actually does was established by reading it and then running
+  it: `create_engine(settings)` resolves `settings.backend` against a
+  module-level registry and returns one of four **in-process** backends —
+  `kokoro` (default, kokoro-onnx on ONNX Runtime, 54 voices, 24 kHz),
+  `openvoice`, `chatterbox`, `mock`. Nothing speaks HTTP to an engine. The only
+  HTTP left is the API speaker-helper *serves*, and the only outbound request
+  is `urllib.request` fetching the weights once in `install.py`. Both READMEs,
+  both cookbooks, `TECHNICAL_STACK.md`, both technical reports and both
+  `LANDSCAPE` twins now say that, and their Mermaid diagrams draw the backends
+  inside the process box.
+
+- **The `/health` sample was wrong in both cookbooks.** They showed
+  `{"status":"ok","voicebox":{...}}`. The route returns
+  `{"status","backend","engine"}` — where `engine` is the backend's own
+  document — or `{"status":"degraded","backend","engine_error"}` when the
+  backend cannot run. Replaced with the real payload, read off the endpoint.
+
+- **The cloning examples selected nothing.** They passed
+  `{"engine": "chatterbox", …}`, but `engine` is only a label carried on
+  results; `backend` is what `create_engine` dispatches on. So
+  `Settings.from_mapping({"engine": "chatterbox"})` built a `KokoroEngine`,
+  and Kokoro refuses to clone. Now `{"backend": "chatterbox"}`, with the
+  distinction stated where it is used.
+
+- **`requirements.txt` pinned `httpx>=0.27`; `pyproject.toml` said in a comment
+  that `httpx` was gone.** One of the two had to be wrong. Nothing in the
+  package imports `httpx` — `install.py` downloads with stdlib
+  `urllib.request`, and the only other appearance is `httpx2`, which
+  `pyproject` already declares under `[dev]` for starlette's `TestClient`. The
+  pin is removed, and `requirements.txt` now mirrors
+  `[project.dependencies]` exactly.
+
+  A test compares the two lists, because a surplus requirement installs
+  cleanly and so this class of drift cannot be caught by reading. Proven by
+  putting `httpx>=0.27` back and watching it go red.
+
+- **Dead environment variables and a dead air-gapping recipe.** Both cookbooks
+  told the reader to `export SPEAKER_HELPER_VOICEBOX_PORT`, which
+  `_apply_env_overrides` has never read, and both READMEs' "self-hosted
+  engines" section told them to point `VOICEBOX_MODELS_DIR` at a bundle with
+  `HF_HUB_OFFLINE=1` — a documented override of the *removed* engine, which
+  nothing in this package reads. The section now describes what actually makes
+  the default engine air-gapped: its two files come from a pinned
+  `kokoro-onnx` release into `~/.cache/speaker-helper/kokoro`, nothing is
+  fetched during synthesis, and copying that directory is the whole procedure.
+
+### Changed
+
+- **`BENCHMARKS.md` was re-measured rather than relabelled.** Its figures were
+  real measurements of an engine this package no longer contains, in two
+  configurations (a native MLX build on the Apple GPU, and that same engine's
+  CPU build in a container) that cannot be reproduced from this repository.
+  Silently re-attributing them to the in-process ONNX engine would have been
+  the one unacceptable option.
+
+  So both: the gate was re-run on the same host (Apple M2 Max) against the
+  current engine — `speaker-helper eval --languages fr,en,es`, warmed, zero
+  anomalies — giving mean RTF **0.223** (fr), **0.237** (en), **0.206** (es),
+  four to five times faster than real time on the CPU; and the old figures are
+  kept in a dated, explicitly-labelled historical section that says which
+  engine they describe and why neither table can be re-run. There is now one
+  operating point to report instead of a comparison, which is itself the
+  architectural result.
+
+- **`profiles.py` carried the removed engine's timings.** `_MEASURED_KOKORO_MLX`
+  seeded the router's operating-point catalogue with RTFs labelled "native MLX,
+  M2 Max" — measured against the engine that left in 0.8.0. Renamed to
+  `_MEASURED_KOKORO` and refreshed with the re-measurement above, on the same
+  host. `measured_quality` is **not** touched: it comes from a separate UTMOSv2
+  naturalness sweep, it was not re-run here, and it keeps its own provenance in
+  the comment rather than being folded into one sweep that never happened.
+
+- **The `@slow` benchmark was measuring the model load, and the exclusion hid
+  it.** `test_run_eval_live_kokoro` asserts `mean_rtf < 1.0` against the real
+  engine over three short cases, and it did not warm up — so the one-off ~5 s
+  ONNX session build was billed to the first case. On an **idle** M2 Max that
+  synthesises at 0.223 warm, it failed at **1.2235**: a six-fold error, which
+  is why the number was read as "this machine is busy" rather than as the
+  wrong measurement. It was excluded from the default run, from CI and from the
+  pre-push gate, so nothing was going to correct that reading.
+
+  One line — `await spk.warmup()` before the timed run — and it passes here.
+  Proven both ways on the same machine, minutes apart. The `slow` marker's
+  rationale in `pyproject.toml` records the corrected diagnosis, since the
+  original one (load average 133) was true but not the whole story.
+
+### Found, not fixed
+
+- **A single-language `eval` still does not warm up, so the CLI can report the
+  model load as a verdict.** `run_multilang_eval` warms each language before
+  timing; `run_eval` has no such step. Same engine, same dataset, same
+  machine: `--languages fr,en,es` gives `p95_rtf=0.261` and PASS, while
+  `--engine kokoro eval` gives `p95_rtf=1.7617` and FAIL. Giving `run_eval` a
+  warm-up would change what the gate measures for every caller, which is a
+  decision rather than a fix, so this release only documents it — in
+  `BENCHMARKS.md` §"The model load is not the engine", in §5.2 of both
+  technical reports, and in both READMEs.
+
+- **`README` still says the package is "not on PyPI yet" and pins `v0.7.5`.**
+  PyPI serves `speaker-helper` up to 0.8.1. Out of scope for a pass about the
+  engine, and the right fix is a release rather than an edit.
+
 ## [0.9.0] - 2026-10-25
 
 ### Changed
@@ -111,6 +230,8 @@ Voicebox engine still appears in the Python snippets
 in `settings.yaml.example`, in `examples/quickstart.py` and as a stale
 `httpx>=0.27` in `requirements.txt` — a documentation rot from 0.8.0 that is
 wider than one command line and wants its own pass.
+
+*Done in 0.9.1.*
 
 ## [0.8.2] - 2026-10-23
 

@@ -195,7 +195,7 @@ def test_reports_take_precedence() -> None:
             self.quality = quality
             self.mean_rtf = rtf
             self.quality_source = "measured_chrf"
-            self.backend = "voicebox"
+            self.backend = "kokoro"
 
     reports = [_Report("kokoro", 0.7, 0.2), _Report("chatterbox", 0.9, 0.5)]
     d = route(RouteRequest(condition=OFFLINE), reports=reports)

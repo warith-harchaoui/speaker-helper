@@ -20,9 +20,10 @@ flowchart TB
     router["router<br/>condition → engine + mode"]:::core
     text["text splitter<br/>sentence chunks → low TTFA"]:::util
 
-    subgraph engines["TTSEngine protocol (backend-agnostic)"]
-        voicebox["VoiceboxClient<br/>presets · cloning · retries"]:::engine
-        mock["MockEngine<br/>deterministic · serverless"]:::engine
+    subgraph engines["TTSEngine protocol — backends, all in this process"]
+        kokoro["KokoroEngine (default)<br/>ONNX Runtime · 54 voices"]:::engine
+        cloning["OpenVoiceEngine · ChatterboxEngine<br/>cloning · torch"]:::engine
+        mock["MockEngine<br/>deterministic · no model"]:::engine
     end
 
     subgraph evallayer["Evaluation gate"]
@@ -37,7 +38,8 @@ flowchart TB
         vh["vocal-helper (stt)<br/>transcription"]:::eco
     end
 
-    engine["local TTS engine<br/>kokoro · chatterbox · …"]:::ext
+    weights[("weights cache<br/>~/.cache/speaker-helper/kokoro")]:::ext
+    espeak["espeak-ng<br/>phonemisation"]:::ext
 
     lib --> speaker
     cli --> speaker
@@ -45,9 +47,11 @@ flowchart TB
     gui --> api
     speaker --> text
     router -.->|picks engine + mode| speaker
-    speaker -- "TTSEngine" --> voicebox
+    speaker -- "TTSEngine" --> kokoro
+    speaker -- "TTSEngine" --> cloning
     speaker -- "TTSEngine" --> mock
-    voicebox -->|HTTP| engine
+    weights -.->|loaded once| kokoro
+    espeak -.->|phonemes| kokoro
     speaker -.->|measured by| metrics
     metrics --> priors --> thresholds
     priors -.->|evidence| router
@@ -72,7 +76,8 @@ flowchart TB
 | Types | `types.py` | `Voice`, `AudioResult` (+`rtf`), `StreamChunk`, `VoiceList`, `VoiceSample` |
 | Config | `config.py` | YAML + `${VAR}` + `SPEAKER_HELPER_*` overrides; `backend`, `clone`, `mock` |
 | Engine | `engine.py` | `TTSEngine` protocol, backend registry, `MockEngine` |
-| Backend | `client.py` | `VoiceboxClient` — presets, cloning, retries/backoff, async fallback |
+| Backends | `backends/` | `kokoro.py` (default, ONNX in-process), `openvoice.py`, `chatterbox.py` |
+| Install | `install.py` | fetches Kokoro's ~340 MB from a pinned release, size-checked |
 | Façade | `speaker.py` | `Speaker` — `say` / `stream` / `clone_voice` / `warmup` / `from_profile` / `from_route` |
 | Router | `router.py` | condition (`online_realtime` / `offline`) → engine + mode from measured quality↔speed evidence |
 | Profiles | `profiles.py` | per-language hyperparameters (producer/consumer) + measured RTF/quality |
@@ -89,10 +94,15 @@ flowchart TB
 
 ## Design choices
 
-- **Backend-agnostic core.** Everything talks to the `TTSEngine` protocol, never
-  to a concrete engine. Voicebox is the default backend; a `mock` backend makes
-  the whole package (including the evaluation gate) runnable in CI without a
-  server; new backends register with one call.
+- **Backend-agnostic core, and no second process.** Everything talks to the
+  `TTSEngine` protocol, never to a concrete engine: `create_engine(settings)`
+  looks `settings.backend` up in a module-level registry. Four backends are
+  registered — `kokoro` (the default), `openvoice`, `chatterbox`, `mock` — and
+  every one of them synthesises in the calling process. The package shipped a
+  fifth once, a REST client for a desktop application on a fixed port; it was
+  removed when the default moved in-process, because an engine you have to
+  install, launch and keep alive is not a second option but a second way to
+  fail. `register_backend` adds your own with one call.
 - **Low time-to-first-audio.** Streaming splits text into sentence chunks and
   pipelines synthesis (`stream_concurrency=1` by default) so the first chunk is
   emitted as early as possible while later chunks are produced ahead of playback.
@@ -106,10 +116,12 @@ flowchart TB
   time; maximise quality on the Pareto front among engines that keep up) or
   `offline` (quality only) — maps to a concrete engine + mode, with provenance
   (`quality_source`), a `confidence` flag, and a number-citing justification.
-- **Self-hosted, no Hugging Face at runtime.** An optional `speaker-engines`
-  bundle serves every engine + metric model from your own server; point
-  `VOICEBOX_MODELS_DIR` at it with `HF_HUB_OFFLINE=1` and nothing is fetched from
-  Hugging Face at runtime.
+- **Nothing fetched at synthesis time.** The default engine's weights come from
+  a pinned `kokoro-onnx` GitHub release and then live in
+  `~/.cache/speaker-helper/kokoro`; `install.py` checks the exact byte sizes so
+  a truncated download is repaired rather than mistaken for an install. Copy
+  that directory and the engine runs air-gapped. Only the cloning backends
+  still fetch their own checkpoints.
 - **Cloning made trivial.** Supply a recording; the transcript is derived with
   `vocal-helper` and over-long audio is trimmed with `audio-helper`, so a custom
   voice works from the library, CLI, and REST API alike.

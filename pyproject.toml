@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "speaker-helper"
-version = "0.9.0"
+version = "0.9.1"
 description = "Speaker Helper — speech synthesis that runs in your process: say a sentence, stream a reply, or narrate a document with the timed track that lets a page follow along. Kokoro by default (no server), voice cloning through OpenVoice and Chatterbox. The inverse of vocal-helper: text in, speech out. Library + CLI + REST API + MCP + skill, with a built-in evaluation gate."
 readme = "README.md"
 requires-python = ">=3.10,<3.14"
@@ -13,7 +13,7 @@ authors = [
     { name = "Warith HARCHAOUI", email = "warith@deraison.ai" },
 ]
 keywords = [
-    "tts", "text-to-speech", "speech", "voicebox", "kokoro", "streaming",
+    "tts", "text-to-speech", "speech", "kokoro", "onnx", "streaming",
     "offline", "asyncio", "real-time", "french", "multilingual",
 ]
 classifiers = [
@@ -32,8 +32,10 @@ classifiers = [
 
 # Runtime contract:
 # - The engine runs **in this process**. There is no server to start and no
-#   port to configure; `speaker-helper install-voice` fetches the weights once.
-#   `httpx` is gone with the REST client it existed for.
+#   port to configure; `speaker-helper install-voice` fetches the weights once
+#   over stdlib `urllib`. No HTTP client is declared: `httpx` went with the
+#   REST client it existed for, and `requirements.txt` says the same list
+#   (a test compares the two).
 # - Part of the AI Helpers ecosystem: logging goes through ``os-helper`` and
 #   audio slicing/concatenation through ``audio-helper`` (both on PyPI, like
 #   every ``*-helper``).
@@ -170,8 +172,14 @@ testpaths = ["tests"]
 # agent sessions, a container build, a local model serving): 15.86, a failing
 # suite that says nothing about speaker-helper.
 #
+# Load was not the whole story, though, and the exclusion hid the rest of it:
+# that test did not warm the engine up, so the one-off ~5 s ONNX session build
+# was billed to the first of three short cases and `mean_rtf` came out at
+# 1.2235 on an *idle* M2 Max that synthesises at 0.223 warm. It was measuring
+# the model load. Fixed in 0.9.1 by warming up; it now passes here.
+#
 # Raising the threshold would hide the regressions it exists to catch. Running
-# it deliberately, on a quiet machine, is the answer:
+# it deliberately, on a quiet machine, is still the answer:
 #
 #     pytest -m slow
 #

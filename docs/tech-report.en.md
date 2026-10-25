@@ -11,13 +11,14 @@ lang: en
 
 Speaker Helper turns text into speech on your own machine. It is the output
 counterpart of Vocal Helper (speech → text) in the AI Helpers ecosystem
-[@aihelpers], and it wraps a *local* text-to-speech engine — Voicebox
-[@voicebox] running the Kokoro model [@kokoro] by default — behind a small,
-typed Python API, a CLI, a REST API, and a minimal web GUI. Two design
-commitments run through the whole system. First, **the
-engine is an implementation detail**: every component speaks to a `TTSEngine`
-protocol, so Voicebox is one backend among others and a deterministic `mock`
-backend makes the package (and its evaluation) runnable in CI without a server.
+[@aihelpers], and it runs a text-to-speech engine **inside the calling
+process** — the Kokoro model [@kokoro] through ONNX Runtime by default —
+behind a small, typed Python API, a CLI, a REST API, and a minimal web GUI.
+Two design commitments run through the whole system. First, **the engine is an
+implementation detail**: every component speaks to a `TTSEngine` protocol, and
+`create_engine(settings)` resolves `settings.backend` against a registry, so
+the concrete engine is swappable and a deterministic `mock` backend makes the
+package (and its evaluation) runnable in CI without any model at all.
 Second, **quality is measured, not asserted**: a committed dataset, versioned
 thresholds, and audio-specific metrics (real-time factor, signal anomalies,
 and — with a transcriber — a word-error / chrF round-trip [@popovic2015chrf])
@@ -73,8 +74,9 @@ your text ──▶ Speaker (offline · streaming · clone) ──TTSEngine─�
   `VoiceList`, `VoiceSample`.
 - **Engine boundary** (`engine.py`): the `TTSEngine` protocol —
   `synthesize`, `list_voices`, `health`, `clone_voice`, `aclose` — plus a
-  backend registry. Two backends ship: `VoiceboxClient` (real) and `MockEngine`
-  (deterministic, serverless).
+  backend registry. Four backends ship, all in-process: `KokoroEngine`
+  (`backends/kokoro.py`, the default), `OpenVoiceEngine` and
+  `ChatterboxEngine` (cloning), and `MockEngine` (deterministic, no model).
 - **Façade** (`speaker.py`): `Speaker` — `say`, `stream`, `clone_voice`,
   `warmup`, `from_profile`.
 - **Interfaces**: CLI (`cli.py`), REST API (`api.py`, [@fastapi]).
@@ -94,12 +96,28 @@ means faster than real time. It is derived from the `AudioResult`, never guessed
 
 ## 3.1 The engine boundary
 
-`create_engine(settings)` dispatches on `settings.backend`. The `voicebox`
-backend hides three awkward details of the Voicebox REST API: idempotent
-*profile* bootstrap (a preset or a cloned voice), a synchronous
-`POST /generate/stream` path with a transparent fallback to the async
-`/generate` path that triggers a first-time model download, and retries with
-exponential backoff on transient (transport / 5xx) failures. The `mock` backend
+`create_engine(settings)` dispatches on `settings.backend` against a
+module-level registry, and `register_backend` lets a third party add to it at
+runtime. Every registered factory is lazy, so the package stays importable on a
+machine with no ONNX runtime and no weights: nothing touches a model until the
+first synthesis.
+
+The `kokoro` backend hides three awkward details of running a model in-process:
+the weights are looked for in two caches and their absence is reported by
+`health()` as a *reason plus a fix* rather than as an exception at the first
+sentence; the voice **is** the language (the name's first letter encodes it), so
+an unset voice is resolved from the detected language rather than defaulting to
+one that would phonemise the text as if it were English; and `espeak-ng` is
+resolved from the system install first, because the copy bundled in the
+`espeakng-loader` wheel exits the process from C when it cannot find its data.
+Cloning it refuses outright, naming `openvoice` and `chatterbox` instead — the
+useful answer to a request it cannot serve.
+
+A fifth backend shipped until 0.8.0: a REST client for an out-of-process engine
+on a fixed port [@voicebox], with idempotent profile bootstrap, a sync/async
+fallback and retries with exponential backoff on transient failures. It was
+removed when the default moved in-process, and with it the HTTP dependency, the
+connection errors, and the port. The `mock` backend
 renders a deterministic sine tone whose duration tracks the input length and
 whose `compute_s` reproduces a configured RTF — enough to exercise every code
 path, including the evaluation's anomaly checks, without a server.
@@ -211,53 +229,72 @@ improves as the evidence grows without any code change.
 
 ## 4.5 Self-hosted engines (no Hugging Face)
 
-By default the engine server downloads model weights from Hugging Face on first
-use. For a production or air-gapped host, an optional `speaker-engines` bundle
-(hosted at `https://harchaoui.org/warith/speaker-engines/`) serves every TTS engine —
-**and the evaluation metric models** — from a single self-hosted archive. The
-consumer downloads and unzips it, then points the runtime at it with
-`VOICEBOX_MODELS_DIR=$HOME/speaker-engines/tts` and `HF_HUB_OFFLINE=1`, so
-nothing is fetched from Hugging Face at runtime.
+The default engine never reaches Hugging Face. Its two files — a ~325 MB ONNX
+graph and a ~28 MB voice bank — come from a pinned `kokoro-onnx` release and
+then live in `~/.cache/speaker-helper/kokoro`; `install.py` pins their exact
+byte sizes, so a truncated download is repaired rather than mistaken for an
+install, and two machines installing a week apart get the same narrator.
+Nothing is fetched during synthesis, so air-gapping amounts to having that
+directory: copy it across and `health()` reports `status: ok` with no network.
+Only the cloning backends still fetch their own checkpoints, and
+`install_engine` says which of them it will not pull for you.
 
 # 5. Measurements
 
-Hardware: Apple M2 Max. Engine: Kokoro [@kokoro] on Voicebox [@voicebox].
-Datasets: 10–12 committed reference utterances per language, voice auto-picked
-per language and warmed up. Quality is the engine prior (no transcriber here);
-anomaly rate is zero in every run below.
+Measured 2026-10-25. Hardware: Apple M2 Max, macOS 26.5.2. Engine: Kokoro
+[@kokoro] via `kokoro-onnx` 0.6.1 on onnxruntime 1.26.0, in-process, on the
+`CPUExecutionProvider` (no GPU). Datasets: 10–12 committed reference utterances
+per language, voice auto-picked per language and warmed up. Quality is the
+engine prior (no transcriber here); anomaly rate is zero in every run below.
 
-## 5.1 Native MLX (Apple GPU / Metal) — the recommended operating point
+## 5.1 Kokoro in-process, warmed up
 
 | language | cases | mean RTF | p95 RTF | verdict |
 | -------- | ----: | -------: | ------: | ------- |
-| fr       | 12    | **0.151**| 0.201   | PASS    |
-| en       | 10    | **0.133**| 0.150   | PASS    |
-| es       | 10    | **0.141**| 0.170   | PASS    |
+| fr       | 12    | **0.223**| 0.261   | PASS    |
+| en       | 10    | **0.237**| 0.299   | PASS    |
+| es       | 10    | **0.206**| 0.230   | PASS    |
 
-The native backend on the Apple GPU synthesises **6–8× faster than real time**
-in every language. This is Speaker Helper's default port (`:17493`).
+Four to five times faster than real time in every language, on the CPU, with
+zero anomalies — comfortably inside the router's `online_realtime` ceiling of
+`0.8`. There is one operating point to report rather than a comparison, and
+that *is* the architectural result: the engine is a backend in this process, so
+there is no second process, no port, and no GPU path in the ONNX build to
+contrast it with.
 
-## 5.2 CPU inside Docker — for contrast
+## 5.2 The model load is not the engine
 
-| language | cases | mean RTF | p95 RTF | verdict          |
-| -------- | ----: | -------: | ------: | ---------------- |
-| fr       | 12    | 1.341    | 1.723   | FAIL (RTF > 1.0) |
-| en       | 10    | 1.131    | 1.470   | FAIL (RTF > 1.0) |
-| es       | 10    | 1.287    | 1.678   | FAIL (RTF > 1.0) |
-
-CPU synthesis is borderline and load-sensitive: on an idle host French measured
-≈ 0.32–0.37 (passing), but under contention it climbs above 1.0. Docker on macOS
-has **no GPU/Metal passthrough**, which explains the ~8× gap with §5.1. Crucially,
-*quality and integrity hold in both regimes* (zero anomalies everywhere); only
-speed misses the bar on loaded CPU — exactly what the gate is meant to catch.
+Building the ONNX session costs ≈ 5 s, once per process. Against a 1.19 s
+utterance it dominates completely: the first call measures RTF **4.42**, every
+call after it **0.31**. A single-language `eval` does not warm up, so on a cold
+process its first case carries that load and the gate reports
+`mean_rtf=0.5219 p95_rtf=1.7617 → FAIL` — same engine, same dataset, same
+machine as §5.1, minutes apart. This is why `run_multilang_eval` warms each
+language up before timing and why `Speaker.warmup()` is public: a benchmark that
+includes a one-off initialisation measures the initialisation.
 
 ## 5.3 Per-language operating profiles
 
 `LanguageProfile` bundles a language's voice/engine and its producer/consumer
 knobs together with a **measured operating point**. `tune_profiles` measures a
 set of languages and folds each report's RTF/quality back into its profile. The
-shipped defaults carry the §5.1 reference numbers (M2 Max, native MLX); a
-different host recalibrates them with one call.
+shipped defaults carry the §5.1 RTFs; their `measured_quality` comes from a
+separate UTMOSv2 naturalness sweep in the companion study and is kept with its
+own provenance rather than folded into the same run. A different host
+recalibrates both with one call.
+
+## 5.4 Historical: the engine that was removed
+
+Until 0.8.0 the measurements on this page described an out-of-process REST
+engine [@voicebox] driven over HTTP: an MLX build on the Apple GPU reached mean
+RTF 0.151 / 0.133 / 0.141 (fr / en / es), while the same engine's CPU build
+inside Docker measured 1.341 / 1.131 / 1.287 and failed the gate, macOS having
+no GPU/Metal passthrough to the container. Those figures are kept, dated and
+labelled, in `BENCHMARKS.md`; they are **not** re-attributed to the engine
+measured above, and neither can be reproduced from this repository. The
+comparison is still informative in one respect: the in-process ONNX engine of
+§5.1 also runs on the CPU, and it is four to six times faster than that CPU
+container while needing no second process at all.
 
 # 6. Interfaces
 

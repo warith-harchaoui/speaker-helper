@@ -54,10 +54,11 @@ On remarque que plusieurs options, comme Coqui XTTS, Chatterbox, F5-TTS, OpenVoi
 ## Positionnement
 
 `speaker-helper` n'est pas un énième modèle de TTS : c'est la **boîte à outils
-autour** des modèles. Il ne parle à un moteur concret (Voicebox par défaut) qu'à
-travers le protocole `TTSEngine`, si bien que Kokoro, Chatterbox, les moteurs de
-la classe XTTS et un `mock` déterministe se trouvent tous derrière le même
-`Speaker` typé. Sur ce cœur neutre, il ajoute ce qu'un checkpoint de recherche
+autour** des modèles. Il n'atteint un moteur concret qu'à travers le protocole
+`TTSEngine`, si bien que Kokoro, Chatterbox, OpenVoice et un `mock` déterministe
+se trouvent tous derrière le même `Speaker` typé — et tournent tous dans le
+processus appelant : `settings.backend` en choisit un dans un registre et il n'y
+a aucun serveur à lancer. Sur ce cœur neutre, il ajoute ce qu'un checkpoint de recherche
 ou un simple script d'inférence ne livrent jamais : un **routeur** qui transforme
 une *condition* de fonctionnement (temps réel en ligne ou hors-ligne) en
 moteur et mode concrets à partir de preuves qualité↔vitesse mesurées, une
@@ -117,10 +118,13 @@ qui n'optimiserait que la qualité vous tendrait une violation de licence avec
 une justification jointe : voilà pourquoi `commercial` se place à côté de
 `condition`, comme une contrainte énoncée.
 
-Le coût honnête est le **poids d'installation** (⭐⭐⭐) : un vrai moteur réclame
-`torch`, plus `ffmpeg` et `libsndfile` pour la plomberie audio et un Voicebox en
-fonctionnement. C'est le prix à payer pour être la couche pipeline par-dessus de
-vrais moteurs neuronaux plutôt qu'un passe-plat OS d'un seul fichier.
+Le coût honnête est le **poids d'installation** (⭐⭐⭐). La voix par défaut en
+est l'extrémité la moins chère — ONNX Runtime, `espeak-ng` et ~340 Mo de poids
+récupérés une fois — mais `ffmpeg` et `libsndfile` restent nécessaires pour la
+plomberie audio et la moitié *clonage* tire `torch` et `torchaudio` derrière les
+extras `[openvoice]` et `[chatterbox]`. C'est le prix à payer pour être la
+couche pipeline par-dessus de vrais moteurs neuronaux plutôt qu'un passe-plat OS
+d'un seul fichier.
 
 ## Quand choisir quoi
 

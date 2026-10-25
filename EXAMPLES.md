@@ -1,13 +1,17 @@
 # speaker-helper — Examples
 
-A runnable cookbook of the most common workflows. Every example assumes a
-Voicebox engine is running (native on `:17493`, or Docker on `:17600`) and that
-you have installed speaker-helper (`pip install -e ".[server]"`).
+A runnable cookbook of the most common workflows. There is no engine to start:
+every backend runs in the same process as your code. What each example assumes
+is an install (`pip install -e ".[kokoro,server]"`) and, for the default voice,
+the weights on disk.
 
-Set the port once for the shell examples:
+Fetch them once, and check:
 
 ```bash
-export SPEAKER_HELPER_VOICEBOX_PORT=17600
+speaker-helper install-voice
+speaker-helper health
+# {"engine": "kokoro", "loaded": false, "sample_rate": 24000, "status": "ok",
+#  "weights": "/Users/you/.cache/speaker-helper/kokoro"}
 ```
 
 ---
@@ -19,11 +23,10 @@ The simplest possible call — synthesise a whole string and write a WAV:
 ```python
 from speaker_helper import Speaker, Settings
 
-spk = Speaker(Settings.from_mapping({"engine": "kokoro", "language": "fr",
-                                     "voicebox": {"port": 17600}}))
+spk = Speaker(Settings.from_mapping({"backend": "kokoro", "language": "fr"}))
 result = spk.save("Bonjour, ceci est speaker-helper.", "hello.wav")
 print(f"{result.duration_s:.2f}s audio at {result.sample_rate} Hz, RTF {result.rtf:.2f}")
-# 3.02s audio at 24000 Hz, RTF 0.43
+# 3.31s audio at 24000 Hz, RTF 1.13     <- the first call builds the ONNX session
 ```
 
 ---
@@ -124,7 +127,10 @@ speaker-helper serve --bind-host 0.0.0.0 --bind-port 8080
 
 ```bash
 curl -s localhost:8080/health
-# {"status":"ok","voicebox":{"status":"healthy",...}}
+# {"status":"ok","backend":"kokoro","engine":{"status":"ok","engine":"kokoro",
+#  "loaded":true,"weights":"/Users/you/.cache/speaker-helper/kokoro",
+#  "sample_rate":24000}}
+# engine down but server up -> {"status":"degraded","backend":…,"engine_error":…}
 
 curl -s "localhost:8080/voices?engine=kokoro"
 # {"engine":"kokoro","voices":[...]}
@@ -171,8 +177,9 @@ import asyncio
 from speaker_helper import Speaker, Settings, VoiceSample
 
 async def main() -> None:
+    # `backend` picks the engine; `engine` is only a label carried on results.
     spk = Speaker(Settings.from_mapping({
-        "engine": "chatterbox", "language": "fr", "voicebox": {"port": 17600},
+        "backend": "chatterbox", "language": "fr",
     }))
     async with spk:
         # supply only the recording — transcript auto-derived and aligned:
@@ -191,7 +198,7 @@ from speaker_helper import Speaker, Settings
 
 # empty clone block -> the bundled reference voice is used
 spk = Speaker(Settings.from_mapping({
-    "engine": "chatterbox", "voicebox": {"port": 17600},
+    "backend": "chatterbox",
     "clone": {"name": "ref-fr-female"},
 }))
 spk.save("Voix clonée par défaut.", "cloned.wav")   # clones on first synthesis
@@ -238,7 +245,7 @@ from speaker_helper.eval import run_eval
 from speaker_helper.transcription import VocalHelperTranscriber
 
 async def main() -> None:
-    async with Speaker(Settings.from_mapping({"voicebox": {"port": 17600}})) as spk:
+    async with Speaker(Settings.from_mapping({"language": "fr"})) as spk:
         report = await run_eval(spk, transcriber=VocalHelperTranscriber("fr"))
     print(report.mean_wer, report.mean_chrf)
 
@@ -296,7 +303,7 @@ from speaker_helper.eval import run_multilang_eval, format_matrix
 
 async def main() -> None:
     reports = await run_multilang_eval(
-        Settings.from_mapping({"engine": "kokoro", "voicebox": {"port": 17600}}),
+        Settings.from_mapping({"backend": "kokoro"}),
         ["fr", "en", "es"],
     )
     print(format_matrix(reports))
@@ -320,7 +327,7 @@ from speaker_helper.sources import from_youtube, revoice
 
 async def main() -> None:
     src = from_youtube("https://youtu.be/…")            # extra: youtube
-    async with Speaker(Settings.from_mapping({"voicebox": {"port": 17600}})) as spk:
+    async with Speaker(Settings.from_mapping({"language": "fr"})) as spk:
         out = await revoice(src, spk)                   # transcribe (vocal-helper) + re-speak
     open("revoiced.wav", "wb").write(out.wav_bytes)
 

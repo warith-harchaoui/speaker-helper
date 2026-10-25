@@ -3,18 +3,31 @@
 # Copy to ``settings.yaml`` (gitignored) and adjust. Every value can also be
 # overridden by a ``SPEAKER_HELPER_*`` environment variable, and ``${VAR}``
 # references below are expanded from the environment at load time.
+#
+# There is no host, port or timeout here any more: the engine runs in the same
+# process as your code. A ``voicebox:`` section left over from the REST-engine
+# era is still *accepted* — it is dropped rather than refused, so an old file
+# loads — but it does nothing.
 
-voicebox:
-  # Where the Voicebox engine listens. Native default is 17493; the bundled
-  # docker-compose maps the container to 17600 on the host.
-  host: "127.0.0.1"          # or "${VOICEBOX_HOST}"
-  port: 17493
-  timeout_s: 300.0           # generous: the first synthesis downloads the model
+backend: "kokoro"           # kokoro (default) | openvoice | chatterbox | mock
+engine: "kokoro"            # a label carried on results; `backend` is what selects
+voice: ""                   # "" → read the text, detect the language, pick its voice
+language: "fr"              # ISO-639-1 target language
+normalize: true             # loudness-normalise the output
 
-engine: "kokoro"             # kokoro is fast enough for real time on CPU
-voice_id: ""                 # "" → auto-pick a voice matching `language`
-language: "fr"               # ISO-639-1 target language
-normalize: true              # loudness-normalise the output
+mode: "offline"             # "offline" | "streaming"
+first_chunk_sentences: 1    # streaming: 1 → lowest time-to-first-audio
 
-mode: "offline"              # "offline" | "streaming"
-first_chunk_sentences: 1     # streaming: 1 → lowest time-to-first-audio
+# Cloning (openvoice / chatterbox only). Empty means "use a preset voice";
+# an empty `audio` falls back to the bundled assets/ref-fr-female.wav, and a
+# missing `reference_text` is transcribed with vocal-helper.
+# clone:
+#   name: "my-voice"
+#   audio: "my_voice.wav"
+#   reference_text: ""
+
+# Knobs for the `mock` backend only (tests, CI, the evaluation layer).
+# mock:
+#   rtf: 0.3
+#   chars_per_sec: 15.0
+#   sample_rate: 24000

@@ -66,8 +66,10 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - name: Install (dev + server)
         run: pip install -e ".[dev,server]"
-      # The @slow live tests need a running Voicebox engine, which CI has no
-      # access to, so they are excluded here; the fast suite gates merges.
+      # The @slow test is a real-time-factor benchmark against the real engine:
+      # it measures the machine, and a shared runner is the wrong machine. It
+      # is excluded here (see the `slow` marker in pyproject); the fast suite
+      # gates merges.
       # Coverage is tracked and gated: the floor (70%) sits just under the
       # current fast-suite total (~74%), which is capped by modules only
       # exercisable against live services (client / transcription / the
