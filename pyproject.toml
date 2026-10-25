@@ -47,7 +47,14 @@ classifiers = [
 #   The model arrives with `[kokoro]`.
 dependencies = [
     # Ecosystem building blocks, resolved from PyPI (no more git pins).
-    "os-helper>=1.7.2",
+    # Capped below 4 like every other member of the suite. Uncapped, a future
+    # os-helper 4.0.0 would be installed silently and break at runtime --
+    # os-helper 3.0.0 was itself a breaking release (it dropped its CLI).
+    # The floor stays at 1.7.2: the nine functions used here (init_logging,
+    # info/warning/error, join, file_exists, temporary_folder,
+    # make_temporary_directory, download_file) are long-standing basics,
+    # and raising a floor without exercising it would just be a guess.
+    "os-helper>=1.7.2,<4",
     "audio-helper>=1.6.0",
     "pyyaml>=6.0",
     "numpy>=1.24",
