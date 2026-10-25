@@ -47,6 +47,7 @@ from __future__ import annotations
 import asyncio
 import importlib
 import io
+import re
 import time
 import wave
 from pathlib import Path
@@ -198,6 +199,55 @@ def check_install() -> int:
     except ImportError:
         return 1
     return 0 if model_paths() else 1
+
+
+#: espeak-ng marks a foreign word inside another language by wrapping its
+#: phonemes in switch markers: French "Tailwind et Apple sous Windows" comes
+#: back as ``(en)tˈeɪlwɪnd(fr) e (en)ˈapəl(fr) su (en)wˈɪndəʊz(fr)``.
+#:
+#: kokoro-onnx does not know what those markers mean, and every character in
+#: them -- the parentheses, the ``e``, the ``n``, the ``f``, the ``r`` -- is a
+#: valid entry in its phoneme vocabulary. So they are not ignored, they are
+#: **spoken**: the model voices the marker around the word, which is why every
+#: English brand name in a French page came out mangled while "Microsoft",
+#: which espeak knows in French and marks with nothing, came out clean.
+#:
+#: Found on 2026-10-24 on the French 4ml page, on four names at once: Tailwind,
+#: Apple, OpenCode, Windows. The cure is to phonemise here, drop the markers,
+#: and hand kokoro phonemes instead of text. The word keeps the pronunciation
+#: espeak chose for it -- an English word still reads as English -- it simply
+#: stops being announced.
+_SWITCH_MARKER = re.compile(r"\((?:[a-z]{2,3}(?:-[a-z]{2,4})?)\)")
+
+
+def _phonemise_without_switches(text: str, lang: str) -> str:
+    """Phonemes for ``text`` in ``lang``, with espeak's switch markers removed.
+
+    Falls back to the original text when the phonemiser is unavailable, so a
+    machine without it degrades to the previous behaviour rather than failing.
+
+    Examples
+    --------
+    >>> _SWITCH_MARKER.sub("", "(en)tˈeɪlwɪnd(fr) e la pˈɔm")
+    'tˈeɪlwɪnd e la pˈɔm'
+    """
+    try:
+        import espeakng_loader
+        import phonemizer
+        from phonemizer.backend.espeak.wrapper import EspeakWrapper
+
+        EspeakWrapper.set_library(espeakng_loader.get_library_path())
+        EspeakWrapper.set_data_path(espeakng_loader.get_data_path())
+        raw = phonemizer.phonemize(
+            text,
+            lang or "en-us",
+            backend="espeak",
+            preserve_punctuation=True,
+            with_stress=True,
+        )
+    except Exception:  # pragma: no cover - depends on the local espeak install
+        return text
+    return _SWITCH_MARKER.sub("", raw).strip()
 
 
 def espeak_config() -> Any:
@@ -432,8 +482,15 @@ class KokoroEngine:
         lang = normalise_language(language or "") or language_for(chosen)
 
         started = time.perf_counter()
+        phonemes = await asyncio.to_thread(_phonemise_without_switches, text, lang)
         samples, rate = await asyncio.to_thread(
-            model.create, text, voice=chosen, speed=speed, lang=lang, trim=True
+            model.create,
+            phonemes,
+            voice=chosen,
+            speed=speed,
+            lang=lang,
+            is_phonemes=True,
+            trim=True,
         )
         compute_s = time.perf_counter() - started
 
