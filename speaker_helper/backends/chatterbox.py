@@ -11,6 +11,21 @@ this person" or "sound like you mean it", and the wrong one for "read me this
 article" — it pulls torch, and a reader who wants a page read aloud should not
 have to install a deep-learning stack to get it.
 
+Three variants, one backend
+---------------------------
+Since ``chatterbox-tts`` 0.1.7 the one distribution ships three models, and
+``settings.chatterbox["variant"]`` picks among them:
+
+* ``"turbo"`` — the 2025-12 Turbo model: faster, the most lively English of
+  the shippable open models (the 2026-10 survey's English pick — see
+  ``STUDY.md`` on the ``research`` branch). English only.
+* ``"multilingual"`` — 23 languages including French. The quality is honest
+  rather than native (the survey records 6–8% French CER), which is why the
+  router prefers ``kyutai`` for French and keeps this as the challenger.
+* ``"base"`` — the original English model, kept for continuity.
+* ``"auto"`` (default) — Turbo for English, Multilingual for anything else,
+  base when a chosen variant is missing from the installed package.
+
 Two dials, and what they are for
 --------------------------------
 ``exaggeration`` (0–2, neutral at 0.5) carries emotion. ``cfg_weight`` carries
@@ -123,45 +138,116 @@ class ChatterboxEngine:
         model's default speaker reads.
     """
 
+    #: variant → (module, class) in the installed ``chatterbox`` package.
+    #: ``base`` is also importable as ``chatterbox_tts`` on very old installs,
+    #: which :meth:`_load` still tries last.
+    VARIANT_CLASSES: dict[str, tuple[str, str]] = {
+        "base": ("chatterbox.tts", "ChatterboxTTS"),
+        "turbo": ("chatterbox.tts_turbo", "ChatterboxTurboTTS"),
+        "multilingual": ("chatterbox.mtl_tts", "ChatterboxMultilingualTTS"),
+    }
+
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
-        self._model: Any = None
+        # One lazily-loaded model per variant: a narration can mix languages,
+        # and reloading Turbo and Multilingual alternately would dominate it.
+        self._models: dict[str, Any] = {}
         self._lock = asyncio.Lock()
         self._reference: Path | None = None
         raw = getattr(settings, "voice_sample", "") or ""
         if raw:
             self._reference = Path(raw)
+        else:
+            # No reference configured: default to the bundled female voice
+            # (CC BY 4.0, see assets/ref-fr-female.NOTICE.md) rather than the
+            # model's own default speaker. The project's contract is a female
+            # voice in every language, and the built-in speaker's gender is
+            # nothing the model card promises; cloning is this engine's native
+            # operation, so the guarantee costs one bundled file. Point
+            # ``voice_sample`` at any recording to choose a different voice.
+            from speaker_helper.cloning import DEFAULT_CLONE_AUDIO
 
-    async def _loaded(self) -> Any:
-        """The model, loaded once on first use (see KokoroEngine for why)."""
-        if self._model is not None:
-            return self._model
+            if DEFAULT_CLONE_AUDIO.is_file():
+                self._reference = DEFAULT_CLONE_AUDIO
+        # "auto" (default) resolves per call from the language; anything else
+        # pins the variant regardless of language.
+        knobs = getattr(settings, "chatterbox", {}) or {}
+        self._variant: str = str(knobs.get("variant") or "auto").lower()
+
+    def _variant_for(self, language: str) -> str:
+        """Which model variant serves ``language`` under the current knob.
+
+        Parameters
+        ----------
+        language : str
+            Bare ISO-639-1 code of the text about to be synthesised.
+
+        Returns
+        -------
+        str
+            ``"turbo"``, ``"multilingual"`` or ``"base"``.
+        """
+        if self._variant != "auto":
+            return self._variant
+        # Auto: English gets the lively Turbo model; anything else needs the
+        # multilingual one (Turbo and base are English-only).
+        return "turbo" if language.startswith("en") else "multilingual"
+
+    async def _loaded(self, variant: str) -> Any:
+        """The ``variant`` model, loaded once on first use (see KokoroEngine)."""
+        if variant in self._models:
+            return self._models[variant]
         async with self._lock:
-            if self._model is None:
-                self._model = await asyncio.to_thread(self._load)
-        return self._model
+            if variant not in self._models:
+                self._models[variant] = await asyncio.to_thread(self._load, variant)
+        return self._models[variant]
 
-    def _load(self) -> Any:
-        """Build the ChatterboxTTS model. Blocking; called in a thread."""
-        module = None
-        for name in ("chatterbox.tts", "chatterbox_tts"):
-            try:
-                module = importlib.import_module(name)
-                break
-            except ImportError:
-                continue
-        if module is None:
-            raise RuntimeError(
-                "chatterbox-tts is not installed. Install it with:\n"
-                "    pip install 'speaker-helper[chatterbox]'"
-            )
+    def _load(self, variant: str) -> Any:
+        """Build one Chatterbox model. Blocking; called in a thread.
+
+        Parameters
+        ----------
+        variant : str
+            A key of :data:`VARIANT_CLASSES`.
+
+        Raises
+        ------
+        RuntimeError
+            When the package is missing entirely, or too old to ship the
+            requested variant (the message says which and how to fix it).
+        """
+        module_name, class_name = self.VARIANT_CLASSES.get(variant, self.VARIANT_CLASSES["base"])
+        try:
+            module = importlib.import_module(module_name)
+            cls = getattr(module, class_name)
+        except (ImportError, AttributeError):
+            # The requested variant is not in this install. For `base` try the
+            # historical distribution name before giving up; for the newer
+            # variants name the actual fix (upgrade) rather than a bare error.
+            if variant == "base":
+                try:
+                    module = importlib.import_module("chatterbox_tts")
+                    cls = module.ChatterboxTTS
+                except ImportError as exc:
+                    raise RuntimeError(
+                        "chatterbox-tts is not installed. Install it with:\n"
+                        "    pip install 'speaker-helper[chatterbox]'"
+                    ) from exc
+            else:
+                # `from None`: the ImportError behind this is an implementation
+                # detail; the actionable story is "your install is too old".
+                raise RuntimeError(
+                    f"this chatterbox-tts install has no {variant!r} model; "
+                    "upgrade it with:\n"
+                    "    pip install -U 'speaker-helper[chatterbox]' chatterbox-tts"
+                ) from None
         # device="cpu" is the floor, not the choice: the class detects an
         # accelerator itself and uses it when there is one.
-        return module.ChatterboxTTS.from_pretrained(device="cpu")
+        return cls.from_pretrained(device="cpu")
 
     async def aclose(self) -> None:
-        """Drop the model so torch can free it."""
-        self._model = None
+        """Drop the models so torch can free them."""
+        self._models.clear()
 
     async def synthesize(
         self,
@@ -181,18 +267,43 @@ class ChatterboxEngine:
         """
         import numpy as np
 
-        model = await self._loaded()
+        # The variant is a per-call decision because a narration can mix
+        # languages: English lines get Turbo, French ones Multilingual.
+        base_lang = ((language or self._settings.language or "en").strip().lower()).split("-")[0]
+        variant = self._variant_for(base_lang)
+        model = await self._loaded(variant)
         pace = "slow" if speed < 0.95 else "fast" if speed > 1.05 else "normal"
         exaggeration = emotion_to_exaggeration(emotion, _intensity_of(intensity))
 
+        # Assemble the per-variant keyword set. The three generate() methods
+        # share text / audio_prompt_path but disagree on the rest:
+        # * multilingual requires a `language_id`;
+        # * turbo's neutral exaggeration is 0.0 (not base's 0.5) and its
+        #   cfg_weight defaults to 0.0 — shift our dial onto its scale and
+        #   leave its cfg alone rather than impose base's pacing trick.
+        kwargs: dict[str, Any] = {
+            "text": text,
+            "audio_prompt_path": str(self._reference) if self._reference else None,
+        }
+        if variant == "multilingual":
+            kwargs["language_id"] = base_lang
+            kwargs["exaggeration"] = exaggeration
+            kwargs["cfg_weight"] = PACE_CFG_WEIGHT.get(pace, 0.5)
+        elif variant == "turbo":
+            kwargs["exaggeration"] = max(0.0, exaggeration - 0.5)
+            # Upstream dtype bug (chatterbox-tts 0.1.7): Turbo's prompt
+            # loudness-normalisation goes through pyloudnorm, which returns
+            # float64, and the s3 tokenizer then crashes multiplying it
+            # against float32 mel filters ("expected m1 and m2 to have the
+            # same dtype"). Disabling it keeps the prompt path float32; the
+            # evaluation gate already watches output levels for anomalies.
+            kwargs["norm_loudness"] = False
+        else:
+            kwargs["exaggeration"] = exaggeration
+            kwargs["cfg_weight"] = PACE_CFG_WEIGHT.get(pace, 0.5)
+
         started = time.perf_counter()
-        wav = await asyncio.to_thread(
-            model.generate,
-            text=text,
-            audio_prompt_path=str(self._reference) if self._reference else None,
-            exaggeration=exaggeration,
-            cfg_weight=PACE_CFG_WEIGHT.get(pace, 0.5),
-        )
+        wav = await asyncio.to_thread(model.generate, **kwargs)
         compute_s = time.perf_counter() - started
 
         samples = np.clip(wav.squeeze().detach().cpu().numpy(), -1.0, 1.0)
@@ -241,7 +352,8 @@ class ChatterboxEngine:
         return {
             "status": "ok",
             "engine": "chatterbox",
-            "loaded": self._model is not None,
+            "loaded": sorted(self._models),
+            "variant": self._variant,
             "reference": str(self._reference) if self._reference else "",
             "sample_rate": SAMPLE_RATE_HZ,
         }

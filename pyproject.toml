@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "speaker-helper"
-version = "0.9.3"
+version = "0.10.0"
 description = "Speaker Helper — speech synthesis that runs in your process: say a sentence, stream a reply, or narrate a document with the timed track that lets a page follow along. Kokoro by default (no server), voice cloning through OpenVoice and Chatterbox. The inverse of vocal-helper: text in, speech out. Library + CLI + REST API + MCP + skill, with a built-in evaluation gate."
 readme = "README.md"
 requires-python = ">=3.10,<3.14"
@@ -96,6 +96,20 @@ chatterbox = [
     "torchaudio>=2.0.0",
     "numpy>=1.24.0",
     "resemble-perth>=1.0",
+]
+# Kyutai TTS (native French + English, voice-embedding bank). `moshi` is
+# Kyutai's own runtime and pulls torch — same reasoning as the cloning
+# extras: reading a page aloud must not require a deep-learning stack.
+kyutai = [
+    "moshi>=0.2.13",
+    "numpy>=1.24.0",
+]
+# The pronunciation lexicon's LLM tier: derive missing respellings once with
+# the local model resolved through best-engine-ai-helper (served by Ollama).
+# Optional — hand-written `ipa:`/`respelling:` entries need none of this.
+lexicon-llm = [
+    "best-engine-ai-helper>=1.9",
+    "ollama>=0.4",
 ]
 # Everything that speaks, without the cloning engines' torch stack.
 all = [

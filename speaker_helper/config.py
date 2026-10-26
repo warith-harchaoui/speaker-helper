@@ -137,6 +137,27 @@ class Settings:
     # :mod:`speaker_helper.cloning`. A missing transcript is derived with
     # ``vocal-helper``; an empty ``audio`` falls back to the bundled ref-fr-female.
     clone: dict[str, Any] = field(default_factory=dict)
+    # Backend-specific knobs for the ``chatterbox`` engine. Key: ``variant`` —
+    # "auto" (default: Turbo for English, Multilingual elsewhere), "base",
+    # "turbo", or "multilingual". See
+    # :class:`speaker_helper.backends.chatterbox.ChatterboxEngine`.
+    chatterbox: dict[str, Any] = field(default_factory=dict)
+    # Backend-specific knobs for the ``kyutai`` engine (repo, device, dtype,
+    # cfg_coef, temp). Ignored by other backends; see
+    # :class:`speaker_helper.backends.kyutai.KyutaiEngine`.
+    kyutai: dict[str, Any] = field(default_factory=dict)
+    # Long-text chunking (see :mod:`speaker_helper.chunking`). Keys:
+    # ``enabled`` (default True), ``llm`` (default True — let the local LLM
+    # place chunk boundaries at discourse breaks; greedy packing otherwise),
+    # ``max_chars`` (default 500, ~30 s of speech per chunk).
+    chunking: dict[str, Any] = field(default_factory=dict)
+    # Pronunciation-lexicon configuration (see :mod:`speaker_helper.lexicon`).
+    # Keys: ``path`` (default: ``./lexicon.yaml`` when it exists), ``enabled``
+    # (default True), ``llm`` (default True — allow deriving missing
+    # respellings with the local LLM resolved via best-engine-ai-helper).
+    # Empty means "use the defaults": the feature is on, and quietly inert
+    # when no lexicon file exists.
+    lexicon: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Let ``voice_id`` stand in for ``voice``.
@@ -233,3 +254,8 @@ class Settings:
                 self.voice = self.voice_id
         if "SPEAKER_HELPER_LANGUAGE" in env:
             self.language = env["SPEAKER_HELPER_LANGUAGE"]
+        # The lexicon path override keeps the rest of the `lexicon` mapping
+        # intact: an operator pointing every process at one shared lexicon
+        # should not thereby re-enable an LLM a settings file disabled.
+        if "SPEAKER_HELPER_LEXICON" in env:
+            self.lexicon = {**self.lexicon, "path": env["SPEAKER_HELPER_LEXICON"]}

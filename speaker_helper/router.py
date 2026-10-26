@@ -82,6 +82,19 @@ CONDITIONS = (ONLINE_REALTIME, OFFLINE)
 # absorb the first-chunk latency and per-chunk jitter that a pure mean RTF hides.
 DEFAULT_RTF_CEILING = 0.8
 
+# Which in-tree backend serves each engine id the catalogue may propose. An
+# engine absent from this table has no backend in this package: routing to it
+# would produce Settings no `create_engine` call can honour, so the default
+# catalogue excludes it (its prior stays available to the eval layer). The
+# chatterbox_turbo variant is served by the same `chatterbox` backend.
+ENGINE_BACKENDS: dict[str, str] = {
+    "kokoro": "kokoro",
+    "chatterbox": "chatterbox",
+    "chatterbox_turbo": "chatterbox",
+    "kyutai": "kyutai",
+    "openvoice": "openvoice",
+}
+
 
 @dataclass(frozen=True)
 class OperatingPoint:
@@ -270,23 +283,36 @@ def default_operating_points(language: str = "fr") -> list[OperatingPoint]:
         )
     )
 
-    # 2) Every other engine we hold a quality prior for. RTF is unknown (never
-    #    timed here), so these are quality-only candidates: usable for offline
-    #    quality maximisation, excluded from online routing by default.
+    # 2) Every other engine we hold a quality prior for *and* a backend that
+    #    can actually serve it. RTF is unknown (never timed here), so these are
+    #    quality-only candidates: usable for offline quality maximisation,
+    #    excluded from online routing by default. Engines without an in-tree
+    #    backend (qwen3_tts, f5, xtts, …) keep their priors for the eval layer
+    #    but never enter a routing decision no `create_engine` could honour.
+    # Only the priors table is imported here; engine_quality_prior is already
+    # a module-level import (re-importing it locally would shadow the earlier
+    # kokoro-point use above into an UnboundLocalError on unmeasured languages).
     from speaker_helper.eval.priors import TTS_QUALITY_PRIORS
 
-    for engine, quality in TTS_QUALITY_PRIORS.items():
+    for engine in TTS_QUALITY_PRIORS:
         # kokoro already added with its measured RTF; mock is a test signal, not
         # a shippable voice, so it never competes for a real routing decision.
         if engine in ("kokoro", "mock"):
             continue
+        backend = ENGINE_BACKENDS.get(engine)
+        if backend is None:
+            continue
         points.append(
             OperatingPoint(
                 engine=engine,
-                quality=quality,
+                # Language-aware where the survey found an asymmetry (kyutai's
+                # native French vs chatterbox's English-first French — see
+                # priors.TTS_QUALITY_PRIORS_BY_LANG), the base prior elsewhere.
+                quality=engine_quality_prior(engine, language),
                 mean_rtf=None,
                 quality_source="prior",
                 rtf_source="unknown",
+                backend=backend,
                 language=language,
             )
         )

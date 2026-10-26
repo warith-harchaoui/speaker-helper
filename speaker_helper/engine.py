@@ -10,10 +10,12 @@ the CLI, the evaluation layer — talks only to the :class:`TTSEngine` protocol
 defined here. Swapping or adding a backend is therefore a local change: write a
 class with four coroutines and register it.
 
-Four backends ship in-tree:
+Five backends ship in-tree:
 
 * ``kokoro`` — the default. In this process, no server, 54 built-in voices.
 * ``openvoice``, ``chatterbox`` — cloning, from a reference recording.
+* ``kyutai`` — native French (and English) from Kyutai's 1.6B model; voices
+  picked from a published embedding bank rather than cloned.
 * ``mock`` — :class:`MockEngine`, a deterministic, dependency-light
   synthesiser that needs no server and no model. It makes the test suite and
   the evaluation layer runnable in CI, and it proves the abstraction: the
@@ -200,6 +202,16 @@ def _chatterbox_factory(settings: Settings) -> TTSEngine:
 
 
 register_backend("chatterbox", _chatterbox_factory)
+
+
+def _kyutai_factory(settings: Settings) -> TTSEngine:
+    """Lazily build the Kyutai TTS backend (native French + English)."""
+    from speaker_helper.backends.kyutai import KyutaiEngine
+
+    return KyutaiEngine(settings)
+
+
+register_backend("kyutai", _kyutai_factory)
 
 
 # ---------------------------------------------------------------------------

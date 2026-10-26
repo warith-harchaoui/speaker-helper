@@ -333,3 +333,79 @@ async def main() -> None:
 
 asyncio.run(main())
 ```
+
+---
+
+## 13. Pronunciation lexicon: fix how a word is said, once
+
+Copy `lexicon.yaml.example` to `lexicon.yaml` next to your `settings.yaml`
+(or point `settings.lexicon.path` / `SPEAKER_HELPER_LEXICON` at it) and every
+synthesis — Python, CLI, REST, GUI — honours it automatically:
+
+```yaml
+# lexicon.yaml
+entries:
+  - word: "Grasse"        # exact phonemes: deterministic on kokoro
+    language: fr
+    ipa: "ɡʁas"
+  - word: "GitHub"        # orthographic rewrite: works on every engine
+    language: fr
+    respelling: "guite-heube"
+  - word: "RGPD"          # neither -> the local LLM derives a respelling once
+    language: fr          #   (best-engine-ai-helper + Ollama), then it is cached
+```
+
+```python
+from speaker_helper import Speaker, Settings
+
+Speaker(Settings.load()).save("Le RGPD s'applique à GitHub, même à Grasse.", "out.wav")
+# kokoro splices /ɡʁas/ at its phonemisation step; a phoneme-less engine
+# (chatterbox, kyutai) speaks the respellings instead. The derived RGPD
+# respelling lands in lexicon.yaml.llm-cache.yaml — delete a line there to
+# re-derive, or move it into `respelling:` to make it a human decision.
+```
+
+---
+
+## 14. Long texts: chunked at discourse boundaries
+
+`say()` cuts anything longer than `chunking.max_chars` (default 500) into
+sentence-group chunks, synthesises them in order and concatenates — because
+every neural engine audibly degrades past its comfort zone. The local LLM
+places the boundaries (it only ever *groups* locally-split sentences, so the
+text itself cannot change); without Ollama a greedy packer does it:
+
+```yaml
+# settings.yaml — all optional, these are the defaults
+chunking:
+  enabled: true
+  llm: true
+  max_chars: 500
+```
+
+---
+
+## 15. The language rules, end to end
+
+The defaults implement the 2026-10 survey (`STUDY.md`, `research` branch),
+with **a female voice in every language**:
+
+```python
+from speaker_helper import Speaker
+
+# French -> kyutai (native French, voice "developpeuse-3", female)
+spk = Speaker.from_route("offline", language="fr")
+
+# English -> chatterbox, Turbo variant (female via the bundled reference)
+spk = Speaker.from_route("offline", language="en")
+
+# Any other language -> chatterbox, Multilingual variant (23 languages)
+spk = Speaker.from_route("offline", language="es")
+
+# Real-time streaming stays on measured evidence -> kokoro (RTF ~0.22 on CPU)
+spk = Speaker.from_route("online_realtime", language="fr")
+```
+
+Language resolution everywhere follows one rule: **stated → believed,
+unstated → detected** (`langdetect`, seeded), falling back to the configured
+`language`.

@@ -9,7 +9,7 @@
 # era is still *accepted* — it is dropped rather than refused, so an old file
 # loads — but it does nothing.
 
-backend: "kokoro"           # kokoro (default) | openvoice | chatterbox | mock
+backend: "kokoro"           # kokoro (default) | openvoice | chatterbox | kyutai | mock
 engine: "kokoro"            # a label carried on results; `backend` is what selects
 voice: ""                   # "" → read the text, detect the language, pick its voice
 language: "fr"              # ISO-639-1 target language
@@ -25,6 +25,48 @@ first_chunk_sentences: 1    # streaming: 1 → lowest time-to-first-audio
 #   name: "my-voice"
 #   audio: "my_voice.wav"
 #   reference_text: ""
+
+# Pronunciation lexicon: per-word overrides applied automatically on every
+# synthesis (see lexicon.yaml.example at the repo root). All keys OPTIONAL.
+# `path` defaults to ./lexicon.yaml when that file exists; `enabled` defaults
+# to true (quietly inert without a file); `llm: false` forbids deriving
+# missing respellings with the local LLM (best-engine-ai-helper + Ollama) —
+# useful on machines without Ollama. Env override: SPEAKER_HELPER_LEXICON.
+# lexicon:
+#   path: "lexicon.yaml"
+#   enabled: true
+#   llm: true
+
+# Long-text chunking: texts longer than `max_chars` are synthesised in
+# sentence-group chunks and concatenated (engines degrade on very long
+# inputs). With `llm: true` (default) the local LLM places the boundaries at
+# discourse breaks; it only ever *groups* locally-split sentences, so the text
+# itself is never touched. `llm: false` packs greedily — deterministic, no
+# Ollama needed. All keys OPTIONAL.
+# chunking:
+#   enabled: true
+#   llm: true
+#   max_chars: 500
+
+# Chatterbox variant (chatterbox backend only). "auto" (default) picks the
+# lively English-only Turbo model for English and the 23-language Multilingual
+# model for everything else; or pin "base" | "turbo" | "multilingual".
+# Without a `clone`/`voice_sample`, the bundled female reference
+# (assets/ref-fr-female.wav, CC BY 4.0) keeps the voice female by default.
+# chatterbox:
+#   variant: "auto"
+
+# Kyutai backend knobs (kyutai backend only). The model (~3.4 GB) downloads
+# once from Hugging Face, then runs offline. Voices are embeddings from the
+# kyutai/tts-voices bank; the defaults are female (fr: developpeuse-3,
+# en: VCTK p329). `device` stays "cpu" unless you know your torch build runs
+# this model elsewhere; `cfg_coef` higher = follows voice/text more strictly.
+# kyutai:
+#   repo: "kyutai/tts-1.6b-en_fr"
+#   device: "cpu"
+#   dtype: "float32"
+#   cfg_coef: 2.0
+#   temp: 0.6
 
 # Knobs for the `mock` backend only (tests, CI, the evaluation layer).
 # mock:

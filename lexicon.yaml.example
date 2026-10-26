@@ -1,0 +1,67 @@
+# lexicon.yaml.example
+# --------------------
+# Pronunciation lexicon: per-word overrides applied automatically on every
+# synthesis (see speaker_helper/lexicon.py). Copy this file to `lexicon.yaml`
+# next to your `settings.yaml` (or point `settings.lexicon.path` / the
+# SPEAKER_HELPER_LEXICON environment variable at it):
+#   cp lexicon.yaml.example lexicon.yaml
+#
+# Each entry names a word and how to pronounce it. Two tiers exist, and you
+# may fill either or both:
+#
+#   ipa:        — exact phonemes (IPA, no surrounding slashes). DETERMINISTIC,
+#                 honoured verbatim by phoneme-input backends (kokoro). Get
+#                 the IPA from espeak-ng, e.g.:
+#                   espeak-ng -v fr -q --ipa=3 "Grasse"
+#                 - macOS 🍎 : `brew install espeak-ng`
+#                   (install `brew` thanks to https://brew.sh/)
+#                 - Ubuntu 🐧 : `sudo apt install espeak-ng`
+#                 - Windows 🪟 : `winget install espeak-ng`
+#   respelling: — an orthographic rewrite ("GitHub" → "guite-heube") that an
+#                 engine WITHOUT phoneme access (chatterbox, kyutai) reads
+#                 correctly. Fragile by nature but universal.
+#
+# An entry with NEITHER gets a respelling derived ONCE by the local LLM
+# (resolved through best-engine-ai-helper, served by Ollama, temperature 0),
+# then cached in `lexicon.yaml.llm-cache.yaml` next to this file — after that
+# first derivation everything is deterministic and fully offline. Delete a
+# cache line to force a re-derivation; move a cached value into `respelling:`
+# here to promote it to a human decision (the human always wins).
+
+# OPTIONAL — allow the LLM derivation for this file (default: true). Set to
+# false on machines without Ollama, or when every entry is hand-written.
+# The same switch exists machine-wide in settings.yaml (`lexicon: {llm: false}`)
+# and the settings switch wins.
+llm: true
+
+entries:
+  # REQUIRED per entry — `word`: the written form to match. Matching is
+  # case-insensitive and on word boundaries ("ONU" matches in "l'ONU !" but
+  # not inside "monument").
+  #
+  # OPTIONAL — `language`: ISO-639-1 code the entry applies to ("fr", "en",
+  # ...), or "*" (default) for every language — useful for brand names that
+  # are mangled the same way everywhere.
+
+  # A proper noun the French G2P gets wrong: force exact phonemes (the town
+  # of Grasse must not rhyme with "grâce" in every accent).
+  - word: "Grasse"
+    language: fr
+    ipa: "ɡʁas"
+
+  # An anglicism in French text: a hand-written respelling any engine reads
+  # correctly, phoneme input or not.
+  - word: "GitHub"
+    language: fr
+    respelling: "guite-heube"
+
+  # An acronym with neither ipa nor respelling: the local LLM derives a
+  # respelling on first use ("ONU" → something like "au-haine-u") and caches
+  # it; phoneme backends then phonemise that respelling deterministically.
+  - word: "ONU"
+    language: fr
+
+  # The same word may carry different pronunciations per language.
+  - word: "Paris"
+    language: en
+    ipa: "ˈpæɹɪs"

@@ -4,6 +4,67 @@ All notable changes to speaker-helper are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project aims to adhere
 to [Semantic Versioning](https://semver.org/).
 
+## [0.10.0] - 2026-10-26
+
+### Added
+- **A pronunciation lexicon, integrated by default** (`speaker_helper/lexicon.py`,
+  `lexicon.yaml.example`). State once how a word is pronounced — IPA, a
+  respelling, or nothing at all — and every synthesis honours it. Two tiers,
+  because the engines come in two kinds: backends that accept phonemes
+  (kokoro, which already phonemised its own input) splice the stated **IPA
+  verbatim** at their existing phonemisation step, deterministically; every
+  other backend gets the **respelling** tier, a text rewrite applied by
+  `Speaker` before the engine sees the text. An entry with neither gets its
+  respelling **derived once by the local LLM** — resolved through
+  `best-engine-ai-helper` (the suite rule), served by Ollama at temperature 0,
+  few-shot prompted — validated structurally, and persisted to a sidecar cache
+  so everything after that first derivation is deterministic and offline.
+  The feature keys on `settings.lexicon` (`path`, `enabled`, `llm`) and the
+  `SPEAKER_HELPER_LEXICON` environment variable, and costs nothing when no
+  lexicon file exists.
+- **A `kyutai` backend** — Kyutai's `tts-1.6b-en_fr`, the 2026-10 survey's
+  French pick (`STUDY.md`, `research` branch): native French from a Paris lab
+  where the alternatives render French through English-first pipelines.
+  Voices are precomputed embeddings from the `kyutai/tts-voices` bank (the
+  speaker encoder is deliberately unreleased — the backend says so instead of
+  pretending to clone); the defaults are **female**: `developpeuse-3`
+  (unmute's French voice, CC0; measured median F0 240 Hz on this machine) and
+  VCTK `p329` for English. Weights (~3.4 GB) download once, then it is
+  offline. New `[kyutai]` extra; knobs under `settings.kyutai`.
+- **Long-text chunking, LLM-assisted** (`speaker_helper/chunking.py`). A long
+  `say()` is no longer one engine call — past their comfort zone the neural
+  engines audibly degrade — but sentence-group chunks concatenated with a
+  breath between them. The local LLM only *places the boundaries* (it groups
+  locally-split sentences and its answer must be positive integers summing to
+  the sentence count), so the spoken text is structurally guaranteed to be
+  the caller's text; any failure falls back to a deterministic greedy packer.
+  Knobs under `settings.chunking` (`enabled`, `llm`, `max_chars`).
+- **Language-aware quality priors** (`eval/priors.py`): `engine_quality_prior`
+  takes an optional language, and a per-language table refines the base —
+  kyutai is 0.92 in French and floored at 0.30 outside fr/en (it would read
+  Spanish with a French/English tongue); chatterbox keeps 0.90 in English and
+  drops to 0.78 in French (6–8% CER, per the survey). Offline routing now
+  lands where the evidence points: **French → kyutai, English → chatterbox,
+  every other language → chatterbox's multilingual model.** Still priors,
+  still flagged `confidence="low"` — the ~/speak study's measured numbers
+  replace them as they land.
+
+### Changed
+- **The chatterbox backend knows its three variants.** `chatterbox-tts` 0.1.7
+  ships base, **Turbo** (the survey's English pick) and **Multilingual**
+  (23 languages); `settings.chatterbox["variant"]` pins one, and the default
+  `"auto"` serves English with Turbo and everything else with Multilingual —
+  per call, so a narration can mix languages. Without a configured reference
+  it now clones the bundled female voice (`assets/ref-fr-female.wav`) instead
+  of trusting the model's default speaker: the project's contract is **a
+  female voice in every language**, and no model card promises that.
+- **The router's catalogue names real backends.** Engines used to enter the
+  catalogue with the dataclass default `backend="kokoro"` — an offline
+  decision for chatterbox would have produced Settings no `create_engine`
+  could honour. A `ENGINE_BACKENDS` table maps engine → serving backend, and
+  engines with no in-tree backend (qwen3_tts, f5, xtts) keep their priors for
+  the eval layer but no longer enter routing decisions.
+
 ## [0.9.3] - 2026-10-25
 
 ### Changed

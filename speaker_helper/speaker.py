@@ -113,6 +113,12 @@ class Speaker:
         # The routing decision that built this speaker, when created via
         # :meth:`from_route` (else ``None``) — kept for provenance / logging.
         self.route: object | None = None
+        # The pronunciation lexicon (None when none is configured). Loaded
+        # here so every surface that speaks through a Speaker — say, stream,
+        # narrate, and the CLI/REST/GUI built on them — honours it by default.
+        from speaker_helper.lexicon import load_lexicon
+
+        self.lexicon = load_lexicon(self.settings)
 
     @classmethod
     def from_profile(
@@ -316,6 +322,13 @@ class Speaker:
     async def say(self, text: str, *, language: str | None = None) -> AudioResult:
         """Synthesise ``text`` into one :class:`AudioResult` (offline mode).
 
+        A long text is not synthesised in one engine call: past their comfort
+        zone the neural engines audibly degrade, so the text is cut into
+        sentence-group chunks (boundaries placed by the local LLM when
+        available, greedily otherwise — see :mod:`speaker_helper.chunking`),
+        synthesised chunk by chunk, and concatenated. The caller still gets
+        one result; short texts skip all of it.
+
         Parameters
         ----------
         text : str
@@ -328,7 +341,91 @@ class Speaker:
         AudioResult
             The synthesised audio and its metadata.
         """
-        return await self.engine.synthesize(text, language=language)
+        from speaker_helper.chunking import chunk_long_text
+
+        # Lexicon first (one pass over the whole text), chunking second — so a
+        # respelling never straddles a chunk boundary.
+        spoken = self._respelled(text, language)
+        chunks = chunk_long_text(spoken, language or self.settings.language, self.settings)
+        if len(chunks) <= 1:
+            return await self.engine.synthesize(spoken, language=language)
+        return await self._say_chunked(chunks, text, language)
+
+    async def _say_chunked(
+        self,
+        chunks: list[str],
+        original_text: str,
+        language: str | None,
+    ) -> AudioResult:
+        """Synthesise ``chunks`` in order and concatenate into one result.
+
+        Parameters
+        ----------
+        chunks : list of str
+            The synthesis-sized pieces (from :func:`chunk_long_text`).
+        original_text : str
+            The caller's text, reported on the merged result (the chunks are
+            an implementation detail the caller never asked about).
+        language : str or None
+            Forwarded to every chunk's synthesis.
+
+        Returns
+        -------
+        AudioResult
+            One result spanning all chunks, with a short breath of silence
+            between them and durations/compute summed.
+
+        Raises
+        ------
+        RuntimeError
+            When the backend changes sample rate between chunks (no engine
+            does; the check keeps the concatenation honest).
+        """
+        import numpy as np
+
+        # Bounded like narration: later chunks may synthesise while earlier
+        # ones are awaited, but emission order is the text's order.
+        sem = asyncio.Semaphore(self.stream_concurrency)
+
+        async def _synth(chunk: str) -> AudioResult:
+            async with sem:
+                return await self.engine.synthesize(chunk, language=language)
+
+        tasks = [asyncio.create_task(_synth(c)) for c in chunks]
+        try:
+            results = [await task for task in tasks]
+        finally:
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+
+        rate = results[0].sample_rate
+        if any(r.sample_rate != rate for r in results):
+            raise RuntimeError("backend changed sample rate between chunks")
+        # A short breath between chunks: the cut sits at a sentence (often a
+        # paragraph) boundary, where silence is what a reader would do anyway.
+        breath = np.zeros(int(rate * PUNCTUATION_PAUSE_MS / 1000.0), dtype=np.int16)
+        pieces: list[Any] = []
+        for i, result in enumerate(results):
+            if i:
+                pieces.append(breath)
+            pieces.append(_wav_to_pcm16(result.wav_bytes))
+        merged = np.concatenate(pieces)
+
+        from speaker_helper.backends.kokoro import pcm_to_wav_bytes
+
+        return AudioResult(
+            wav_bytes=pcm_to_wav_bytes(merged, rate),
+            sample_rate=rate,
+            duration_s=len(merged) / float(rate),
+            # Compute time is the sum of the engine's work, not the wall time
+            # of the bounded pipeline — RTF must reflect the engine, not our
+            # scheduling.
+            compute_s=sum(r.compute_s for r in results),
+            text=original_text,
+            voice_id=results[0].voice_id,
+            language=results[0].language,
+        )
 
     # ----- streaming ------------------------------------------------------
 
@@ -359,6 +456,10 @@ class Speaker:
         later chunks are produced while earlier ones are being consumed, but
         emission order matches the text.
         """
+        # The lexicon rewrites the whole text before chunking — rewriting per
+        # chunk would re-scan the same words and could split one across a
+        # chunk boundary the sentence splitter chose.
+        text = self._respelled(text, language)
         # Producer side: split the text into chunks (first one kept small so the
         # first audio comes out fast). Nothing to do for empty input.
         chunks = chunk_for_streaming(text, self.settings.first_chunk_sentences)
@@ -453,7 +554,10 @@ class Speaker:
         async def _synth(seg: Segment) -> AudioResult:
             async with sem:
                 return await self.engine.synthesize(
-                    seg.spoken,
+                    # The lexicon applies to what is *spoken* (text or its
+                    # `say` override), never to the page's own text — cues
+                    # keep showing the document's words.
+                    self._respelled(seg.spoken, language),
                     language=language,
                     **self._voice_and_speed(voice, seg),
                 )
@@ -529,6 +633,47 @@ class Speaker:
             language=first.language,
             ignored_hints=sorted(ignored),
         )
+
+    def _respelled(self, text: str, language: str | None) -> str:
+        """Apply the lexicon's respelling tier when the backend needs it.
+
+        A backend that declares ``LEXICON_TIER = "ipa"`` (kokoro) splices the
+        lexicon's phonemes itself, deterministically — rewriting its input
+        here would hide the original words from that better tier. Every other
+        backend has no phoneme access, so the only lever is rewriting the text
+        before it leaves this class.
+
+        Parameters
+        ----------
+        text : str
+            The text about to be synthesised.
+        language : str or None
+            The call's language override; falls back to the configured one
+            (lexicon entries are language-keyed).
+
+        Returns
+        -------
+        str
+            The text to hand the engine — unchanged when no lexicon is
+            configured, when the backend owns the IPA tier, or when nothing
+            matched.
+        """
+        if self.lexicon is None:
+            return text
+        # The class attribute (not the instance) is consulted so a mock
+        # wrapping/spec-ing a real engine still answers honestly.
+        if getattr(type(self.engine), "LEXICON_TIER", "respelling") == "ipa":
+            return text
+        # The house rule on language: stated → believed, unstated → detected
+        # (langdetect, seeded), with the configured language as the fallback a
+        # detector-less install degrades to. Lexicon entries are
+        # language-keyed, so respelling with the wrong language would apply
+        # the wrong entries, not merely mis-accent them.
+        if not language:
+            from speaker_helper.backends.kokoro import detect_language
+
+            language = detect_language(text, fallback=self.settings.language)
+        return self.lexicon.respell(text, language)
 
     def _voice_and_speed(self, voice: str | None, seg: Segment) -> dict[str, Any]:
         """The per-segment knobs, passed only to backends that accept them.

@@ -388,10 +388,21 @@ class KokoroEngine:
         the language, pick the voice that speaks it".
     """
 
+    #: This backend feeds the model phonemes it produced itself, so lexicon
+    #: entries are honoured at the IPA level right here — the deterministic
+    #: tier. :class:`~speaker_helper.speaker.Speaker` reads this attribute and
+    #: leaves the text alone instead of applying the respelling tier.
+    LEXICON_TIER: str = "ipa"
+
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
         self._kokoro: Any = None
         self._lock = asyncio.Lock()
+        # The pronunciation lexicon (None when none is configured). Loaded at
+        # construction, not per call: the file is small and synthesis is hot.
+        from speaker_helper.lexicon import load_lexicon
+
+        self._lexicon = load_lexicon(settings)
 
     # -- lifecycle ---------------------------------------------------------
 
@@ -482,7 +493,7 @@ class KokoroEngine:
         lang = normalise_language(language or "") or language_for(chosen)
 
         started = time.perf_counter()
-        phonemes = await asyncio.to_thread(_phonemise_without_switches, text, lang)
+        phonemes = await asyncio.to_thread(self._phonemise, text, lang)
         samples, rate = await asyncio.to_thread(
             model.create,
             phonemes,
@@ -509,6 +520,38 @@ class KokoroEngine:
             text=text,
             voice_id=chosen,
             language=lang,
+        )
+
+    def _phonemise(self, text: str, lang: str) -> str:
+        """Phonemise ``text``, honouring the pronunciation lexicon.
+
+        The lexicon's IPA tier plugs in exactly here because this is the one
+        place in the package where text becomes phonemes: matched words
+        contribute their stated IPA verbatim, everything else goes through
+        :func:`_phonemise_without_switches` as before. Blocking; called in a
+        thread by :meth:`synthesize`.
+
+        Parameters
+        ----------
+        text : str
+            The text to phonemise.
+        lang : str
+            espeak-style language code (e.g. ``"fr-fr"``).
+
+        Returns
+        -------
+        str
+            One phoneme string for the whole text.
+        """
+        from speaker_helper.lexicon import phonemise_with_lexicon
+
+        return phonemise_with_lexicon(
+            text,
+            lang,
+            self._lexicon,
+            # The lexicon splices around chunks; each chunk still goes through
+            # this module's own phonemiser (switch markers removed and all).
+            lambda chunk: _phonemise_without_switches(chunk, lang),
         )
 
     def _require_known_voice(self, model: Any, voice: str) -> None:
