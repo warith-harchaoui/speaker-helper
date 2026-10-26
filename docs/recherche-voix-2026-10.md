@@ -1,0 +1,304 @@
+# Recherche — deux voix féminines (FR + EN) réalistes et vivantes, offline, avec lexique de prononciation
+
+**Date de la recherche : 2026-10-26.** Les classements, licences et versions citées ont
+été vérifiés ce jour-là ; tout ici est périssable, la date fait partie de chaque
+affirmation. Quatre volets de recherche web indépendants (open source anglais,
+français, propriétaire offline, benchmarks + contrôle phonétique), sources
+primaires privilégiées (API live du TTS Arena, cartes de modèles, code source
+inspecté).
+
+---
+
+## 1. La question posée, et la grille de lecture
+
+Quatre modes d'exploitation, croisement de deux axes :
+
+| | **Local gratuit (open source)** | **Cloud payant (propriétaire)** |
+|---|---|---|
+| **Offline (différé)** | ← **la présente recherche** | ElevenLabs v4, Cartesia Sonic 3.6, MiniMax… (plafond de qualité actuel) |
+| **Streaming (temps réel)** | Kokoro (RTF 0,22 CPU mesuré ici), Pocket TTS, Hume TADA (RTF ~0,09) | Cartesia Sonic, ElevenLabs Flash, Inworld |
+
+Deux cases hors-diagonale existent aussi et sont documentées en §7 : le
+**propriétaire local** (voix Premium d'Apple — gratuites ; SDK Acapela,
+Picovoice Orca — payants) et les offres on-prem/on-device des grands du cloud
+(quasi toutes verrouillées enterprise en 2026).
+
+**Critères durs pour la case visée :**
+
+1. Une voix **féminine française** et une voix **féminine anglaise**, réalistes
+   et **vivantes** (prosodie expressive, pas une voix de narrateur plate).
+2. **Offline intégral** : poids locaux, aucun réseau à l'exécution. Machine
+   cible : Apple M2 Max, 96 Go unifiés, ~30 Go de disque libre.
+3. **Lexique de prononciation** : pouvoir forcer la prononciation de certains
+   mots, par exemple en notation phonétique (IPA ou équivalent).
+4. **Licence** permettant d'expédier (speaker-helper est un produit ; cf.
+   LANDSCAPE.md : la licence est une entrée du routeur, pas une note de bas de
+   page).
+
+## 2. Le verdict en une phrase
+
+**Aucun moteur open source ne combine aujourd'hui (2026-10-26) vivacité de
+pointe, contrôle phonétique déterministe et licence permissive** — les moteurs
+les plus vivants (Chatterbox, Kyutai, Qwen3-TTS) n'exposent aucun accès aux
+phonèmes, et les moteurs contrôlables (Kokoro, Piper) sont les moins
+expressifs. La recommandation (§8) est donc une **paire de moteurs par rôle**,
+avec le lexique porté par speaker-helper et non par le moteur — ce que
+l'architecture actuelle (`say`/`text`, phonémisation espeak en amont de Kokoro,
+`is_phonemes=True`) permet déjà presque gratuitement.
+
+## 3. Où en sont les classements (instantané du 2026-10-26)
+
+- **TTS Arena V2** (TTS-AGI, Hugging Face, API live, 43 modèles) : tout le
+  top 10 est propriétaire (Audio8-TTS 1726, Gradium 1610, Aurora 1560…).
+  Les meilleures options locales sont **Chatterbox (Elo 1469 ± 20)** et
+  **Kokoro v1.0 (1466 ± 24)** — égalité statistique, ~60 Elo sous le milieu de
+  tableau fermé. <https://huggingface.co/spaces/TTS-AGI/TTS-Arena-V2>
+- **Artificial Analysis, arène open-weights** : 1. Fish Drama 3 Preview (1249,
+  licence à plafond de revenus), 2. Breeze TTS 2 (1233, **non commercial**),
+  3. Ming-3.0-tts (1192, MIT, sorti le 2026-10-20), … 7. Kokoro (1066),
+  12. Chatterbox (1027). Sur le top 6, seuls Ming (MIT) et Step-Audio-EditX
+  (Apache, mais CUDA-seulement et phonèmes chinois uniquement) sont
+  exploitables commercialement.
+  <https://artificialanalysis.ai/text-to-speech/leaderboard/provider-voice/open-weights>
+- Artificial Analysis a ouvert des **arènes multilingues (9 langues dont le
+  français)** vers octobre 2026 : Cartesia Sonic 3.6 est n°1 dans 7 langues
+  sur 9 ; **aucun modèle ouvert ne mène aucune langue**.
+- **TTSDS2** (seul benchmark distributionnel multilingue couvrant le français,
+  ICLR 2026) : site et espace HF **injoignables le 2026-10-26** (DNS/erreur
+  runtime) — pas de classement français par système ce jour. Alternative :
+  calculer `ttsds` (PyPI v2.1.1) localement dans ~/speak.
+  <https://arxiv.org/abs/2506.19441>
+- **UTMOS communautaire** (tts-bench, UTMOS-2022 — *pas* UTMOSv2, corrélation
+  de rang seulement) : Chatterbox 4,42 / WER 0,061 · Qwen3-TTS-0.6B 4,27 ·
+  Kokoro 4,18 / WER 0,054 · Piper 3,88 · XTTS-v2 3,94.
+  <https://5uck1ess.github.io/tts-bench/scores.html>
+- **EmergentTTS-Eval** (NeurIPS 2025) : tous les modèles ouverts échouent sur
+  la « prononciation complexe » (nombres, URL) ; Orpheus anglicise les mots
+  étrangers ; Sesame CSM insère des interjections aléatoires.
+  <https://arxiv.org/abs/2505.23009>
+
+Lecture honnête : en offline open source, le plafond de réalisme reste sous
+ElevenLabs/Cartesia ; la question n'est pas « qui égale le cloud » mais « quel
+compromis vivacité / contrôle / licence on choisit ».
+
+## 4. Le critère qui départage tout : le lexique de prononciation
+
+C'est le critère le plus discriminant de toute la recherche. Trois familles
+seulement offrent un override **déterministe** par mot, entièrement offline :
+
+| Mécanisme documenté | Moteur | Syntaxe | Langues |
+|---|---|---|---|
+| Lien markdown inline + lexiques éditables (misaki G2P) | **Kokoro** | `[Worcester](/wˈʊstər/)` ; lexiques gold/silver extensibles ; entrée phonèmes brute | EN natif ; **FR via espeak** (voir ci-dessous) |
+| Blocs phonèmes bruts + dictionnaires espeak compilés | **Piper** | `[[ f ɔ̃ ]]` ; `espeak-ng --compile=fr` | **FR + EN uniformément** |
+| Entrée = chaîne IPA (on possède l'étage G2P) | **StyleTTS2** | IPA directe | EN seulement |
+| « Pronunciation inpainting » entraîné | **CosyVoice 3** | `mot[K AH0 M]` (CMU/ARPAbet), pinyin | **EN + ZH, pas le FR** |
+| Balise inline | **IndexTTS-2.5** | `<minute\|M IH1 N AH0 T>` | EN/ZH/JA, pas de FR (et licence Bilibili sur autorisation écrite) |
+| IPA pipe-delimited + dictionnaires G2P | **NVIDIA Magpie 357M** | IPA | 12 langues (couverture FR à vérifier) |
+| Phonémiseur espeak en façade | **NeuTTS Air** | chaîne phonémisée acceptée en entrée | selon espeak |
+
+**Impossible** (texte brut → BPE, aucun étage phonémique) : Chatterbox (toutes
+variantes — demandes ouvertes [#115](https://github.com/resemble-ai/chatterbox/issues/115),
+#550), F5-TTS ([#241](https://github.com/SWivid/F5-TTS/issues/241)), Orpheus,
+Dia, Sesame CSM, **Qwen3-TTS**, VibeVoice, Higgs, Maya1, **Kyutai (1.6B et
+Pocket)**, Hume TADA, Fish/OpenAudio (balises ARPAbet **EN seulement**),
+Ming-3.0 (rien de documenté). Seul recours : la **réécriture orthographique**
+(« ONU » → « au-haine-u ») — fragile, dépendante de la voix, invérifiable.
+Deux papiers 2026 confirment qu'il n'existe **aucun correctif d'inférence**
+pour ces modèles ; les corrections passent par du fine-tuning
+(<https://arxiv.org/html/2610.24164>).
+
+**SSML est mort en open source** : aucun moteur moderne ne parse `<phoneme>`.
+Le lexique doit donc vivre dans **notre couche de prétraitement** — c'est le
+motif vers lequel tout l'écosystème a convergé.
+
+### Pourquoi speaker-helper est déjà aux trois quarts du chemin
+
+Deux points d'ancrage existent **déjà** dans le code :
+
+1. **Niveau texte** : `Segment.text` / `Segment.say` (narration.py,
+   speech_text.py) — « les overrides de prononciation appartiennent à qui
+   assemble les segments ». Un lexique par réécriture (`say`) fonctionne avec
+   *n'importe quel* moteur, y compris Chatterbox/Kyutai. Fiabilité moyenne.
+2. **Niveau phonèmes** : le backend Kokoro phonémise lui-même
+   (phonemizer + espeak-ng → IPA, suppression des marqueurs de switch,
+   `is_phonemes=True` — backends/kokoro.py). Y greffer une substitution
+   `mot → IPA` **avant** synthèse donne un lexique déterministe FR + EN pour un
+   diff minime. C'est exactement le chemin « DIY » que la recherche identifie
+   comme la seule voie française déterministe (l'override inline de misaki ne
+   couvre pas le français, qui passe par le fallback espeak).
+
+## 5. Candidats — voix féminine anglaise
+
+| Moteur | Licence (poids) | Vivacité | Lexique | Mac (M2 Max) | Taille | Voix féminines |
+|---|---|---|---|---|---|---|
+| **Chatterbox-Turbo** | MIT (watermark PerTh par défaut) | ★★★★★ | ✗ (réécriture) | MLX RTF 0,87 (torch-MPS : 2,63) | ~4 Go | clonage ~10 s + défaut |
+| **Kokoro af_heart / af_bella** | Apache-2.0 | ★★★ (narratrice soignée) | ★★★★★ natif | >10× temps réel (MLX/CoreML/CPU) | 330 Mo | 15 voix notées (af_heart = A) |
+| **CosyVoice 3 0.5B-2512** | Apache-2.0 | ★★★★ (instruct + `[laughter]`) | ★★★★ (CMU inpainting EN) | CPU RTF 0,3–0,5 ; pas de MPS ; pas de MLX officiel | 2–3 Go | clonage 3–10 s (pas de preset) |
+| **Qwen3-TTS 1.7B CustomVoice** | Apache-2.0 | ★★★★★ (réputation 2026) | ✗ | mlx-audio de 1re classe | 4,5 Go | Vivian, Serena, Chelsie |
+| **IndexTTS-2.5** | autorisation écrite Bilibili | ★★★★★ (vecteur émotion 8D) | ★★★★ (ARPAbet inline) | MPS ok, pas de MLX | 4,7 Go | clonage |
+| Magpie 357M (outsider) | NVIDIA Open (commercial ok) | ★★ | ★★★★★ (IPA + dicos) | port MLX communautaire | 0,3–0,6 Go | Aria, Sofia |
+| NeuTTS Air (outsider) | Apache-2.0 (watermark) | ★★★ | ★★★★ (entrée phonémisée) | GGUF/llama.cpp, 2–4× TR | 0,5–1 Go | clonage 3 s |
+
+Notes qui pèsent :
+
+- **Chatterbox-Turbo** est le choix « vivant » expédiable : préféré à 65,3 %
+  face à ElevenLabs Turbo v2.5 en éval aveugle (Podonos, *commanditée par
+  Resemble*), meilleure entrée open du TTS Arena, backend **déjà présent** dans
+  speaker-helper et dans le bundle speaker-engines. Son absence totale d'accès
+  phonémique est son seul vrai défaut — rédhibitoire seul, acceptable adossé à
+  un moteur de garantie (§8).
+- **Kokoro** est le seul moteur qui satisfait *tous* les critères durs sans
+  réserve (licence, taille, vitesse, lexique) — au prix de la vivacité : pas de
+  balises d'émotion, prosodie régulière.
+- **CosyVoice 3** est le meilleur compromis mono-moteur EN (expressif *et*
+  contrôlable *et* Apache) ; il demande un clip de référence féminin licencié
+  et tourne CPU (quand même plus vite que temps réel). Son inpainting ne
+  couvre pas le français.
+- **Ming-3.0-tts** (MIT, n°1 open en « Controlled Voice », déjà dans
+  mlx-audio) est *le modèle à surveiller* : s'il documente un accès phonémique,
+  il passe en tête de liste.
+
+## 6. Candidats — voix féminine française
+
+C'est le côté le plus contraint : la qualité française des modèles ouverts est
+le maillon faible documenté partout.
+
+| Moteur | Licence (poids) | Français | Vivacité | Lexique | Mac |
+|---|---|---|---|---|---|
+| **Kyutai TTS 1.6B en_fr** | CC-BY-4.0 (code MIT) | **natif** (labo parisien) : WER FR 3,29 %, prosodie/hésitations saluées | ★★★★ | ✗ | **MLX officiel** (~4 Go) |
+| **Chatterbox Multilingual v3** | MIT (watermark) | CER FR 6–8 % (vs <0,2 % sur ses meilleures langues) ; prise en main indépendante ~9/10 — *jamais le modèle de base EN, accent allemand* | ★★★★★ | ✗ | MPS/MLX |
+| **Kokoro ff_siwis** | Apache-2.0 | **une seule voix**, <11 h de corpus, grade officiel **B-** ; « légèrement robotique » | ★★ | ★★★★ (via chemin espeak déjà en place) | excellent |
+| **Piper fr (siwis, upmc)** | GPL-3.0 (piper1-gpl ; l'original MIT est archivé, oct. 2025) | fiable mais **plate**, « pas expressive » | ★ | ★★★★★ | CPU trivial |
+| **Qwen3-TTS** | Apache-2.0 | rapport technique flatteur (WER 2,6–2,9 auto-déclaré) mais retours terrain mitigés : accent québécois, voix « déprimées » | ★★★★ | ✗ | mlx-audio |
+| **Pocket TTS (Kyutai)** | CC-BY-4.0 (code MIT) | FR natif, voix Estelle (défaut spectral connu >2 kHz, issue #372) | ★★ | ✗ | 6× TR sur 2 cœurs |
+| CosyVoice 3 | Apache-2.0 | 9 langues dont FR, mais preuves françaises rares et inpainting **sans** FR | ★★★ | ✗ (pour le FR) | CPU |
+
+**Juridiquement morts pour un produit** (constat convergent avec LANDSCAPE.md) :
+XTTS-v2 (CPML, et Coqui ayant fermé, personne ne vend plus de licence),
+Fish/OpenAudio S1-mini (CC-BY-NC-SA), les finetunes français de F5
+(CC-BY-NC), MMS-TTS-fra (CC-BY-NC). **Sans français** : IndexTTS-2.5, Dia,
+Sesame CSM. **Écosystème académique français** (Lina-Speech/IRCAM, LinTO,
+Le Voice Lab) : rien d'expédiable aujourd'hui.
+
+Le trio de tête français est donc : **Kyutai 1.6B** (le plus naturellement
+français, banque de voix féminines CC-BY/CC0, clonage volontairement bridé à
+des embeddings précalculés), **Chatterbox Multilingual v3** (le plus vivant,
+n'importe quelle voix féminine FR par clonage 10 s, mais CER français moyen)
+— et **Kokoro ff_siwis** comme garantie de prononciation, pas comme voix
+vitrine.
+
+## 7. Les autres cases de la matrice (pour plus tard)
+
+Résumé du volet propriétaire offline — utile le jour où la case « cloud
+payant » ou « propriétaire local » s'ouvre :
+
+- **Verrouillé enterprise** (hors de portée d'une petite équipe en 2026) :
+  Azure Embedded Speech (le meilleur sur le papier — SDK macOS arm64 natif,
+  fr-FR-Denise + en-US-Jenny, SSML `<phoneme>` IPA complet — mais accès
+  réservé aux clients gérés par Microsoft) ; Cartesia on-prem/on-device (ironie :
+  kernels Metal Apple, beta privée) ; ElevenLabs on-prem/on-device (annoncé
+  avril 2026, liste d'attente) ; Camb.ai, Cerence.
+- **Réellement accessible** : les **voix Apple intégrées** (gratuites, offline,
+  natives : Ava/Zoe en Premium EN, Audrey/Aurélie FR, contrôle IPA via
+  `AVSpeechSynthesisIPANotationAttribute` pour en-US **et** fr-FR — qualité
+  « bonne mais plate », voix Siri interdites aux apps tierces) ;
+  **Picovoice Orca** (self-serve, macOS arm64, FR + EN, prononciations ARPAbet,
+  réalisme moyen) ; SDK **Acapela** (meilleur catalogue féminin FR — Claire,
+  Manon, Margaux — et excellent outillage lexique/SAMPA ; devis, build Apple
+  Silicon à confirmer) ; **CereProc/Capacity** (macOS, historiquement
+  indie-friendly, continuité post-rachat à vérifier).
+- **Morts** : Play.ht/PlayAI (fermé déc. 2025), Nuance Vocalizer (retiré
+  2025-2026), Supertonic (archivé sept. 2026).
+
+## 8. Recommandation
+
+### L'architecture avant les moteurs
+
+Le lexique vit dans speaker-helper, à deux étages, et devient une **capacité de
+la boîte à outils** plutôt qu'une propriété d'un moteur :
+
+1. **Lexique niveau `say`** (réécriture orthographique) — s'applique à tous les
+   moteurs, y compris les non-contrôlables ; fiabilité moyenne, à documenter
+   comme telle.
+2. **Lexique niveau IPA** — greffé sur la phonémisation espeak existante du
+   backend Kokoro (`is_phonemes=True`) : déterministe, FR + EN, diff minime.
+
+Le routeur gagne une entrée de plus : un segment contenant des mots du lexique
+*critiques* peut être routé vers le moteur à garantie phonétique — cohérent
+avec la philosophie « condition → moteur justifié par des nombres ».
+
+### La paire recommandée (case « local gratuit offline »)
+
+- **Anglais, voix féminine : Chatterbox-Turbo** (MIT ; clonage d'une référence
+  féminine licenciée ou voix par défaut). Le plus vivant des expédiables,
+  backend déjà écrit, MLX plus vite que temps réel. Lexique : étage `say`
+  uniquement.
+- **Français, voix féminine : Kyutai TTS 1.6B en_fr** (poids CC-BY-4.0, MLX
+  officiel). Le seul candidat dont le français est *natif* et documenté comme
+  tel ; banque de voix féminines CC-BY/CC0. Nouveau backend à écrire.
+  Lexique : étage `say` uniquement.
+- **Garantie de prononciation (déjà en place) : Kokoro** (af_heart EN /
+  ff_siwis FR) — le filet déterministe pour les segments à vocabulaire
+  critique, et le défaut temps réel actuel du routeur.
+
+**Variante conservatrice** si le lexique déterministe prime partout : Kokoro
+seul pour les deux langues (af_heart grade A ; ff_siwis grade B-, c'est le
+compromis), zéro nouveau backend.
+
+**Challenger à mettre dans le même A/B** : Chatterbox Multilingual v3 en
+français (réutilise le backend existant ; si son CER 6–8 % s'avère acceptable
+sur notre banc, il fait l'économie d'un backend Kyutai).
+
+### Plan de validation (dans ~/speak, pas ici)
+
+Conformément au partage des rôles (toolbox ↔ expériences) :
+
+1. Banc FR : Kyutai 1.6B vs Chatterbox Multilingual v3 vs Kokoro ff_siwis —
+   UTMOSv2 (naturalité), WER/chrF aller-retour (intelligibilité, avec des cas
+   pièges français : homographes hétérophones, sigles, anglicismes),
+   speaker-sim le cas échéant.
+2. Banc EN : Chatterbox-Turbo vs Kokoro af_heart vs CosyVoice 3 (si un clip de
+   référence propre est disponible) — mêmes métriques.
+3. Banc lexique : taux de respect de prononciations imposées (lexique IPA via
+   Kokoro vs réécriture `say` via Chatterbox/Kyutai) sur une liste de mots
+   difficiles — c'est la métrique qui n'existe pas encore et que ce critère
+   impose de créer.
+4. Replier les nombres dans le catalogue du routeur
+   (`quality_source="measured_mos"`), ajouter la dimension `lexicon_support`
+   aux capacités d'engine.
+
+### Incertitudes assumées
+
+- TTSDS2 injoignable le jour de la recherche : pas de classement FR neutre par
+  système ; à recontrôler ou à calculer localement.
+- Les chiffres UTMOS publics sont en UTMOS-2022, pas UTMOSv2 : comparables en
+  rang, pas en valeur, avec notre banc.
+- Le RTF MLX de Kokoro sur M2 Max (13–17×) est interpolé M1 Max/M4 Max, pas
+  mesuré ; nos propres mesures (BENCHMARKS.md : RTF 0,22 CPU/ONNX) restent la
+  référence.
+- La vivacité « ~9/10 » du français de Chatterbox Multilingual vient d'une
+  prise en main indépendante unique (archy.net) ; le banc FR tranchera.
+- Piper : le projet actif est GPL-3.0 et cherche des mainteneurs — risque de
+  gouvernance s'il devait devenir un backend.
+
+## 9. Sources principales
+
+- TTS Arena V2 (API live) — <https://huggingface.co/spaces/TTS-AGI/TTS-Arena-V2>
+- Artificial Analysis, arènes TTS — <https://artificialanalysis.ai/text-to-speech/leaderboard>
+- TTSDS2 (ICLR 2026) — <https://arxiv.org/abs/2506.19441>
+- EmergentTTS-Eval (NeurIPS 2025) — <https://arxiv.org/abs/2505.23009>
+- Kyutai TTS — <https://kyutai.org/tts/> · <https://huggingface.co/kyutai/tts-1.6b-en_fr>
+- Chatterbox (Resemble) — <https://github.com/resemble-ai/chatterbox> ·
+  <https://www.resemble.ai/resources/chatterbox-multilingual-v3-tts-with-embedded-watermarking-for-25-languages>
+- Kokoro / misaki — <https://huggingface.co/hexgrad/Kokoro-82M> · <https://github.com/hexgrad/misaki>
+- CosyVoice 3 — <https://huggingface.co/FunAudioLLM/Fun-CosyVoice3-0.5B-2512>
+- Qwen3-TTS — <https://github.com/QwenLM/Qwen3-TTS>
+- mlx-audio — <https://github.com/Blaizzy/mlx-audio>
+- Piper (successeur GPL) — <https://github.com/OHF-Voice/piper1-gpl>
+- IndexTTS — <https://github.com/index-tts/index-tts>
+- Magpie 357M — <https://huggingface.co/nvidia/magpie_tts_multilingual_357m>
+- Apple AVSpeech IPA — <https://developer.apple.com/documentation/avfaudio/avspeechsynthesisipanotationattribute>
+- Azure Embedded Speech (accès restreint) — <https://learn.microsoft.com/en-us/azure/ai-services/speech-service/embedded-speech>
+- Acapela — <https://www.acapela-group.com/voices/repertoire/french-text-to-speech-voices/>
+- Picovoice Orca — <https://github.com/Picovoice/orca>
+- Blizzard 2023 (référentiel qualité FR) — <https://www.sciencedirect.com/science/article/pii/S088523082400130X>
