@@ -399,24 +399,36 @@ chunking:
 
 ## 15. Les règles de langue, de bout en bout
 
-Les défauts appliquent l'étude d'octobre 2026 (`STUDY.md`, branche
-`research`), avec **une voix féminine dans chaque langue** :
+Le routage suit **les preuves mesurées, pas les goûts** — et dit lesquelles
+il a utilisées. L'étude d'octobre 2026 (`STUDY.md`, branche `research`)
+proposait kyutai pour le français et chatterbox-Turbo pour l'anglais sur des
+priors ; le banc A/B de l'étude compagne (naturalité UTMOSv2 + aller-retour
+WER/chrF, 2026-10-26) a ensuite mesuré chaque couple (moteur, langue) et
+**kokoro a gagné les deux langues** — c'est donc ce que la condition offline
+décide aujourd'hui, avec `quality_source="measured_mos"` et
+`confidence="high"`. Chaque voix par défaut est **féminine**, dans chaque
+moteur :
 
 ```python
 from speaker_helper import Speaker
 
-# Français -> kyutai (français natif, voix "developpeuse-3", féminine)
+# Français et anglais -> kokoro (vainqueur mesuré, en MOS comme en WER)
 spk = Speaker.from_route("offline", language="fr")
+print(spk.route.justification)   # cite les nombres mesurés
 
-# Anglais -> chatterbox, variante Turbo (féminine via la référence bundlée)
-spk = Speaker.from_route("offline", language="en")
-
-# Toute autre langue -> chatterbox, variante Multilingual (23 langues)
+# Une langue que personne n'a encore mesurée -> retour aux priors (confiance
+# basse affichée) : le modèle Multilingual de chatterbox (23 langues)
 spk = Speaker.from_route("offline", language="es")
 
-# Le streaming temps réel reste sur les preuves mesurées -> kokoro (RTF ~0,22 CPU)
+# Le streaming temps réel -> kokoro (RTF mesuré ~0,22 sur CPU)
 spk = Speaker.from_route("online_realtime", language="fr")
 ```
+
+Vous préférez une voix plus vivante que ne le dit la métrique ? Les moteurs
+restent à un réglage de distance — `backend: kyutai` (français, MLX sur Mac,
+RTF ~1) ou `backend: chatterbox` (Turbo pour l'anglais) — et le pack d'écoute
+de l'étude (`speak/out/ab_samples/`) existe précisément pour qu'une oreille
+humaine puisse renverser le verdict d'UTMOSv2 avec de nouveaux nombres.
 
 La résolution de langue suit partout une seule règle : **précisée → crue,
 non précisée → détectée** (`langdetect`, graine fixée), avec la `language`

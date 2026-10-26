@@ -151,18 +151,49 @@ class LanguageProfile:
 _MEASURED_KOKORO: dict[str, tuple[float, float]] = {
     # language: (mean RTF, quality)
     # RTF: in-process kokoro-onnx on CPU, M2 Max, 2026-10-25, warmed.
-    # quality: measured UTMOSv2 MOS on [0,1] (see MEASURED_MOS + the speak study).
-    "fr": (0.223, 0.59),
-    "en": (0.237, 0.65),
+    # quality: measured UTMOSv2 MOS on [0,1] — fr/en re-measured 2026-10-26 by
+    # the speak study's A/B bench (exp_ab_voices.py, 10 sentences: the 5
+    # historical declaratives + 5 expressive ones), which is why they moved
+    # from the 2026-07 five-declarative numbers (fr 0.59, en 0.65); es keeps
+    # the older five-sentence measurement.
+    "fr": (0.223, 0.468),
+    "en": (0.237, 0.666),
     "es": (0.206, 0.55),
+}
+
+# Measured quality for the OTHER engines, per language — UTMOSv2 MOS mapped to
+# [0, 1], from the speak study's A/B bench (out/ab_voices.json, 2026-10-26,
+# M2 Max, same 10-sentence set as kokoro's fr/en above; kyutai measured with
+# its default voices — fr cml-tts/10087 enhanced, en VCTK p329 — chatterbox
+# with the bundled female reference, Turbo for en / Multilingual for fr).
+#
+# The headline the numbers tell, against the survey's priors: UTMOSv2 ranks
+# kokoro FIRST in both languages (and the WER round-trip agrees for en; for fr
+# kyutai ties kokoro on WER 0.039 but trails on MOS). Caveat worth keeping in
+# view: UTMOSv2 is trained on English MOS panels — its French absolutes are an
+# extrapolation — and the listening pack (speak out/ab_samples/) exists for a
+# human to overrule these numbers by ear.
+MEASURED_QUALITY: dict[str, dict[str, float]] = {
+    "kyutai": {"fr": 0.3483, "en": 0.438},
+    "chatterbox": {"fr": 0.414, "en": 0.462},
+}
+
+# Measured mean RTF for the other engines on the same reference host/run —
+# kyutai via its MLX-q8 implementation, chatterbox via torch CPU (Multilingual
+# for fr, Turbo for en). Host-dependent like every RTF; re-measure on yours.
+MEASURED_RTF: dict[str, dict[str, float]] = {
+    "kyutai": {"fr": 1.025, "en": 1.06},
+    "chatterbox": {"fr": 5.80, "en": 2.34},
 }
 
 # (engine -> languages) whose ``measured_quality`` is a real UTMOSv2 MOS rather
 # than the engine prior. The router reads this to stamp ``quality_source`` as
 # ``"measured_mos"`` vs ``"prior"`` on a per-language decision. Grows as the study
-# measures more (engine, language) pairs; see the ``speak`` study's exp_quality.py.
+# measures more (engine, language) pairs; see the ``speak`` study's exp_ab_voices.py.
 MEASURED_MOS: dict[str, set[str]] = {
     "kokoro": {"fr", "en", "es"},
+    "kyutai": {"fr", "en"},
+    "chatterbox": {"fr", "en"},
 }
 DEFAULT_PROFILES: dict[str, LanguageProfile] = {
     lang: LanguageProfile(

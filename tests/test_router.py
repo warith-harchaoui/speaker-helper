@@ -162,10 +162,13 @@ def test_default_catalogue_has_measured_kokoro() -> None:
     """The fallback catalogue seeds kokoro with its measured native-MLX RTF."""
     pts = {p.engine: p for p in default_operating_points("fr")}
     assert "kokoro" in pts
-    # kokoro's RTF is measured (from the fr profile), others are unknown.
+    # kokoro's RTF is measured (from the fr profile); since the 2026-10-26
+    # A/B bench, the other French engines carry measured RTFs too.
     assert pts["kokoro"].rtf_source == "measured"
     assert pts["kokoro"].mean_rtf is not None
-    assert any(p.rtf_source == "unknown" for p in pts.values())
+    # A language nobody benched keeps honest "unknown" RTFs on those engines.
+    unmeasured = {p.engine: p for p in default_operating_points("it")}
+    assert any(p.rtf_source == "unknown" for p in unmeasured.values())
 
 
 def test_online_default_catalogue_routes_to_kokoro() -> None:

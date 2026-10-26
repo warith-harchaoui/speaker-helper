@@ -58,8 +58,8 @@ first_chunk_sentences: 1    # streaming: 1 → lowest time-to-first-audio
 
 # Kyutai backend knobs (kyutai backend only). The model (~3.4 GB) downloads
 # once from Hugging Face, then runs offline. Voices are embeddings from the
-# kyutai/tts-voices bank; the defaults are female (fr: developpeuse-3,
-# en: VCTK p329). `device: auto` (default) picks Kyutai's own MLX runtime on
+# kyutai/tts-voices bank; the defaults are female (fr: CML-TTS 10087
+# enhanced — picked by measurement in the A/B study; en: VCTK p329). `device: auto` (default) picks Kyutai's own MLX runtime on
 # a Mac when moshi-mlx is installed (os-helper detects the platform) and
 # torch CPU elsewhere; `quantize: 8` is the MLX on-device setting (measured
 # RTF 0.84 vs 7.5 unquantized on an M2 Max — null keeps full bf16);

@@ -281,6 +281,57 @@ Conformément au partage des rôles (toolbox ↔ expériences) :
 - Piper : le projet actif est GPL-3.0 et cherche des mainteneurs — risque de
   gouvernance s'il devait devenir un backend.
 
+## 8 bis. Addendum — le banc a parlé (2026-10-26, soir)
+
+Le plan de validation du §8 a été exécuté le jour même (`~/speak`,
+`scripts/exp_ab_voices.py` : UTMOSv2 + aller-retour WER/chrF via vocal-helper
++ RTF, 10 phrases par langue — les 5 déclaratives historiques plus 5 phrases
+expressives — moteurs à leur point de fonctionnement réel sur M2 Max :
+kyutai en MLX quantifié 8 bits, chatterbox Turbo/Multilingual en torch CPU,
+kokoro en ONNX CPU). **Les mesures contredisent la recommandation du §8** :
+
+| scénario | MOS (UTMOSv2) | qualité [0,1] | WER | chrF | RTF |
+|---|---:|---:|---:|---:|---:|
+| **fr** kokoro `ff_siwis` | **2,87** | **0,468** | **0,039** | **0,970** | 0,23 |
+| fr chatterbox (mtl) | 2,66 | 0,414 | 0,111 | 0,953 | 5,80 |
+| fr kyutai (cml-10087) | 2,39 | 0,348 | **0,039** | **0,970** | 1,03 |
+| **en** kokoro `af_heart` | **3,67** | **0,666** | **0,051** | 0,956 | 0,24 |
+| en chatterbox (turbo) | 2,85 | 0,462 | 0,103 | 0,930 | 2,34 |
+| en kyutai (p329) | 2,75 | 0,438 | 0,051 | 0,956 | 1,06 |
+
+Enseignements, dans l'ordre où ils ont surpris :
+
+1. **Kokoro gagne la condition offline dans les deux langues, sur les deux
+   axes.** Sa régularité de narratrice, que le §5 comptait comme une
+   faiblesse de vivacité, est ce que le prédicteur MOS récompense — et le
+   diagnostic par phrase a réfuté l'excuse toute prête : les phrases
+   expressives ne sont *pas* systématiquement pénalisées (kokoro y score
+   même plus haut que sur les plates).
+2. **La voix kyutai par défaut était le mauvais cheval.** Un crible de six
+   voix féminines de la banque a montré +0,9 MOS entre `developpeuse-3`
+   (don vocal CC0) et la meilleure voix CML-TTS « enhanced » (10087) — la
+   voix pèse plus que la quantization (q8 ≥ bf16 en MOS mesuré). Le défaut
+   du backend est maintenant cml-10087 ; kyutai devient alors co-leader
+   d'intelligibilité française (WER 0,039) mais son MOS global reste sous
+   kokoro, plombé par ses rendus expressifs.
+3. **Chatterbox paie son WER** (0,10–0,11 dans les deux langues) : le prix
+   des libertés expressives que le §5/§6 saluaient.
+4. **Réserve épistémique, maintenue au premier plan** : UTMOSv2 est entraîné
+   sur des panels MOS anglophones ; ses valeurs absolues en français sont une
+   extrapolation, et il est plausible qu'il sous-cote le *caractère* des
+   moteurs LLM. Un **pack d'écoute** (`~/speak/out/ab_samples/`, les 6
+   scénarios × plat/vivant + les variantes kyutai) attend l'arbitrage à
+   l'oreille qui pourrait renverser ce verdict — par de nouveaux nombres,
+   pas par décret.
+
+Conséquence appliquée (version 0.10.0, branche `research`) : les mesures sont
+repliées dans `profiles.MEASURED_QUALITY`/`MEASURED_RTF`, la condition
+offline route fr et en vers **kokoro** avec `quality_source="measured_mos"`
+et `confidence="high"`, kyutai (MLX, RTF ~1) et chatterbox restent à un
+réglage de distance, et le lexique de prononciation couvre les trois moteurs.
+La paire du §8 reste la bonne réponse à « la voix la plus vivante » ; elle
+n'est plus la bonne réponse par défaut à « la meilleure qualité mesurée ».
+
 ## 9. Sources principales
 
 - TTS Arena V2 (API live) — <https://huggingface.co/spaces/TTS-AGI/TTS-Arena-V2>

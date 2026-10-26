@@ -76,12 +76,17 @@ DEFAULT_VOICE_REPO: str = "kyutai/tts-voices"
 
 #: Default **female** voice per language, as names in the voice repository
 #: (the ``.safetensors`` embedding suffix is appended by the runtime).
-#: ``developpeuse-3`` is the French female voice of Kyutai's own unmute.sh
-#: (CC0, voice-donation program); ``p329_022`` is VCTK speaker p329, a female
-#: English voice. Chosen to honour this package's "female FR + female EN"
-#: defaults; any other name from the repository works via ``voice=``.
+#:
+#: The French default is a CML-TTS speaker (CC BY 4.0), picked by
+#: *measurement* in the ~/speak A/B study (2026-10-26): screened against
+#: four other female CML voices and unmute's ``developpeuse-3``, it scored
+#: highest on UTMOSv2 by a wide margin (≈3.4 vs ≈2.0 for developpeuse-3 on
+#: the same sentences, F0 ≈ 226 Hz — female). ``developpeuse-3``
+#: (``unmute-prod-website/developpeuse-3.wav``, CC0) remains a fine lighter
+#: -licence alternative via ``voice=``. ``p329_022`` is VCTK speaker p329, a
+#: female English voice.
 DEFAULT_VOICE_BY_LANG: dict[str, str] = {
-    "fr": "unmute-prod-website/developpeuse-3.wav",
+    "fr": "cml-tts/fr/10087_11650_000028-0002_enhanced.wav",
     "en": "unmute-prod-website/p329_022.wav",
 }
 
@@ -587,7 +592,7 @@ class KyutaiEngine:
         voices = [
             Voice(
                 voice_id=DEFAULT_VOICE_BY_LANG["fr"],
-                name="Développeuse (unmute, CC0)",
+                name="CML-TTS 10087 enhanced (CC BY 4.0)",
                 language="fr",
                 gender="female",
                 engine="kyutai",

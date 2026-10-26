@@ -49,13 +49,25 @@ to [Semantic Versioning](https://semver.org/).
   Knobs under `settings.chunking` (`enabled`, `llm`, `max_chars`).
 - **Language-aware quality priors** (`eval/priors.py`): `engine_quality_prior`
   takes an optional language, and a per-language table refines the base —
-  kyutai is 0.92 in French and floored at 0.30 outside fr/en (it would read
-  Spanish with a French/English tongue); chatterbox keeps 0.90 in English and
-  drops to 0.78 in French (6–8% CER, per the survey). Offline routing now
-  lands where the evidence points: **French → kyutai, English → chatterbox,
-  every other language → chatterbox's multilingual model.** Still priors,
-  still flagged `confidence="low"` — the ~/speak study's measured numbers
-  replace them as they land.
+  kyutai is floored at 0.30 outside fr/en (it would read Spanish with a
+  French/English tongue); chatterbox keeps 0.90 in English and drops to 0.78
+  in French (6–8% CER, per the survey). Priors are flagged
+  `confidence="low"` and only speak where nothing was measured.
+- **Measured quality and speed, folded back from the ~/speak A/B bench**
+  (`profiles.MEASURED_QUALITY` / `MEASURED_RTF`, run of 2026-10-26: UTMOSv2
+  naturalness + WER/chrF round-trip + RTF, 10 sentences per language, every
+  engine at its real operating point on the reference M2 Max). The
+  measurements overruled the survey's priors: **kokoro wins offline French
+  AND English** (fr MOS 2.87 / WER 0.039; en MOS 3.67 / WER 0.051), ahead of
+  chatterbox (lively but WER ~0.10) and kyutai (ties kokoro's French WER with
+  its new default voice, trails on MOS). The offline condition now decides
+  kokoro for fr/en with `quality_source="measured_mos"`,
+  `confidence="high"`; unmeasured languages fall back to priors (chatterbox
+  multilingual). Kyutai's French default voice moved from `developpeuse-3`
+  to **CML-TTS 10087 enhanced** — a six-voice screening showed the voice,
+  not the q8 quantization, was costing ~0.9 MOS. The caveat rides with the
+  data (UTMOSv2 is English-trained; `STUDY.md` §8 bis) and a listening pack
+  (`speak/out/ab_samples/`) awaits the human ear that could overrule it.
 
 ### Changed
 - **The chatterbox backend knows its three variants.** `chatterbox-tts` 0.1.7

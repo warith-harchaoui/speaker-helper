@@ -387,24 +387,34 @@ chunking:
 
 ## 15. The language rules, end to end
 
-The defaults implement the 2026-10 survey (`STUDY.md`, `research` branch),
-with **a female voice in every language**:
+Routing follows **measured evidence, not taste** — and says which it used.
+The 2026-10 survey (`STUDY.md`, `research` branch) proposed kyutai for French
+and chatterbox-Turbo for English on priors; the companion study's A/B bench
+(UTMOSv2 naturalness + WER/chrF round-trip, 2026-10-26) then measured every
+(engine, language) pair and **kokoro won both languages**, so that is what the
+offline condition decides today — `quality_source="measured_mos"`,
+`confidence="high"`. Every default voice is **female** in every engine:
 
 ```python
 from speaker_helper import Speaker
 
-# French -> kyutai (native French, voice "developpeuse-3", female)
+# French and English -> kokoro (measured winner on MOS and WER alike)
 spk = Speaker.from_route("offline", language="fr")
+print(spk.route.justification)   # cites the measured numbers
 
-# English -> chatterbox, Turbo variant (female via the bundled reference)
-spk = Speaker.from_route("offline", language="en")
-
-# Any other language -> chatterbox, Multilingual variant (23 languages)
+# A language nobody benched yet -> back to priors (flagged low confidence):
+# chatterbox's 23-language Multilingual model
 spk = Speaker.from_route("offline", language="es")
 
-# Real-time streaming stays on measured evidence -> kokoro (RTF ~0.22 on CPU)
+# Real-time streaming -> kokoro (measured RTF ~0.22 on CPU)
 spk = Speaker.from_route("online_realtime", language="fr")
 ```
+
+Prefer a livelier voice than the metric does? The engines stay one setting
+away — `backend: kyutai` (French, MLX on Macs, RTF ~1) or
+`backend: chatterbox` (Turbo for English) — and the study's listening pack
+(`speak/out/ab_samples/`) exists precisely so a human ear can overrule
+UTMOSv2's verdict with new numbers.
 
 Language resolution everywhere follows one rule: **stated → believed,
 unstated → detected** (`langdetect`, seeded), falling back to the configured
