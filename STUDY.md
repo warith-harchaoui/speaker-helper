@@ -354,6 +354,13 @@ Le remplaçant prévu du critère est un protocole d'écoute humaine par paires
 critère récusé : la voix française kyutai par défaut (cml-10087, soutenue
 aussi par le WER 0,039) et les garde-fous chiffrés.
 
+**Décision ratifiée par le propriétaire (2026-10-26)** : la configuration
+offline est arrêtée à **fr → kyutai, en → chatterbox (Turbo), es et autres
+langues → chatterbox (Multilingual)** — appuyée, au-delà du choix éditorial,
+par la littérature à jugement humain (arènes de préférences, retours publiés
+sur le français d'unmute, test aveugle Turbo vs ElevenLabs) plutôt que par
+les prédicteurs automatiques.
+
 ## 9. Sources principales
 
 - TTS Arena V2 (API live) — <https://huggingface.co/spaces/TTS-AGI/TTS-Arena-V2>

@@ -58,9 +58,13 @@ _DEFAULT_PRIOR = 0.80
 #   French at 6–8% CER through an English-first pipeline → en keeps the base,
 #   fr drops well under kyutai's.
 #
-# These are still *priors* (quality_source="prior", confidence="low" at the
-# router): the ~/speak study's measured UTMOSv2/chrF numbers replace them as
-# they land, exactly as kokoro's already did (see profiles._MEASURED_KOKORO).
+# These are *priors* in the router's vocabulary (quality_source="prior",
+# confidence="low") but they are not guesses: the owner RATIFIED this
+# configuration on 2026-10-26 — fr → kyutai, en → chatterbox (Turbo), other
+# languages → chatterbox (Multilingual) — after récusing automatic MOS
+# predictors as the offline criterion (STUDY.md §8 bis). Human
+# pairwise-listening scores (quality_source="measured_human") are the only
+# measurement meant to supersede these values.
 #
 # The ``"*"`` key is a per-engine floor for every *other* language: kyutai
 # only speaks French and English, and would read Spanish with a
