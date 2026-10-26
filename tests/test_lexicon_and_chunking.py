@@ -345,29 +345,27 @@ def test_chunked_say_merges_into_one_result() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_offline_routing_follows_the_measured_evidence() -> None:
-    """Offline routing rests on the A/B bench's measurements, flagged as such.
+def test_offline_routing_follows_the_owner_priors() -> None:
+    """Offline routing encodes the owner's editorial choice, flagged as prior.
 
-    The 2026-10 survey's priors proposed kyutai (fr) and chatterbox (en); the
-    speak study's A/B bench then *measured* UTMOSv2 quality for every
-    (engine, language) pair and kokoro won both languages — so that is what
-    the router must decide, with ``measured_mos`` provenance, until new
-    measurements say otherwise. This test pins the decisions to the data in
-    ``profiles.MEASURED_QUALITY``, not to anybody's taste.
+    The A/B bench's UTMOSv2 numbers were deliberately NOT folded into routing:
+    the owner rejected that metric as the offline criterion (it scores a
+    generic anonymous-panel naturalness, not "réaliste et vivante" to a human
+    ear — see STUDY.md §8 bis). Until human listening data lands, the
+    language-aware priors ARE the decision, and the router must say so
+    (``quality_source="prior"``, low confidence) rather than dress them up.
     """
-    # French and English: kokoro leads the measured UTMOSv2 table on both,
-    # so the decision is measured, high-confidence (quality AND RTF measured).
-    for lang in ("fr", "en"):
-        d = route(RouteRequest(condition="offline", language=lang))
-        assert (d.engine, d.backend) == ("kokoro", "kokoro")
-        assert d.quality_source == "measured_mos"
-        assert d.confidence == "high"
-    # A language nobody measured yet: back to priors (flagged low), where
-    # chatterbox's multilingual model outranks kyutai's wildcard floor —
-    # kyutai must NOT win, it would read Spanish with a French/English tongue.
+    # French: kyutai (the survey's native-French editorial pick).
+    fr = route(RouteRequest(condition="offline", language="fr"))
+    assert (fr.engine, fr.backend) == ("kyutai", "kyutai")
+    assert fr.quality_source == "prior"
+    # English: chatterbox (its backend auto-picks the Turbo variant).
+    en = route(RouteRequest(condition="offline", language="en"))
+    assert (en.engine, en.backend) == ("chatterbox", "chatterbox")
+    # Any other language: chatterbox too (the multilingual variant serves it);
+    # kyutai must NOT win — it would read Spanish with a French/English tongue.
     es = route(RouteRequest(condition="offline", language="es"))
     assert (es.engine, es.backend) == ("chatterbox", "chatterbox")
-    assert es.quality_source == "prior"
     assert es.confidence == "low"
 
 

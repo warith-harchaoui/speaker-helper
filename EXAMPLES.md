@@ -387,34 +387,36 @@ chunking:
 
 ## 15. The language rules, end to end
 
-Routing follows **measured evidence, not taste** — and says which it used.
-The 2026-10 survey (`STUDY.md`, `research` branch) proposed kyutai for French
-and chatterbox-Turbo for English on priors; the companion study's A/B bench
-(UTMOSv2 naturalness + WER/chrF round-trip, 2026-10-26) then measured every
-(engine, language) pair and **kokoro won both languages**, so that is what the
-offline condition decides today — `quality_source="measured_mos"`,
-`confidence="high"`. Every default voice is **female** in every engine:
+The offline defaults are the **owner's editorial choice** from the 2026-10
+survey (`STUDY.md`, `research` branch), honestly flagged as such
+(`quality_source="prior"`, low confidence): automatic naturalness predictors
+were evaluated and **rejected as the offline criterion** — they score a
+generic anonymous-panel "naturalness", not "realistic and lively" to a human
+ear (see `STUDY.md` §8 bis). Automatic metrics remain as guardrails (WER
+floor, anomaly gate, female-F0 check), never as the ranking; a human
+pairwise-listening protocol is the planned replacement. Every default voice
+is **female** in every engine:
 
 ```python
 from speaker_helper import Speaker
 
-# French and English -> kokoro (measured winner on MOS and WER alike)
+# French -> kyutai (native French; MLX on Macs, ~real time)
 spk = Speaker.from_route("offline", language="fr")
-print(spk.route.justification)   # cites the measured numbers
+print(spk.route.justification)   # says it stands on priors, and why
 
-# A language nobody benched yet -> back to priors (flagged low confidence):
-# chatterbox's 23-language Multilingual model
+# English -> chatterbox (its backend auto-picks the lively Turbo model)
+spk = Speaker.from_route("offline", language="en")
+
+# Any other language -> chatterbox's 23-language Multilingual model
 spk = Speaker.from_route("offline", language="es")
 
-# Real-time streaming -> kokoro (measured RTF ~0.22 on CPU)
+# Real-time streaming runs on measured evidence -> kokoro (RTF ~0.22 on CPU)
 spk = Speaker.from_route("online_realtime", language="fr")
 ```
 
-Prefer a livelier voice than the metric does? The engines stay one setting
-away — `backend: kyutai` (French, MLX on Macs, RTF ~1) or
-`backend: chatterbox` (Turbo for English) — and the study's listening pack
-(`speak/out/ab_samples/`) exists precisely so a human ear can overrule
-UTMOSv2's verdict with new numbers.
+Prefer kokoro's polished-narrator steadiness? It stays one setting away
+(`backend: kokoro`), and the study's listening pack
+(`speak/out/ab_samples/`) exists so the defaults can be re-decided by ear.
 
 Language resolution everywhere follows one rule: **stated → believed,
 unstated → detected** (`langdetect`, seeded), falling back to the configured

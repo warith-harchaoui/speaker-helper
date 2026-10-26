@@ -286,20 +286,23 @@ def default_operating_points(language: str = "fr") -> list[OperatingPoint]:
     )
 
     # 2) Every other engine we hold a quality prior for *and* a backend that
-    #    can actually serve it. Where the speak study has MEASURED an
-    #    (engine, language) pair — UTMOSv2 MOS, and on the same run an RTF —
-    #    the measurement replaces the prior and is flagged as such; otherwise
-    #    the (language-aware) prior stands with an unknown RTF. Engines without
-    #    an in-tree backend (qwen3_tts, f5, xtts, …) keep their priors for the
-    #    eval layer but never enter a routing decision no `create_engine`
-    #    could honour.
+    #    can actually serve it. RTF is unknown (never timed here), so these are
+    #    quality-only candidates: usable for offline quality maximisation,
+    #    excluded from online routing by default. Engines without an in-tree
+    #    backend (qwen3_tts, f5, xtts, …) keep their priors for the eval layer
+    #    but never enter a routing decision no `create_engine` could honour.
+    #
+    #    Deliberately PRIORS, not the A/B bench's UTMOSv2 numbers: the owner
+    #    rejected that metric as the offline criterion — it scores a generic
+    #    anonymous-panel "naturalness" (English-trained), not "réaliste et
+    #    vivante" to a human ear — see profiles.py's note and STUDY.md §8 bis.
+    #    The priors encode the owner's editorial choice, honestly flagged
+    #    `prior`/low-confidence, until human listening data replaces them.
     # Only the priors table is imported here; engine_quality_prior is already
     # a module-level import (re-importing it locally would shadow the earlier
     # kokoro-point use above into an UnboundLocalError on unmeasured languages).
     from speaker_helper.eval.priors import TTS_QUALITY_PRIORS
-    from speaker_helper.profiles import MEASURED_QUALITY, MEASURED_RTF
 
-    base = (language or "").lower().split("-")[0]
     for engine in TTS_QUALITY_PRIORS:
         # kokoro already added with its measured RTF; mock is a test signal, not
         # a shippable voice, so it never competes for a real routing decision.
@@ -308,22 +311,16 @@ def default_operating_points(language: str = "fr") -> list[OperatingPoint]:
         backend = ENGINE_BACKENDS.get(engine)
         if backend is None:
             continue
-        measured_q = MEASURED_QUALITY.get(engine, {}).get(base)
-        # The study's RTF is host-dependent evidence like kokoro's profile RTF:
-        # honest to carry, flagged measured, and re-measurable on your machine.
-        measured_rtf = MEASURED_RTF.get(engine, {}).get(base)
         points.append(
             OperatingPoint(
                 engine=engine,
-                # A measured UTMOSv2 number beats any prior; the prior stays
-                # language-aware where the survey found an asymmetry (see
-                # priors.TTS_QUALITY_PRIORS_BY_LANG).
-                quality=(
-                    measured_q if measured_q is not None else engine_quality_prior(engine, language)
-                ),
-                mean_rtf=measured_rtf,
-                quality_source="measured_mos" if measured_q is not None else "prior",
-                rtf_source="measured" if measured_rtf is not None else "unknown",
+                # Language-aware where the survey found an asymmetry (kyutai's
+                # native French vs chatterbox's English-first French — see
+                # priors.TTS_QUALITY_PRIORS_BY_LANG), the base prior elsewhere.
+                quality=engine_quality_prior(engine, language),
+                mean_rtf=None,
+                quality_source="prior",
+                rtf_source="unknown",
                 backend=backend,
                 language=language,
             )

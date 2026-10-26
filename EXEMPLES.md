@@ -399,36 +399,38 @@ chunking:
 
 ## 15. Les règles de langue, de bout en bout
 
-Le routage suit **les preuves mesurées, pas les goûts** — et dit lesquelles
-il a utilisées. L'étude d'octobre 2026 (`STUDY.md`, branche `research`)
-proposait kyutai pour le français et chatterbox-Turbo pour l'anglais sur des
-priors ; le banc A/B de l'étude compagne (naturalité UTMOSv2 + aller-retour
-WER/chrF, 2026-10-26) a ensuite mesuré chaque couple (moteur, langue) et
-**kokoro a gagné les deux langues** — c'est donc ce que la condition offline
-décide aujourd'hui, avec `quality_source="measured_mos"` et
-`confidence="high"`. Chaque voix par défaut est **féminine**, dans chaque
-moteur :
+Les défauts offline sont le **choix éditorial du propriétaire** issu de
+l'étude d'octobre 2026 (`STUDY.md`, branche `research`), affiché honnêtement
+comme tel (`quality_source="prior"`, confiance basse) : les prédicteurs
+automatiques de naturalité ont été évalués puis **récusés comme critère
+offline** — ils notent une « naturalité » générique de panel anonyme, pas
+« réaliste et vivante » à l'oreille humaine (voir `STUDY.md` §8 bis). Les
+métriques automatiques restent des garde-fous (plancher WER, détection
+d'anomalies, contrôle F0 féminin), jamais le classement ; un protocole
+d'écoute humaine par paires est le remplaçant prévu. Chaque voix par défaut
+est **féminine**, dans chaque moteur :
 
 ```python
 from speaker_helper import Speaker
 
-# Français et anglais -> kokoro (vainqueur mesuré, en MOS comme en WER)
+# Français -> kyutai (français natif ; MLX sur Mac, ~temps réel)
 spk = Speaker.from_route("offline", language="fr")
-print(spk.route.justification)   # cite les nombres mesurés
+print(spk.route.justification)   # dit qu'il s'appuie sur des priors, et pourquoi
 
-# Une langue que personne n'a encore mesurée -> retour aux priors (confiance
-# basse affichée) : le modèle Multilingual de chatterbox (23 langues)
+# Anglais -> chatterbox (son backend choisit tout seul le modèle Turbo, vivant)
+spk = Speaker.from_route("offline", language="en")
+
+# Toute autre langue -> le modèle Multilingual de chatterbox (23 langues)
 spk = Speaker.from_route("offline", language="es")
 
-# Le streaming temps réel -> kokoro (RTF mesuré ~0,22 sur CPU)
+# Le streaming temps réel, lui, roule sur du mesuré -> kokoro (RTF ~0,22 CPU)
 spk = Speaker.from_route("online_realtime", language="fr")
 ```
 
-Vous préférez une voix plus vivante que ne le dit la métrique ? Les moteurs
-restent à un réglage de distance — `backend: kyutai` (français, MLX sur Mac,
-RTF ~1) ou `backend: chatterbox` (Turbo pour l'anglais) — et le pack d'écoute
-de l'étude (`speak/out/ab_samples/`) existe précisément pour qu'une oreille
-humaine puisse renverser le verdict d'UTMOSv2 avec de nouveaux nombres.
+Vous préférez la régularité de narratrice de kokoro ? Elle reste à un réglage
+de distance (`backend: kokoro`), et le pack d'écoute de l'étude
+(`speak/out/ab_samples/`) existe pour que les défauts se re-décident à
+l'oreille.
 
 La résolution de langue suit partout une seule règle : **précisée → crue,
 non précisée → détectée** (`langdetect`, graine fixée), avec la `language`

@@ -53,21 +53,24 @@ to [Semantic Versioning](https://semver.org/).
   French/English tongue); chatterbox keeps 0.90 in English and drops to 0.78
   in French (6–8% CER, per the survey). Priors are flagged
   `confidence="low"` and only speak where nothing was measured.
-- **Measured quality and speed, folded back from the ~/speak A/B bench**
-  (`profiles.MEASURED_QUALITY` / `MEASURED_RTF`, run of 2026-10-26: UTMOSv2
-  naturalness + WER/chrF round-trip + RTF, 10 sentences per language, every
-  engine at its real operating point on the reference M2 Max). The
-  measurements overruled the survey's priors: **kokoro wins offline French
-  AND English** (fr MOS 2.87 / WER 0.039; en MOS 3.67 / WER 0.051), ahead of
-  chatterbox (lively but WER ~0.10) and kyutai (ties kokoro's French WER with
-  its new default voice, trails on MOS). The offline condition now decides
-  kokoro for fr/en with `quality_source="measured_mos"`,
-  `confidence="high"`; unmeasured languages fall back to priors (chatterbox
-  multilingual). Kyutai's French default voice moved from `developpeuse-3`
-  to **CML-TTS 10087 enhanced** — a six-voice screening showed the voice,
-  not the q8 quantization, was costing ~0.9 MOS. The caveat rides with the
-  data (UTMOSv2 is English-trained; `STUDY.md` §8 bis) and a listening pack
-  (`speak/out/ab_samples/`) awaits the human ear that could overrule it.
+- **An A/B bench ran — and its criterion was rejected** (`STUDY.md` §8 bis
+  tells the full story). The ~/speak study measured UTMOSv2 naturalness,
+  WER/chrF round-trips and RTF for every (engine, language) pair
+  (2026-10-26, 10 sentences per language, real operating points on the
+  reference M2 Max); UTMOSv2 ranked kokoro first in both languages, the
+  numbers were briefly folded into routing, and the project owner then
+  **récused the metric as the offline criterion**: it predicts a generic
+  anonymous-panel "naturalness" (English-trained), not "réaliste et vivante"
+  to a human ear. The offline defaults therefore remain the survey's
+  editorial pair — **French → kyutai, English → chatterbox (Turbo)** —
+  honestly flagged `quality_source="prior"`, low confidence, until a human
+  pairwise-listening protocol produces `measured_human` scores. What the
+  bench durably contributed: the automatic **guardrails** (WER floor, anomaly
+  gate, female-F0 check), the recorded numbers (`speak/out/ab_voices.json`,
+  listening pack in `speak/out/ab_samples/`), and kyutai's better French
+  default voice — **CML-TTS 10087 enhanced** replaced `developpeuse-3` after
+  a six-voice screening (supported by the ASR round-trip too: French WER
+  0.068 → 0.039, tying kokoro).
 
 ### Changed
 - **The chatterbox backend knows its three variants.** `chatterbox-tts` 0.1.7

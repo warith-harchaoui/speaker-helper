@@ -332,6 +332,28 @@ réglage de distance, et le lexique de prononciation couvre les trois moteurs.
 La paire du §8 reste la bonne réponse à « la voix la plus vivante » ; elle
 n'est plus la bonne réponse par défaut à « la meilleure qualité mesurée ».
 
+### Post-scriptum (2026-10-26, plus tard dans la soirée) — le critère est récusé
+
+Le propriétaire du projet a tranché après lecture : **UTMOSv2 n'est pas le
+bon critère, et ce n'est pas un critère que la machine peut porter**. Le
+prédicteur note une « naturalité » générique jugée par des panels anonymes
+anglophones ; le cahier des charges est « réaliste et **vivante**, agréable à
+écouter », un jugement perceptif qui appartient à l'oreille du propriétaire.
+Le RTF, de son côté, n'a rien à faire dans l'exposé d'une décision offline.
+
+Conséquence appliquée (révision du repli ci-dessus) : les tables
+`MEASURED_QUALITY`/`MEASURED_RTF` sont **retirées du routage** (les nombres
+restent consignés ici et dans `~/speak/out/ab_voices.json`) ; les défauts
+offline redeviennent le choix éditorial du §8 — **fr → kyutai, en →
+chatterbox-Turbo** — affiché honnêtement comme prior de confiance basse. Les
+métriques automatiques ne servent plus qu'en garde-fous : plancher
+d'intelligibilité (WER/chrF), détection d'anomalies, contrôle F0 du genre.
+Le remplaçant prévu du critère est un protocole d'écoute humaine par paires
+(à la MUSHRA/Blizzard), dont les scores entreront comme
+`quality_source="measured_human"`. Deux acquis du banc survivent au
+critère récusé : la voix française kyutai par défaut (cml-10087, soutenue
+aussi par le WER 0,039) et les garde-fous chiffrés.
+
 ## 9. Sources principales
 
 - TTS Arena V2 (API live) — <https://huggingface.co/spaces/TTS-AGI/TTS-Arena-V2>
