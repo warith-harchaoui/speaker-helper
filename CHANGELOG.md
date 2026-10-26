@@ -31,6 +31,14 @@ to [Semantic Versioning](https://semver.org/).
   (unmute's French voice, CC0; measured median F0 240 Hz on this machine) and
   VCTK `p329` for English. Weights (~3.4 GB) download once, then it is
   offline. New `[kyutai]` extra; knobs under `settings.kyutai`.
+  Two runtimes behind one knob: `device: auto` (default) selects **Kyutai's
+  own MLX implementation on a Mac** — detected with `os-helper`, quantized to
+  8 bits like Kyutai's on-device deployments, measured **RTF 0.84** on an
+  M2 Max where the torch-CPU fallback measured 7.8 — and torch anywhere else,
+  both reading the same cached weights. (The chatterbox Turbo equivalent via
+  `mlx-audio` 0.6.1 was evaluated and rejected for now: its loader leaves the
+  speaker encoder unweighted, so reference-based cloning — our female-voice
+  guarantee — silently breaks; English stays on torch, RTF ~3 on CPU.)
 - **Long-text chunking, LLM-assisted** (`speaker_helper/chunking.py`). A long
   `say()` is no longer one engine call — past their comfort zone the neural
   engines audibly degrade — but sentence-group chunks concatenated with a
