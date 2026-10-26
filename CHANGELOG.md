@@ -4,7 +4,33 @@ All notable changes to speaker-helper are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project aims to adhere
 to [Semantic Versioning](https://semver.org/).
 
-## [0.10.0] - 2026-10-26
+## [0.11.0] - 2026-10-26
+
+### Added
+- **The streaming cell of the operating matrix, studied and wired**
+  ([STREAMING.md](STREAMING.md)): the online condition now ranks quality by
+  **public arena Elo** — human pairwise votes (TTS Arena V2, pulled
+  2026-10-26: chatterbox 1469 ± 20, kokoro 1466 ± 24, a statistical tie) —
+  the criterion the owner ratified after récusing automatic MOS predictors.
+  `eval/priors.py` gains `PUBLIC_ELO` (dated, like the licence table) and
+  `elo_to_unit` (transparent linear map: only the order matters); the
+  router's catalogue is **condition-aware** (`default_operating_points`
+  takes the condition): online quality is `public_elo`, an engine absent
+  from every public arena is `no_public_elo` (quality 0 — a documented data
+  gap ranked below every ranked engine, never a flattering prior in
+  disguise), and offline keeps the ratified editorial pair untouched.
+- **Streaming performance, measured through the production path**
+  (`profiles.MEASURED_RTF`, from speak's `exp_streaming_voices.py`:
+  8-sentence paragraphs through `Speaker.stream` on the reference M2 Max).
+  kokoro sustains RTF 0.24 with first audio under a second; kyutai lands at
+  0.88 French — the near-miss above the 0.8 anti-underrun ceiling, and
+  4-bit quantization does NOT help (0.892: the model is memory-bound);
+  chatterbox misses by miles on torch/CPU (2.3 en / 5.6 fr). **Online
+  French and English therefore route to kokoro** (`ff_siwis` / `af_heart`,
+  both female) as the intersection of both ratified criteria — top-tied
+  public Elo AND the only real-time RTF — with `quality_source="public_elo"`
+  and high confidence. The French open-TTS Elo data gap (no public arena
+  ranks open engines in French) is documented as such in STREAMING.md.
 
 ### Added
 - **A pronunciation lexicon, integrated by default** (`speaker_helper/lexicon.py`,

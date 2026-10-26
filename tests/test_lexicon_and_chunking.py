@@ -412,3 +412,45 @@ def test_kyutai_backend_contract_without_weights() -> None:
     assert {v.language for v in voices.voices} == {"fr", "en"}
     assert all(v.gender == "female" for v in voices.voices)
     assert voices.voices[0].voice_id == DEFAULT_VOICE_BY_LANG["fr"]
+
+
+# ---------------------------------------------------------------------------
+# Streaming (online) routing: the public-Elo criterion
+# ---------------------------------------------------------------------------
+
+
+def test_online_routing_ranks_quality_by_public_elo() -> None:
+    """Online quality is the public arena Elo; absence of Elo is a ranked gap.
+
+    The owner ratified two different quality criteria per condition
+    (STREAMING.md): editorial priors offline, public arena Elo online. The
+    online catalogue must therefore carry ``public_elo`` provenance for
+    arena-ranked engines, and rank an engine absent from every public arena
+    (``no_public_elo``, quality 0.0) below every ranked one — never let a
+    flattering prior sneak into the Elo race.
+    """
+    from speaker_helper.eval.priors import PUBLIC_ELO, elo_to_unit
+
+    pts = {p.engine: p for p in default_operating_points("fr", condition="online_realtime")}
+    # Arena-ranked engines carry their Elo, linearly mapped, flagged as such.
+    assert pts["kokoro"].quality_source == "public_elo"
+    assert pts["kokoro"].quality == elo_to_unit(PUBLIC_ELO["kokoro"])
+    assert pts["chatterbox"].quality_source == "public_elo"
+    # kyutai is on no public arena (as of 2026-10-26): documented gap, not a prior.
+    assert pts["kyutai"].quality_source == "no_public_elo"
+    assert pts["kyutai"].quality == 0.0
+    # The offline catalogue is untouched by the Elo criterion.
+    off = {p.engine: p for p in default_operating_points("fr", condition="offline")}
+    assert off["kyutai"].quality_source == "prior"
+    assert off["kyutai"].quality > 0.5
+
+
+def test_online_decision_is_elo_ranked_and_rtf_gated() -> None:
+    """The online decision cites public Elo and only among engines that keep up."""
+    d = route(RouteRequest(condition="online_realtime", language="fr"))
+    # kokoro: the only engine with BOTH a public Elo and a measured real-time
+    # RTF on the reference host — evidence on both axes, hence high confidence.
+    assert d.engine == "kokoro"
+    assert d.quality_source == "public_elo"
+    assert d.confidence == "high"
+    assert d.mode == "streaming"

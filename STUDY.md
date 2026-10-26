@@ -16,7 +16,7 @@ Quatre modes d'exploitation, croisement de deux axes :
 | | **Local gratuit (open source)** | **Cloud payant (propriétaire)** |
 |---|---|---|
 | **Offline (différé)** | ← **la présente recherche** | ElevenLabs v4, Cartesia Sonic 3.6, MiniMax… (plafond de qualité actuel) |
-| **Streaming (temps réel)** | Kokoro (RTF 0,22 CPU mesuré ici), Pocket TTS, Hume TADA (RTF ~0,09) | Cartesia Sonic, ElevenLabs Flash, Inworld |
+| **Streaming (temps réel)** | → **[STREAMING.md](STREAMING.md)** (Elo public × RTF) | Cartesia Sonic, ElevenLabs Flash, Inworld |
 
 Deux cases hors-diagonale existent aussi et sont documentées en §7 : le
 **propriétaire local** (voix Premium d'Apple — gratuites ; SDK Acapela,

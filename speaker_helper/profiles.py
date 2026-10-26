@@ -176,6 +176,22 @@ _MEASURED_KOKORO: dict[str, tuple[float, float]] = {
 MEASURED_MOS: dict[str, set[str]] = {
     "kokoro": {"fr", "en", "es"},
 }
+
+# Measured mean RTF per (engine, language) on the reference host (Apple
+# M2 Max), from the speak study's STREAMING bench (exp_streaming_voices.py,
+# sustained RTF through Speaker.stream — the number that decides whether
+# playback underruns). The PERFORMANCE axis was never in dispute: these are
+# the numbers the online condition's feasibility gate consumes. kokoro's own
+# RTFs live on its per-language profile above; this table carries the other
+# engines. Host-dependent like every RTF — re-measure on your machine.
+# Values: speak's exp_streaming_voices.py, 2026-10-26, 8-sentence paragraph
+# through Speaker.stream, engines warm. kyutai at its q8 default (q4 measured
+# 0.892 — no gain: the model is memory-bound, not compute-bound); chatterbox
+# through its auto variant (Turbo for en, Multilingual for fr).
+MEASURED_RTF: dict[str, dict[str, float]] = {
+    "kyutai": {"fr": 0.880, "en": 0.945},
+    "chatterbox": {"fr": 5.599, "en": 2.289},
+}
 DEFAULT_PROFILES: dict[str, LanguageProfile] = {
     lang: LanguageProfile(
         language=lang,

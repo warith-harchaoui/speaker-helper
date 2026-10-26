@@ -245,64 +245,101 @@ class RouteDecision:
         return dataclasses.asdict(self)
 
 
-def default_operating_points(language: str = "fr") -> list[OperatingPoint]:
-    """Build the fallback candidate set for ``language`` from profiles + priors.
+def _quality_for(engine: str, language: str, condition: str) -> tuple[float, str]:
+    """The quality score and its provenance for one engine under one condition.
 
-    The per-language profile supplies the *measured* kokoro operating point (RTF
-    from in-process tuning; quality is the engine prior until a round-trip
-    recalibrates it). Every other engine in the priors table contributes a
-    *quality-only* candidate with an unknown RTF — enough to reason about offline
-    quality, but deliberately not enough to claim it keeps up online.
+    The two conditions deliberately rank quality on **different criteria**,
+    both chosen by the project owner (STREAMING.md / STUDY.md §8 bis):
+
+    * **offline** — the ratified editorial choice, encoded as language-aware
+      priors (``"prior"``), except kokoro whose per-language UTMOSv2
+      measurement predates the criterion debate (``"measured_mos"``).
+    * **online_realtime** — the **public arena Elo** (human pairwise votes,
+      ``"public_elo"``). An engine absent from every public arena has no
+      evidence under this criterion: it scores 0.0 with provenance
+      ``"no_public_elo"`` — a documented data gap that ranks it below every
+      publicly-ranked engine, never a flattering prior in disguise.
+
+    Parameters
+    ----------
+    engine : str
+        Engine id (e.g. ``"kokoro"``).
+    language : str
+        ISO-639 target language (drives the per-language prior / MOS tables).
+    condition : str
+        :data:`ONLINE_REALTIME` or :data:`OFFLINE`.
+
+    Returns
+    -------
+    tuple of (float, str)
+        ``(quality, quality_source)`` ready for an :class:`OperatingPoint`.
+    """
+    from speaker_helper.eval.priors import PUBLIC_ELO, elo_to_unit
+
+    # Online: the ratified public-Elo criterion, or an explicit gap.
+    if condition == ONLINE_REALTIME:
+        elo = PUBLIC_ELO.get(engine)
+        if elo is not None:
+            return elo_to_unit(elo), "public_elo"
+        return 0.0, "no_public_elo"
+    # Offline: kokoro's per-language UTMOSv2 measurement where it exists,
+    # the owner-ratified language-aware prior everywhere else.
+    if engine == "kokoro":
+        prof = profile_for(language)
+        if prof.measured_quality is not None and language in MEASURED_MOS.get("kokoro", set()):
+            return prof.measured_quality, "measured_mos"
+    return engine_quality_prior(engine, language), "prior"
+
+
+def default_operating_points(
+    language: str = "fr", condition: str = OFFLINE
+) -> list[OperatingPoint]:
+    """Build the fallback candidate set for ``language`` under ``condition``.
+
+    The per-language profile supplies kokoro's *measured* RTF (in-process
+    tuning) and :data:`~speaker_helper.profiles.MEASURED_RTF` supplies the
+    other engines' (the speak study's streaming bench) — performance is one
+    axis for both conditions. Quality, by contrast, is **condition-specific**
+    (see :func:`_quality_for`): the owner-ratified priors offline, the public
+    arena Elo online.
 
     Parameters
     ----------
     language : str
         Language whose profile seeds the measured kokoro point.
+    condition : str
+        :data:`ONLINE_REALTIME` or :data:`OFFLINE` (default — the historical
+        behaviour of this function).
 
     Returns
     -------
     list of OperatingPoint
         One candidate per known engine, provenance flagged on both axes.
     """
+    from speaker_helper.eval.priors import TTS_QUALITY_PRIORS
+    from speaker_helper.profiles import MEASURED_RTF
+
+    base = (language or "").lower().split("-")[0]
     points: list[OperatingPoint] = []
 
     # 1) The measured kokoro point for this language, straight off the profile.
-    #    ``measured_rtf`` is real (in-process tuning); quality is still the prior
-    #    until a WER/chrF round-trip recalibrates it, so flag the axes honestly.
     prof = profile_for(language)
     kokoro_rtf = prof.measured_rtf
-    # Quality is a real UTMOSv2 MOS only for (engine, language) pairs the study
-    # has measured (see profiles.MEASURED_MOS); otherwise it is the engine prior.
-    kokoro_quality_measured = language in MEASURED_MOS.get("kokoro", set())
+    quality, quality_source = _quality_for("kokoro", language, condition)
     points.append(
         OperatingPoint(
             engine="kokoro",
-            quality=prof.measured_quality or engine_quality_prior("kokoro"),
+            quality=quality,
             mean_rtf=kokoro_rtf,
-            quality_source="measured_mos" if kokoro_quality_measured else "prior",
+            quality_source=quality_source,
             rtf_source="measured" if kokoro_rtf is not None else "unknown",
             language=language,
         )
     )
 
-    # 2) Every other engine we hold a quality prior for *and* a backend that
-    #    can actually serve it. RTF is unknown (never timed here), so these are
-    #    quality-only candidates: usable for offline quality maximisation,
-    #    excluded from online routing by default. Engines without an in-tree
-    #    backend (qwen3_tts, f5, xtts, …) keep their priors for the eval layer
-    #    but never enter a routing decision no `create_engine` could honour.
-    #
-    #    Deliberately PRIORS, not the A/B bench's UTMOSv2 numbers: the owner
-    #    rejected that metric as the offline criterion — it scores a generic
-    #    anonymous-panel "naturalness" (English-trained), not "réaliste et
-    #    vivante" to a human ear — see profiles.py's note and STUDY.md §8 bis.
-    #    The priors encode the owner's editorial choice, honestly flagged
-    #    `prior`/low-confidence, until human listening data replaces them.
-    # Only the priors table is imported here; engine_quality_prior is already
-    # a module-level import (re-importing it locally would shadow the earlier
-    # kokoro-point use above into an UnboundLocalError on unmeasured languages).
-    from speaker_helper.eval.priors import TTS_QUALITY_PRIORS
-
+    # 2) Every other engine with an in-tree backend. Engines without one
+    #    (qwen3_tts, f5, xtts, …) keep their priors for the eval layer but
+    #    never enter a routing decision no `create_engine` could honour.
     for engine in TTS_QUALITY_PRIORS:
         # kokoro already added with its measured RTF; mock is a test signal, not
         # a shippable voice, so it never competes for a real routing decision.
@@ -311,16 +348,18 @@ def default_operating_points(language: str = "fr") -> list[OperatingPoint]:
         backend = ENGINE_BACKENDS.get(engine)
         if backend is None:
             continue
+        quality, quality_source = _quality_for(engine, language, condition)
+        # RTF from the streaming bench where measured (sustained RTF through
+        # Speaker.stream on the reference host), honestly unknown elsewhere —
+        # and the online condition refuses unknown-RTF engines by default.
+        measured_rtf = MEASURED_RTF.get(engine, {}).get(base)
         points.append(
             OperatingPoint(
                 engine=engine,
-                # Language-aware where the survey found an asymmetry (kyutai's
-                # native French vs chatterbox's English-first French — see
-                # priors.TTS_QUALITY_PRIORS_BY_LANG), the base prior elsewhere.
-                quality=engine_quality_prior(engine, language),
-                mean_rtf=None,
-                quality_source="prior",
-                rtf_source="unknown",
+                quality=quality,
+                mean_rtf=measured_rtf,
+                quality_source=quality_source,
+                rtf_source="measured" if measured_rtf is not None else "unknown",
                 backend=backend,
                 language=language,
             )
@@ -369,8 +408,10 @@ def _confidence(point: OperatingPoint) -> str:
     """Rate how trustworthy a point is from its two provenance flags."""
     # Both axes measured → we stand on real numbers; one measured → medium; a
     # decision resting entirely on priors is explicitly low-confidence. Quality
-    # counts as measured whether it came from a round-trip chrF or a UTMOSv2 MOS.
-    measured_q = point.quality_source in ("measured_chrf", "measured_mos")
+    # counts as evidenced whether it came from a round-trip chrF, a UTMOSv2
+    # MOS, or a public arena Elo (human pairwise votes — the online
+    # condition's ratified criterion); "no_public_elo" and "prior" do not.
+    measured_q = point.quality_source in ("measured_chrf", "measured_mos", "public_elo")
     measured_r = point.rtf_source == "measured"
     if measured_q and measured_r:
         return "high"
@@ -426,7 +467,9 @@ def route(
     elif points is not None:
         candidates = list(points)
     else:
-        candidates = default_operating_points(request.language)
+        # The catalogue is condition-aware: quality is ranked by the public
+        # arena Elo online and by the owner-ratified priors offline.
+        candidates = default_operating_points(request.language, request.condition)
     n_considered = len(candidates)
     if not candidates:
         raise ValueError("no candidate operating points to route over")
