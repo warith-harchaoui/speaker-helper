@@ -15,13 +15,14 @@ Quatre modes d'exploitation, croisement de deux axes :
 
 | | **Local gratuit (open source)** | **Cloud payant (propriétaire)** |
 |---|---|---|
-| **Offline (différé)** | ← **la présente recherche** | ElevenLabs v4, Cartesia Sonic 3.6, MiniMax… (plafond de qualité actuel) |
-| **Streaming (temps réel)** | → **[STREAMING.md](STREAMING.md)** (Elo public × RTF) | Cartesia Sonic, ElevenLabs Flash, Inworld |
+| **Offline (différé)** | ← **la présente recherche** → **fr kyutai · en chatterbox-turbo · autres multilingual** (ratifié) | **pré-choisi : ElevenLabs** (décision 2026-10-26 ; clef API à obtenir ; backend à écrire) |
+| **Streaming (temps réel)** | → **[STREAMING.md](STREAMING.md)** → **fr/en kokoro** (Elo public × RTF) | **pré-choisi : ElevenLabs** (même décision ; Cartesia Sonic en challenger d'arène) |
 
-Deux cases hors-diagonale existent aussi et sont documentées en §7 : le
-**propriétaire local** (voix Premium d'Apple — gratuites ; SDK Acapela,
-Picovoice Orca — payants) et les offres on-prem/on-device des grands du cloud
-(quasi toutes verrouillées enterprise en 2026).
+Deux cases hors-diagonale existent aussi, documentées en §7 pour mémoire : le
+**propriétaire local** (SDK Acapela, Picovoice Orca… — et les voix intégrées
+d'Apple, **écartées : jugées mauvaises à l'écoute par le propriétaire**,
+quoi qu'en disent leurs fiches) et les offres on-prem/on-device des grands du
+cloud (quasi toutes verrouillées enterprise en 2026).
 
 **Critères durs pour la case visée :**
 
@@ -189,6 +190,15 @@ vitrine.
 
 ## 7. Les autres cases de la matrice (pour plus tard)
 
+> **Pré-choix ratifié (2026-10-26)** : pour les deux cases « cloud payant »
+> (offline et streaming), le fournisseur pressenti est **ElevenLabs** —
+> cohérent avec les arènes (ses modèles v3/v4 tiennent le haut des
+> classements humains) et avec le constat du LANDSCAPE (« genuinely
+> best-in-class on streaming and cloning quality »). Rien n'est implémenté :
+> pas de clef API à ce jour, le backend `elevenlabs` reste à écrire le jour
+> où la case s'ouvre. Challenger à re-regarder à ce moment-là : Cartesia
+> Sonic (n°1 des arènes multilingues, dont le français, fin 2026).
+
 Résumé du volet propriétaire offline — utile le jour où la case « cloud
 payant » ou « propriétaire local » s'ouvre :
 
@@ -198,15 +208,16 @@ payant » ou « propriétaire local » s'ouvre :
   réservé aux clients gérés par Microsoft) ; Cartesia on-prem/on-device (ironie :
   kernels Metal Apple, beta privée) ; ElevenLabs on-prem/on-device (annoncé
   avril 2026, liste d'attente) ; Camb.ai, Cerence.
-- **Réellement accessible** : les **voix Apple intégrées** (gratuites, offline,
-  natives : Ava/Zoe en Premium EN, Audrey/Aurélie FR, contrôle IPA via
-  `AVSpeechSynthesisIPANotationAttribute` pour en-US **et** fr-FR — qualité
-  « bonne mais plate », voix Siri interdites aux apps tierces) ;
+- **Réellement accessible** (sur le papier) :
   **Picovoice Orca** (self-serve, macOS arm64, FR + EN, prononciations ARPAbet,
   réalisme moyen) ; SDK **Acapela** (meilleur catalogue féminin FR — Claire,
   Manon, Margaux — et excellent outillage lexique/SAMPA ; devis, build Apple
   Silicon à confirmer) ; **CereProc/Capacity** (macOS, historiquement
-  indie-friendly, continuité post-rachat à vérifier).
+  indie-friendly, continuité post-rachat à vérifier). Les **voix intégrées
+  d'Apple** (Ava/Zoe, Audrey/Aurélie), que la presse spécialisée décrivait
+  comme « bonnes », sont **écartées : le propriétaire les a écoutées et les
+  juge mauvaises** — rappel utile que les fiches et revues ne remplacent pas
+  une oreille, exactement la leçon du §8 bis.
 - **Morts** : Play.ht/PlayAI (fermé déc. 2025), Nuance Vocalizer (retiré
   2025-2026), Supertonic (archivé sept. 2026).
 
