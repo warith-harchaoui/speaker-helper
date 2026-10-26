@@ -33,12 +33,27 @@ minimal web GUI — runnable locally (conda + pip) or as a Docker server.
   real time (real-time factor well below 1.0) — no GPU required.
 - **Backend-agnostic, and nothing to launch.** The engine is an implementation
   detail behind a `TTSEngine` protocol, and every backend runs **in this
-  process**. Four ship: `kokoro` (the default — ONNX Runtime, 54 voices),
-  `openvoice` and `chatterbox` (cloning from a recording), and a deterministic
-  `mock` for tests and CI. A new backend is one `register_backend` call.
+  process**. Five ship: `kokoro` (the default — ONNX Runtime, 54 voices),
+  `openvoice` and `chatterbox` (cloning from a recording; the chatterbox
+  backend auto-picks its Turbo model for English and its 23-language
+  Multilingual model elsewhere), `kyutai` (native French and English from
+  Kyutai's 1.6B model, voices from a published embedding bank), and a
+  deterministic `mock` for tests and CI. A new backend is one
+  `register_backend` call.
 - **Voice cloning, everywhere.** Point at a recording and speaker-helper clones
   the voice — in the library, CLI, REST API, and GUI. Missing transcripts are
   derived automatically with [`vocal-helper`](https://github.com/warith-harchaoui).
+- **A pronunciation lexicon, applied by default.** State once, in a
+  `lexicon.yaml`, how a word is pronounced — exact IPA (spliced verbatim into
+  kokoro's phoneme stream, deterministic) or an orthographic respelling (for
+  engines without phoneme access). An entry with neither gets its respelling
+  derived **once** by a local LLM (resolved through `best-engine-ai-helper`,
+  served by Ollama) and cached; after that, everything is deterministic and
+  offline. See [`lexicon.yaml.example`](lexicon.yaml.example).
+- **Long texts don't degrade.** Past ~500 characters, `say()` synthesises
+  sentence-group chunks and concatenates them; the local LLM places the cuts
+  at discourse boundaries (it only ever *groups* locally-split sentences, so
+  the text cannot change), with a deterministic greedy fallback.
 - **Built-in AI evaluation.** A committed dataset, versioned thresholds, and
   speed/anomaly/fidelity metrics gate quality in CI — no vibe checks. Quality is
   measured as round-trip **intelligibility** (text→speech→text WER/chrF).
@@ -75,7 +90,8 @@ flowchart LR
         eval["evaluation<br/>RTF · anomalies · WER/chrF"]:::eval
         subgraph BE["backends, selected by settings.backend"]
             kokoro["kokoro — default<br/>ONNX Runtime · 54 voices"]:::engine
-            clone["openvoice · chatterbox<br/>cloning"]:::engine
+            clone["openvoice · chatterbox<br/>cloning · turbo/multilingual"]:::engine
+            kyutai["kyutai<br/>native FR+EN · voice bank"]:::engine
             mock["mock<br/>deterministic · no model"]:::engine
         end
     end
@@ -86,10 +102,12 @@ flowchart LR
     router -.->|picks| speaker
     speaker -- "TTSEngine protocol" --> kokoro
     speaker -- "TTSEngine protocol" --> clone
+    speaker -- "TTSEngine protocol" --> kyutai
     speaker -- "TTSEngine protocol" --> mock
     weights -.->|loaded once| kokoro
     kokoro --> audio
     clone --> audio
+    kyutai --> audio
     mock --> audio
     speaker -.->|measured by| eval
     eval -.->|evidence| router

@@ -36,14 +36,30 @@ Python typée, une CLI, une API REST et une GUI web minimale. En local
   que le temps réel (RTF nettement inférieur à 1.0) — sans GPU.
 - **Agnostique du moteur et rien à lancer.** Le moteur est un détail
   d'implémentation derrière le protocole `TTSEngine` et chaque backend tourne
-  **dans ce processus**. Quatre sont livrés : `kokoro` (le défaut — ONNX
+  **dans ce processus**. Cinq sont livrés : `kokoro` (le défaut — ONNX
   Runtime, 54 voix), `openvoice` et `chatterbox` (clonage depuis un
-  enregistrement) et un `mock` déterministe pour les tests et la CI. Ajouter un
-  backend, c'est un seul appel à `register_backend`.
+  enregistrement ; le backend chatterbox choisit tout seul son modèle Turbo
+  pour l'anglais et son modèle Multilingual — 23 langues — ailleurs),
+  `kyutai` (français et anglais natifs du modèle 1.6B de Kyutai, voix tirées
+  d'une banque d'embeddings publiée) et un `mock` déterministe pour les tests
+  et la CI. Ajouter un backend, c'est un seul appel à `register_backend`.
 - **Clonage de voix, partout.** Pointez vers un enregistrement, speaker-helper
   clone la voix — dans la bibliothèque, la CLI, l'API REST et la GUI. Les
   transcriptions manquantes sont produites automatiquement avec
   [`vocal-helper`](https://github.com/warith-harchaoui).
+- **Un lexique de prononciation, appliqué d'office.** Déclarez une fois, dans
+  un `lexicon.yaml`, comment un mot se prononce — en IPA exact (épissé tel
+  quel dans le flux de phonèmes de kokoro, déterministe) ou en ré-écriture
+  orthographique (pour les moteurs sans accès phonémique). Une entrée sans ni
+  l'un ni l'autre voit sa ré-écriture dérivée **une seule fois** par un LLM
+  local (résolu via `best-engine-ai-helper`, servi par Ollama) puis mise en
+  cache ; ensuite tout est déterministe et hors-ligne. Voir
+  [`lexicon.yaml.example`](lexicon.yaml.example).
+- **Les longs textes ne se dégradent pas.** Au-delà d'environ 500 caractères,
+  `say()` synthétise par groupes de phrases puis concatène ; le LLM local
+  place les coupes aux frontières du discours (il ne fait que *grouper* des
+  phrases découpées localement, le texte ne peut donc pas changer), avec un
+  repli glouton déterministe.
 - **Évaluation IA intégrée.** Un jeu de données committé, des seuils versionnés
   et des métriques de vitesse, d'anomalie et de fidélité verrouillent la qualité en CI :
   pas de « vibe checks ». La qualité se mesure comme l'**intelligibilité** en
@@ -82,7 +98,8 @@ flowchart LR
         eval["évaluation<br/>RTF · anomalies · WER/chrF"]:::eval
         subgraph BE["backends, choisis par settings.backend"]
             kokoro["kokoro — défaut<br/>ONNX Runtime · 54 voix"]:::engine
-            clone["openvoice · chatterbox<br/>clonage"]:::engine
+            clone["openvoice · chatterbox<br/>clonage · turbo/multilingue"]:::engine
+            kyutai["kyutai<br/>FR+EN natifs · banque de voix"]:::engine
             mock["mock<br/>déterministe · sans modèle"]:::engine
         end
     end
@@ -93,10 +110,12 @@ flowchart LR
     router -.->|choisit| speaker
     speaker -- "protocole TTSEngine" --> kokoro
     speaker -- "protocole TTSEngine" --> clone
+    speaker -- "protocole TTSEngine" --> kyutai
     speaker -- "protocole TTSEngine" --> mock
     weights -.->|chargé une fois| kokoro
     kokoro --> audio
     clone --> audio
+    kyutai --> audio
     mock --> audio
     speaker -.->|mesuré par| eval
     eval -.->|preuves| router

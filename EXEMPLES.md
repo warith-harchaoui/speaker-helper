@@ -342,3 +342,82 @@ async def main() -> None:
 
 asyncio.run(main())
 ```
+
+---
+
+## 13. Lexique de prononciation : fixer la prononciation d'un mot, une fois
+
+Copiez `lexicon.yaml.example` vers `lexicon.yaml` à côté de votre
+`settings.yaml` (ou pointez `settings.lexicon.path` / `SPEAKER_HELPER_LEXICON`
+dessus) et chaque synthèse — Python, CLI, REST, GUI — l'honore
+automatiquement :
+
+```yaml
+# lexicon.yaml
+entries:
+  - word: "Grasse"        # phonèmes exacts : déterministe sur kokoro
+    language: fr
+    ipa: "ɡʁas"
+  - word: "GitHub"        # ré-écriture orthographique : marche sur tous les moteurs
+    language: fr
+    respelling: "guite-heube"
+  - word: "RGPD"          # ni l'un ni l'autre -> le LLM local dérive une ré-écriture
+    language: fr          #   une seule fois (best-engine-ai-helper + Ollama), puis cache
+```
+
+```python
+from speaker_helper import Speaker, Settings
+
+Speaker(Settings.load()).save("Le RGPD s'applique à GitHub, même à Grasse.", "out.wav")
+# kokoro épisse /ɡʁas/ à son étape de phonémisation ; un moteur sans phonèmes
+# (chatterbox, kyutai) prononce les ré-écritures à la place. La ré-écriture
+# dérivée pour RGPD atterrit dans lexicon.yaml.llm-cache.yaml — supprimez une
+# ligne pour re-dériver, ou déplacez-la dans `respelling:` pour en faire une
+# décision humaine.
+```
+
+---
+
+## 14. Longs textes : découpés aux frontières du discours
+
+`say()` coupe tout texte plus long que `chunking.max_chars` (500 par défaut)
+en groupes de phrases, les synthétise dans l'ordre et concatène — parce que
+tout moteur neuronal se dégrade au-delà de sa zone de confort. Le LLM local
+place les frontières (il ne fait que *grouper* des phrases découpées
+localement : le texte lui-même ne peut pas changer) ; sans Ollama, un
+empaquetage glouton s'en charge :
+
+```yaml
+# settings.yaml — tout est optionnel, voici les défauts
+chunking:
+  enabled: true
+  llm: true
+  max_chars: 500
+```
+
+---
+
+## 15. Les règles de langue, de bout en bout
+
+Les défauts appliquent l'étude d'octobre 2026 (`STUDY.md`, branche
+`research`), avec **une voix féminine dans chaque langue** :
+
+```python
+from speaker_helper import Speaker
+
+# Français -> kyutai (français natif, voix "developpeuse-3", féminine)
+spk = Speaker.from_route("offline", language="fr")
+
+# Anglais -> chatterbox, variante Turbo (féminine via la référence bundlée)
+spk = Speaker.from_route("offline", language="en")
+
+# Toute autre langue -> chatterbox, variante Multilingual (23 langues)
+spk = Speaker.from_route("offline", language="es")
+
+# Le streaming temps réel reste sur les preuves mesurées -> kokoro (RTF ~0,22 CPU)
+spk = Speaker.from_route("online_realtime", language="fr")
+```
+
+La résolution de langue suit partout une seule règle : **précisée → crue,
+non précisée → détectée** (`langdetect`, graine fixée), avec la `language`
+configurée en dernier recours.
