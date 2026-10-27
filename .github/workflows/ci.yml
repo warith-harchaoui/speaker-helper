@@ -15,6 +15,7 @@ jobs:
   lint:
     name: Lint (ruff)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -37,6 +38,7 @@ jobs:
   test:
     name: Tests (py${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       # The two ends of `requires-python = ">=3.10,<3.14"`, not every version in
@@ -63,7 +65,26 @@ jobs:
       # audio-helper slices/concatenates audio through ffmpeg; the fast suite
       # exercises that path (voice-clone trimming), so ffmpeg must be present.
       - name: System deps (ffmpeg)
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+        run: |
+          # A bounded, retried apt. This step is the only thing that has ever made
+          # this workflow slow: it normally takes ~20 s, but a stalled Azure mirror
+          # has made it take 31 minutes. Each attempt is capped so a stall is
+          # abandoned and retried rather than waited on; `timeout` exits 124 when it
+          # fires, which separates "mirror stalled" from "no such package" in the log.
+          for attempt in 1 2 3; do
+            # The failure code is read in the `else` branch on purpose: after a plain
+            # `if ...; fi`, `$?` is the status of the `if` itself, which is 0 even when
+            # the condition failed. Reporting that would print "exit 0" next to the word
+            # "failed" and send the next reader looking in the wrong place.
+            if timeout 240 sudo apt-get update && timeout 240 sudo apt-get install -y ffmpeg; then
+              exit 0
+            else
+              echo "apt attempt ${attempt} failed or stalled (exit $?); retrying"
+            fi
+            sleep 5
+          done
+          echo "apt-get install ffmpeg failed three times - the mirror is down, not your change."
+          exit 1
       - name: Install (dev + server)
         run: pip install -e ".[dev,server]"
       # The @slow test is a real-time-factor benchmark against the real engine:
