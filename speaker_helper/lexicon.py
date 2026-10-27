@@ -715,6 +715,44 @@ def phonemise_with_lexicon(
 # ---------------------------------------------------------------------------
 
 
+#: Directory of the built-in per-language lexicons shipped with the package:
+#: one YAML per ISO-639-1 code (``fr.yaml``, ``en.yaml``). Each file holds
+#: measured respellings of proper nouns the G2P of that language gets wrong
+#: ("Van Gogh" read with an English guttural in French, "Gide" read "gaide"
+#: in English). They apply to EVERY synthesis unless ``lexicon.builtin:
+#: false``; a user lexicon is layered on top and wins on a shared word.
+_BUILTIN_DIR = Path(__file__).resolve().parent / "lexicons"
+
+
+def builtin_entries() -> list[LexiconEntry]:
+    """The packaged per-language entries, language stamped from the filename.
+
+    Returns
+    -------
+    list of LexiconEntry
+        Every entry of every ``lexicons/<code>.yaml``, with ``language`` set
+        to ``<code>`` (the files do not repeat it) and ``source`` set to
+        ``"builtin"`` so a merged lexicon stays auditable.
+    """
+    entries: list[LexiconEntry] = []
+    for path in sorted(_BUILTIN_DIR.glob("*.yaml")):
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        for raw in data.get("entries") or []:
+            word = str(raw.get("word") or "").strip()
+            if not word:
+                continue
+            entries.append(
+                LexiconEntry(
+                    word=word,
+                    language=path.stem,
+                    ipa=str(raw.get("ipa") or "").strip().strip("/"),
+                    respelling=str(raw.get("respelling") or "").strip(),
+                    source="builtin",
+                )
+            )
+    return entries
+
+
 def load_lexicon(settings: Settings) -> Lexicon | None:
     """Resolve and load the lexicon the settings point at, if any.
 
@@ -740,6 +778,9 @@ def load_lexicon(settings: Settings) -> Lexicon | None:
     # `enabled: false` switches the whole feature off regardless of files.
     if not bool(cfg.get("enabled", True)):
         return None
+    # The packaged per-language entries come first so a user file can
+    # override any of them; `builtin: false` opts out of them entirely.
+    base = builtin_entries() if bool(cfg.get("builtin", True)) else []
     raw_path = str(cfg.get("path") or "").strip()
     path = Path(raw_path) if raw_path else Path("lexicon.yaml")
     if not path.exists():
@@ -747,8 +788,19 @@ def load_lexicon(settings: Settings) -> Lexicon | None:
         # implicit ./lexicon.yaml simply not existing is the normal quiet case.
         if raw_path:
             osh.warning("lexicon: configured file %s does not exist — no lexicon", path)
-        return None
+        if not base:
+            return None
+        lexicon = Lexicon(base, path=None, llm_enabled=bool(cfg.get("llm", True)))
+        osh.info("lexicon: %d built-in entries, no user file", len(base))
+        return lexicon
     lexicon = Lexicon.load(path)
+    if base:
+        # Rebuild with the user's entries LAST: the constructor indexes in
+        # order and later entries win, which is exactly the layering wanted.
+        merged = base + [e for bucket in lexicon._by_lang.values() for e in bucket.values()]
+        fusion = Lexicon(merged, path=lexicon.path, llm_enabled=lexicon.llm_enabled)
+        fusion._cache = getattr(lexicon, "_cache", {})
+        lexicon = fusion
     # `llm: false` in settings wins over the file's own `llm:` key, so an
     # operator can forbid LLM calls machine-wide without editing lexicons.
     if not bool(cfg.get("llm", True)):

@@ -182,7 +182,7 @@ include = ["speaker_helper*"]
 # Ship the committed evaluation dataset and threshold bar inside the wheel so
 # the eval layer works from an installed package, not only a source checkout.
 [tool.setuptools.package-data]
-speaker_helper = ["eval/data/*.jsonl", "eval/*.yaml", "gui/*.html", "gui/*.js"]
+speaker_helper = ["eval/data/*.jsonl", "eval/*.yaml", "gui/*.html", "gui/*.js", "lexicons/*.yaml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

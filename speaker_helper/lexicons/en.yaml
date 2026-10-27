@@ -1,0 +1,11 @@
+# Built-in English pronunciation lexicon, shipped with speaker-helper.
+# One file per language (the code is the file name); a user lexicon.yaml is
+# layered ON TOP and wins on a shared word. Every respelling below was
+# measured with espeak-ng (`espeak-ng -v en-us --ipa`), never guessed.
+entries:
+  - { word: "Gide",        respelling: "Zheed" }          # else "gaide"
+  - { word: "Aeschylus",   respelling: "Esskilus" }       # else "eeshilus"
+  - { word: "Castiglione", respelling: "Kahsteelyonay" }  # else "castiglayony"
+  - { word: "sprezzatura", respelling: "spretsatoora" }   # else "sprezzachura"
+  - { word: "Illich",      respelling: "Illitch" }        # else "illik"
+  - { word: "Tati",        respelling: "tahtee" }         # else "taddy"

@@ -210,9 +210,14 @@ def test_load_lexicon_resolution_and_switches(
     # enabled: false turns the whole feature off regardless of the file.
     disabled = Settings.from_mapping({"lexicon": {"path": str(file), "enabled": False}})
     assert load_lexicon(disabled) is None
-    # No configured path and no ./lexicon.yaml → quietly no lexicon.
+    # No configured path and no ./lexicon.yaml → the BUILT-IN per-language
+    # entries still apply (that is the point of shipping them); opting out
+    # of them as well is what yields no lexicon at all.
     monkeypatch.chdir(tmp_path)
-    assert load_lexicon(Settings.from_mapping({})) is None
+    builtin_only = load_lexicon(Settings.from_mapping({}))
+    assert builtin_only is not None
+    assert "Vane Gogue" in builtin_only.respell("Van Gogh peint.", "fr")
+    assert load_lexicon(Settings.from_mapping({"lexicon": {"builtin": False}})) is None
     # The environment override points every process at one shared lexicon.
     monkeypatch.setenv("SPEAKER_HELPER_LEXICON", str(file))
     assert load_lexicon(Settings.from_mapping({})) is not None
@@ -454,3 +459,43 @@ def test_online_decision_is_elo_ranked_and_rtf_gated() -> None:
     assert d.quality_source == "public_elo"
     assert d.confidence == "high"
     assert d.mode == "streaming"
+
+
+# ── Built-in per-language lexicons ──────────────────────────────────────────
+
+
+def test_builtin_lexicons_load_and_apply() -> None:
+    """The packaged per-language files apply without any user lexicon.
+
+    "Van Gogh" in French and "Gide" in English are the canonical cases: both
+    are mangled by the default G2P, both are stated once in the shipped
+    ``lexicons/<code>.yaml``, and both must come out respelled on a machine
+    with no ``lexicon.yaml`` at all.
+    """
+    entries = lexicon_mod.builtin_entries()
+    assert entries, "the packaged lexicons are empty"
+    assert all(e.source == "builtin" for e in entries)
+    lex = lexicon_mod.Lexicon(entries)
+    assert "Vane Gogue" in lex.respell("Van Gogh peint.", "fr")
+    assert "Stanislasse" in lex.respell("Stanislas, 2021", "fr")
+    assert "Zheed" in lex.respell("Gide wrote plays.", "en")
+    # et la langue borne l'entree : Gide en francais reste Gide
+    assert lex.respell("Gide écrit.", "fr") == "Gide écrit."
+
+
+def test_user_lexicon_wins_over_builtin(tmp_path: Path) -> None:
+    """A user entry on a built-in word replaces it, the rest survives."""
+    user = tmp_path / "lexicon.yaml"
+    entree = {"word": "Van Gogh", "language": "fr", "respelling": "Vinnecent"}
+    user.write_text(yaml.safe_dump({"entries": [entree]}), encoding="utf-8")
+    settings = Settings.from_mapping({"lexicon": {"path": str(user)}})
+    lex = lexicon_mod.load_lexicon(settings)
+    assert lex is not None
+    assert "Vinnecent" in lex.respell("Van Gogh peint.", "fr")
+    assert "Stanislasse" in lex.respell("Stanislas, 2021", "fr")
+
+
+def test_builtin_optout(tmp_path: Path) -> None:
+    """``lexicon.builtin: false`` leaves only the user file, or nothing."""
+    settings = Settings.from_mapping({"lexicon": {"builtin": False}})
+    assert lexicon_mod.load_lexicon(settings) is None

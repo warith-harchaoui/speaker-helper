@@ -1,0 +1,26 @@
+# Lexique de prononciation français livré DE BASE avec speaker-helper.
+# Un fichier par langue (le code est le nom du fichier) ; le lexicon.yaml de
+# l'utilisateur se pose PAR-DESSUS et gagne sur un mot commun. Chaque
+# respelling ci-dessous a été mesuré à espeak-ng (`espeak-ng -v fr --ipa`),
+# jamais deviné : la graphie de gauche sort faux, celle de droite sort juste.
+entries:
+  - { word: "Stanislas",   respelling: "Stanislasse" }   # le s final se dit
+  - { word: "Van Gogh",    respelling: "Vane Gogue" }    # sinon gott anglais
+  - { word: "Eschyle",     respelling: "Esskil" }        # ch dur, pas "échile"
+  - { word: "Feynman",     respelling: "Faïnemane" }     # sinon "fènman"
+  - { word: "Goodhart",    respelling: "Goudharte" }     # sinon "go-odar"
+  - { word: "Drucker",     respelling: "Droukeur" }      # sinon "druqué"
+  - { word: "Sutton",      respelling: "Seutone" }       # sinon "suton" nasal
+  - { word: "Sculley",     respelling: "Skeuli" }        # sinon "skulé"
+  - { word: "Krug",        respelling: "Kroug" }         # sinon "kreug"
+  - { word: "Illich",      respelling: "Illitch" }       # sinon "ilich"
+  - { word: "Castiglione", respelling: "Castiglioné" }   # le e final se dit
+  - { word: "Bainbridge",  respelling: "Bènebridge" }    # sinon "bin-bridge"
+  - { word: "Norman",      respelling: "Normane" }       # sinon "normant"
+  - { word: "Riley",       respelling: "Raïli" }         # sinon "rilè"
+  - { word: "Huntley",     respelling: "Heunntli" }      # sinon "untlè"
+  - { word: "McKinsey",    respelling: "Mac Kinnzé" }    # sinon "èm-cé kinsè"
+  - { word: "Princeton",   respelling: "Prinnstone" }    # sinon "prin-ston" nasal
+  - { word: "Deep Blue",   respelling: "Dipe Blou" }     # sinon "deep bly"
+  - { word: "BMAD",        respelling: "bé-mad" }        # sinon une seule syllabe
+  - { word: "ChatGPT",     respelling: "Tchatte GPT" }   # sinon "cha jépété"
