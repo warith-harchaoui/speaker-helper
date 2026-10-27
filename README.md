@@ -303,9 +303,14 @@ evidence. You state an operating **condition** and it returns a concrete engine
 - **`offline`** — batch. There is no real-time constraint, so **quality is the
   only objective**: the highest-quality engine wins, speed disregarded.
 
-Quality is measured as round-trip **intelligibility** (text→speech→text WER/chrF
-via `vocal-helper`) or, until an engine is measured, an inherited prior — every
-decision reports which (`quality_source`) and a `confidence` flag.
+The two conditions rank quality on **different criteria**, and every decision
+reports which one it used (`quality_source`) plus a `confidence` flag.
+`online_realtime` reads the public arena Elo (`public_elo` — human pairwise
+votes; an engine listed on no public arena scores `0.0` with `no_public_elo`
+rather than inheriting a flattering prior). `offline` reads the owner-ratified
+per-language priors (`prior`), or a measurement where one exists — kokoro's
+UTMOSv2 score (`measured_mos`), or the round-trip chrF of your own evaluation
+reports (`measured_chrf`) when you pass them in.
 
 ```python
 from speaker_helper import route, RouteRequest, Speaker

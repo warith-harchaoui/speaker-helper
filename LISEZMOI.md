@@ -220,7 +220,7 @@ profond : `pip install "speaker-helper[chatterbox]"` (ou `[openvoice]`).
 Le moteur par défaut ne touche jamais à Hugging Face. Ses deux fichiers viennent
 d'une release GitHub épinglée puis vivent dans un cache local et rien n'est
 récupéré pendant la synthèse — si bien que mettre `kokoro` en environnement clos
-revient à posséder ce cache, et rien d'autre :
+revient à posséder ce cache — rien d'autre :
 
 ```bash
 speaker-helper install-voice            # sur une machine qui a le réseau
@@ -320,10 +320,15 @@ un moteur et un mode concrets, justifiés par les chiffres, jamais devinés.
   qualité compte** : le moteur de plus haute qualité l'emporte, la
   vitesse est ignorée.
 
-La qualité se mesure comme l'**intelligibilité** en aller-retour
-(texte→parole→texte WER/chrF via `vocal-helper`) ou, tant qu'un moteur n'est pas
-mesuré, comme un prior hérité. Chaque décision indique lequel (`quality_source`) et porte un
-flag de `confidence`.
+Les deux conditions classent la qualité sur des **critères différents** ; chaque
+décision indique lequel (`quality_source`) puis porte un flag de `confidence`.
+`online_realtime` lit l'Elo d'arène publique (`public_elo` : des votes humains
+par paires ; un moteur absent de toute arène publique obtient `0.0` avec
+`no_public_elo` au lieu d'hériter d'un prior flatteur). `offline` lit les priors
+par langue ratifiés par le propriétaire (`prior`) — ou bien une mesure là où il
+en existe une : le score UTMOSv2 de kokoro (`measured_mos`), voire le chrF
+aller-retour de vos propres rapports d'évaluation (`measured_chrf`) si vous les
+fournissez.
 
 ```python
 from speaker_helper import route, RouteRequest, Speaker
