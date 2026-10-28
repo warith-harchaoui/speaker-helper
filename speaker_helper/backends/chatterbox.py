@@ -50,6 +50,8 @@ import time
 from pathlib import Path
 from typing import Any
 
+import os_helper as osh
+
 from speaker_helper.config import Settings
 from speaker_helper.types import AudioResult, Voice, VoiceList, VoiceSample
 
@@ -246,6 +248,12 @@ class ChatterboxEngine:
                 ) from None
         # device="cpu" is the floor, not the choice: the class detects an
         # accelerator itself and uses it when there is one.
+        # Say which model actually answers. The variant is picked from the
+        # language, not from config, so without this line nothing in a log or
+        # an eval report distinguishes English (Turbo) from every other
+        # language (Multilingual) — two different models behind one backend
+        # name, and the owner's offline matrix treats them as distinct cells.
+        osh.info("chatterbox: loading the %s model", variant)
         return cls.from_pretrained(device="cpu")
 
     async def aclose(self) -> None:
@@ -269,6 +277,16 @@ class ChatterboxEngine:
         output would change the pitch along with the rate.
         """
         import numpy as np
+
+        # Refuse an empty request here rather than letting it reach the model.
+        # Upstream's `punc_norm("")` does not fail — it SUBSTITUTES the English
+        # sentence "You need to add some text for me to talk.", which the model
+        # then dutifully speaks. Silently emitting an English sentence nobody
+        # asked for, in the middle of a French narration, is worse than a
+        # crash: it is wrong output that sounds deliberate. Same refusal as the
+        # kyutai backend, so the surfaces behave alike.
+        if not text or not text.strip():
+            raise ValueError("cannot synthesise empty text")
 
         # The variant is a per-call decision because a narration can mix
         # languages: English lines get Turbo, French ones Multilingual.
@@ -306,7 +324,29 @@ class ChatterboxEngine:
             kwargs["cfg_weight"] = PACE_CFG_WEIGHT.get(pace, 0.5)
 
         started = time.perf_counter()
-        wav = await asyncio.to_thread(model.generate, **kwargs)
+        try:
+            wav = await asyncio.to_thread(model.generate, **kwargs)
+        except IndexError as exc:
+            # Upstream bug, and one that lands squarely on this suite: the
+            # alignment watchdog (`AlignmentStreamAnalyzer`) is instantiated
+            # ONLY for the multilingual model — see `T3.inference`, guarded by
+            # `if self.hp.is_multilingual` — which is exactly the variant
+            # serving French and every non-English language here. On a text
+            # that tokenises to about three tokens it has no alignment window
+            # to reduce over and dies in `step()` with
+            # "max(): Expected reduction dim 1 to have non-zero size".
+            # Measured boundary (2026-10-28, chatterbox-tts 0.1.7): "Un." and
+            # "A." (3 tokens) fail, "Oui." and "Non." (4) succeed. There is no
+            # flag to disable the analyzer, so the least we owe a caller is an
+            # error that names the cause instead of a torch reduction error
+            # from four frames deep.
+            raise RuntimeError(
+                f"chatterbox {variant!r} could not synthesise {text!r}: upstream's "
+                "multilingual alignment watchdog needs a slightly longer phrase "
+                "(~4 tokens; 'Un.' fails where 'Oui.' succeeds). Group this "
+                "fragment with its neighbour, or use a backend without the "
+                "limitation."
+            ) from exc
         compute_s = time.perf_counter() - started
 
         samples = np.clip(wav.squeeze().detach().cpu().numpy(), -1.0, 1.0)

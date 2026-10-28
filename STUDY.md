@@ -15,8 +15,8 @@ Quatre modes d'exploitation, croisement de deux axes :
 
 | | **Local gratuit (open source)** | **Cloud payant (propriétaire)** |
 |---|---|---|
-| **Offline (différé)** | ← **la présente recherche** → **fr chatterbox-multilingual · en chatterbox-turbo · autres multilingual** (ratifié ; le fr révisé le 2026-10-28, §8 ter) | **pré-choisi : ElevenLabs** (décision 2026-10-26 ; clef API à obtenir ; backend à écrire) |
-| **Streaming (temps réel)** | → **[STREAMING.md](STREAMING.md)** → **fr/en kokoro** (Elo public × RTF) | **pré-choisi : ElevenLabs** (même décision ; Cartesia Sonic en challenger d'arène) |
+| **Offline (différé)** | ← **la présente recherche** → **chatterbox pour TOUTES les langues** : en → Turbo, tout le reste → Multilingual (ratifié ; le fr révisé le 2026-10-28, §8 ter). **C'est aussi le défaut du produit** depuis le 2026-10-28, pas seulement la réponse du routeur (§8 quater) | **indécis : ElevenLabs ou NaturalReaders** (à trancher plus tard ; aucune clef API, aucun backend écrit) |
+| **Streaming (temps réel)** | → **[STREAMING.md](STREAMING.md)** → **kokoro pour le moment** (Elo public × RTF ; fr/en mesurés) | **indécis : ElevenLabs ou NaturalReaders** (Cartesia Sonic en challenger d'arène) |
 
 Deux cases hors-diagonale existent aussi, documentées en §7 pour mémoire : le
 **propriétaire local** (SDK Acapela, Picovoice Orca… — et les voix intégrées
@@ -414,9 +414,10 @@ Rappel du propriétaire, le même jour : **« pour le offline, on s'en fout du
 RTF ; pour le streaming, oui, c'est important. »** La règle existait depuis le
 §8 bis (« le RTF n'a rien à faire dans l'exposé d'une décision offline ») mais
 n'était tenue que par convention — et elle avait dérivé : la justification
-offline citait encore le `mean_rtf` du gagnant, et pire, la `confidence` d'une
-décision offline montait à `medium` *parce que* le RTF était mesuré, hissant un
-simple prior au rang de demi-preuve sur l'axe qui ne décide de rien.
+offline citait encore le `mean_rtf` du gagnant, et pire, la note de
+`confidence` d'une décision offline montait à `medium` *parce que* le RTF était
+mesuré, hissant un simple prior au rang de demi-preuve sur l'axe qui ne décide
+de rien.
 
 Elle est désormais **structurelle**, ce qui veut dire qu'elle ne peut plus
 dériver :
@@ -426,21 +427,39 @@ dériver :
 - une `RouteDecision` hors ligne porte `mean_rtf=None` et
   `rtf_source="not_considered"` — le nombre n'est pas là, il ne peut donc fuir
   ni dans une justification, ni dans un log, ni dans un tableau de bord en aval ;
-- la `confidence` hors ligne note **la seule preuve de qualité** : mesurée →
-  `high`, prior → `low`. Plus de `medium` offert par un chronomètre ;
 - la CLI n'imprime plus de couple `mean_rtf=…` sur un verdict offline ;
 - seule exception, assumée : un **budget de patience** que l'appelant fixe
   lui-même (`rtf_budget`, désactivé par défaut), nommé dans la justification
   comme *sa* contrainte, jamais comme une propriété du gagnant.
 
-Conséquence visible : le français offline est passé de `confidence=medium` à
-`confidence=low`. C'est la bonne note — la décision repose sur un arbitrage
-au-dessus d'un prior, et rien de ce qui la fonde n'a été mesuré. Trois tests
-verrouillent la règle (`test_offline_decisions_carry_no_rtf_at_all`,
-`test_offline_confidence_rates_quality_evidence_alone`,
+Trois tests verrouillent la règle
+(`test_offline_decisions_carry_no_rtf_at_all`,
+`test_decisions_report_provenance_and_no_confidence_grade`,
 `test_offline_ties_break_without_consulting_speed`). Le streaming, lui, ne
 bouge pas d'un iota : sa frontière de faisabilité `RTF < 1` reste le cœur du
 critère.
+
+### La note de « confidence » est supprimée (2026-10-28)
+
+Verdict du propriétaire, dans la foulée : **« tes critères de *confidence* sont
+bidons : abandonne-les. »** Il a raison, et le bug de RTF ci-dessus en était le
+symptôme, pas la cause. L'échelle `high` / `medium` / `low` était une invention
+de ce module : trois barreaux arbitraires posés par-dessus des faits, agrégeant
+deux axes de nature différente en une seule note, qui se lisait comme une mesure
+alors qu'elle n'était qu'un jugement de notre part. Une fois cet emballage
+accepté, rien n'empêchait un chronomètre de faire monter un prior d'un cran.
+
+`RouteDecision.confidence` **n'existe plus** — ni dans l'objet, ni dans le JSON
+de l'API, ni sur la ligne de la CLI, ni dans le badge de la GUI (qui colore
+désormais la **provenance** : mesurée en vert, prior en ambre, plus le badge
+`owner-ratified` quand l'arbitrage a joué).
+
+Ce qui reste est strictement factuel, et c'est tout ce dont un lecteur a
+besoin : **`quality_source`** (`measured_chrf`, `measured_mos`, `public_elo`,
+`prior`, `no_public_elo`) et **`rtf_source`** (`measured`, `estimate`,
+`unknown`, `not_considered`). D'où vient chaque nombre, dit en clair. La
+conclusion appartient à celui qui lit, pas à une note que nous aurions fabriquée
+pour lui.
 
 C'est le même statut épistémique que la paire qu'elle remplace : le jugement
 d'une oreille, pas une mesure, et en attente du même remplaçant — le protocole
@@ -448,6 +467,43 @@ d'écoute humaine par paires (§8 bis), dont les scores arriveront en
 `quality_source="measured_human"` et trancheront le cas français sur preuve
 plutôt que par arbitrage. Le trou de données reste entier : aucune arène
 publique ne classe les moteurs ouverts en français (STREAMING.md §1).
+
+## 8 quater. Le défaut du produit suit la matrice (2026-10-28)
+
+Jusqu'ici la matrice ne vivait que dans le **routeur**. Un appelant qui la
+demandait (`route`, `Speaker.from_route`) obtenait la bonne réponse ; un appelant
+qui ne demandait rien — un `Speaker()` nu, un `speaker-helper synth` — prenait le
+backend configuré, dont le défaut était `kokoro`. « Le français hors ligne va à
+chatterbox » était donc vrai du routeur et **faux du chemin par défaut**.
+
+Rappel du propriétaire : en local gratuit hors ligne, c'est **chatterbox pour
+toutes les langues**, avec **Turbo pour l'anglais** ; en local gratuit streaming,
+**kokoro pour le moment** ; le cloud payant attendra (ElevenLabs ou
+NaturalReaders, pas tranché). Priorité donnée explicitement au hors-ligne.
+
+`settings.backend` vaut désormais **`"auto"`** par défaut, résolu depuis `mode`
+— et résolu **à travers le routeur**, pas par une copie en dur de la matrice qui
+pourrait diverger : la ratification française, les priors par langue et la
+justification imprimée suivent gratuitement. Un backend nommé explicitement
+reste respecté tel quel. Points de détail qui comptent :
+
+- l'**exception anglaise** est portée par le backend lui-même
+  (`variant="auto"` → Turbo si `en`, Multilingual sinon), donc deux modèles
+  différents derrière un seul nom de backend. Le chargement le dit maintenant
+  dans les logs, sans quoi rien ne distinguait les deux cellules ;
+- `Speaker` stocke les réglages **résolus**, pas le sentinelle : `settings.engine`
+  est ce que les rapports d'éval utilisent comme étiquette, et laisser `"auto"`
+  aurait attribué de l'audio chatterbox à la mauvaise ligne ;
+- la condition online refuse une langue que personne n'a chronométrée plutôt que
+  d'affirmer qu'un moteur tient la cadence. C'est juste pour une *question* de
+  routage, mais ça ne doit pas laisser `synth --stream` sans moteur : le repli
+  est kokoro, le défaut streaming énoncé par le propriétaire, et il est
+  **journalisé** — un repli muet est la façon dont un défaut cesse de
+  correspondre à sa documentation.
+
+Le coût redouté (« charger 6 Go sur un simple `synth` ») n'existe pas à la
+construction : les backends sont instanciés paresseusement et ne chargent leurs
+poids qu'à la première synthèse. La CI reste donc légère.
 
 ## 9. Sources principales
 

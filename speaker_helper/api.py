@@ -183,8 +183,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def route_endpoint(req: RouteRequestBody) -> dict:
         """Choose an engine + mode from measured quality↔speed evidence.
 
-        Returns the routing decision (engine, mode, streaming knobs, provenance,
-        confidence, and a number-citing justification) for the requested
+        Returns the routing decision (engine, mode, streaming knobs, the
+        provenance of each number, and a number-citing justification) for the requested
         condition — ``online_realtime`` (speed=RTF, must keep up) or ``offline``
         (quality only). See :mod:`speaker_helper.router`.
         """

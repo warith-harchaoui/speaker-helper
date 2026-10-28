@@ -1,6 +1,6 @@
 {
-  "backend": "kokoro",
-  "engine": "kokoro",
+  "backend": "auto",
+  "engine": "auto",
   "voice": "",
   "language": "fr",
   "normalize": true,

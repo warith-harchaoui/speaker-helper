@@ -80,7 +80,7 @@ from speaker_helper.speaker import Speaker
 from speaker_helper.speech_text import NARRATE_ABOVE, complexity, speak_math, speakable
 
 # Deterministic sentence splitter used for streaming synthesis.
-from speaker_helper.text import chunk_for_streaming, split_sentences
+from speaker_helper.text import chunk_for_streaming, merge_short_fragments, split_sentences
 
 # Dataclasses exchanged across the public surface.
 from speaker_helper.types import (
@@ -95,7 +95,7 @@ from speaker_helper.types import (
 # Curated real presets, resolvable by language and gender.
 from speaker_helper.voices import PRESET_VOICES, voice_for, voices_for
 
-__version__ = "0.12.0"
+__version__ = "0.13.0"
 
 # Explicit, sorted public API: only these names are re-exported from the
 # package root; the sub-modules above hold the implementation.
@@ -131,6 +131,7 @@ __all__ = [
     "__version__",
     "available_backends",
     "chunk_for_streaming",
+    "merge_short_fragments",
     "create_engine",
     "default_operating_points",
     "profile_for",

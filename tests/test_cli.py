@@ -160,8 +160,9 @@ def test_serve_bind_is_the_servers_own_socket(captured) -> None:
     args, settings = captured[-1]
     assert args.bind_host == "0.0.0.0"
     assert args.bind_port == 9000
-    # Nothing about the bind address touches which engine speaks.
-    assert settings.backend == "kokoro"
+    # Nothing about the bind address touches which engine speaks: the backend
+    # is still the unresolved default, decided later from the operating mode.
+    assert settings.backend == "auto"
 
 
 def test_serve_refuses_the_old_host_spelling() -> None:

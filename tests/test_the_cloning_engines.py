@@ -103,3 +103,19 @@ def test_health_names_what_is_missing_without_loading_a_model(engine_class: type
     assert report["status"] in {"ok", "unavailable"}
     if report["status"] == "unavailable":
         assert report["fix"]
+
+
+def test_chatterbox_refuses_empty_text_before_loading_a_model() -> None:
+    """Empty input is refused here, because upstream does something worse.
+
+    ``chatterbox.mtl_tts.punc_norm("")`` does not raise — it SUBSTITUTES the
+    English sentence "You need to add some text for me to talk.", which the
+    model then speaks. Emitting an unrequested English sentence in the middle
+    of a French narration is worse than a crash: it sounds deliberate. The
+    refusal matches the kyutai backend's, so the surfaces behave alike, and it
+    happens before any weights are touched.
+    """
+    engine = ChatterboxEngine(Settings.from_mapping({"backend": "chatterbox", "language": "fr"}))
+    for blank in ("", "   ", "\n\t "):
+        with pytest.raises(ValueError, match="empty"):
+            asyncio.run(engine.synthesize(blank))

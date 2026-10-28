@@ -259,7 +259,7 @@ curl -s -X POST localhost:8080/route \
      -d '{"condition": "online_realtime", "language": "fr"}'
 # {"condition":"online_realtime","engine":"kokoro","backend":"kokoro",
 #  "mode":"streaming","quality":0.466,"mean_rtf":0.223,
-#  "quality_source":"public_elo","rtf_source":"measured","confidence":"high",
+#  "quality_source":"public_elo","rtf_source":"measured",
 #  "justification":"…","candidates_considered":3,"pareto_size":1}
 ```
 
@@ -412,13 +412,13 @@ from speaker_helper import RouteRequest, Speaker, route
 # tiennent la cadence, on maximise la qualité -> diffusion continue à faible
 # temps jusqu'au premier son.
 d = route(RouteRequest(condition="online_realtime", language="fr"))
-print(d.engine, d.mode, d.confidence, d.quality_source)
-# kokoro streaming high public_elo
+print(d.engine, d.mode, d.quality_source, d.rtf_source)
+# kokoro streaming public_elo measured
 
 # hors ligne : la qualité est le SEUL objectif (la vitesse est ignorée).
 d2 = route(RouteRequest(condition="offline", language="fr"))
-print(d2.engine, d2.mode, d2.confidence, d2.quality_source)
-# chatterbox offline low prior  <- « low » : hors ligne, la confiance note la seule preuve de QUALITÉ
+print(d2.engine, d2.mode, d2.quality_source, d2.rtf_source)
+# chatterbox offline prior not_considered
 
 # Le français est tranché par l'arbitrage du propriétaire, pas par l'argmax --
 # et le routeur le dit, au lieu de retoucher discrètement les scores.
@@ -450,8 +450,12 @@ chaque décision dit lequel via `quality_source` :
   (`prior`) — ou bien sur le score UTMOSv2 mesuré de kokoro là où il existe
   (`measured_mos`).
 
-`confidence` vaut `high` quand les deux axes sont mesurés, `medium` quand un
-seul l'est, `low` quand la décision ne repose que sur des priors.
+Il n'y a **aucune note de `confidence` dérivée** sur une décision. C'est
+délibéré. Une échelle high/medium/low inventée ici serait un jugement déguisé
+en mesure — et elle avait déjà commencé à nuire : un RTF mesuré hissait un
+simple prior à « medium » sur le chemin hors ligne, là où le RTF ne décide de
+rien. Vous obtenez `quality_source` et `rtf_source`, qui sont des faits, et
+vous concluez vous-même.
 
 Sous le capot, la condition en ligne choisit sur le **front de Pareto**
 qualité↔RTF ; vous pouvez utiliser cette primitive directement sur un lot de
@@ -637,7 +641,7 @@ print(spk.route.mean_rtf)                           # None
 
 # Le streaming temps réel roule sur du mesuré -> kokoro (RTF 0,223 en français)
 spk = Speaker.from_route("online_realtime", language="fr")
-print(spk.route.engine, spk.route.confidence)       # kokoro high
+print(spk.route.engine, spk.route.rtf_source)       # kokoro measured
 ```
 
 Vous préférez la régularité de narratrice de kokoro ? Elle reste à un réglage
@@ -719,7 +723,7 @@ Routage (§10) puis garde-fou qualité (§9) :
 ```bash
 speaker-helper --language fr route --condition online_realtime
 # condition=online_realtime engine=kokoro mode=streaming
-# quality=0.466 (public_elo) mean_rtf=0.223 (measured) confidence=high
+# quality=0.466 (public_elo) mean_rtf=0.223 (measured)
 # online_realtime: require mean_rtf <= 0.8 (RTF<1 is the real-time feasibility
 # boundary; margin absorbs TTFA + jitter). 1/3 candidates keep up; on the
 # 1-point Pareto front, chose 'kokoro' …

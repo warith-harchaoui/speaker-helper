@@ -104,8 +104,14 @@ class Speaker:
         stream_concurrency : int
             Max chunks synthesised in parallel while streaming (floored at 1).
         """
-        # Fall back to file/env-derived settings when none are supplied.
-        self.settings = settings or Settings.load()
+        # Fall back to file/env-derived settings when none are supplied, then
+        # resolve an "auto" backend from the mode. Resolving HERE rather than
+        # only inside create_engine matters: `settings.engine` is what the eval
+        # reports label a run with, so leaving it "auto" (or stale) would
+        # attribute chatterbox audio to another engine's row.
+        from speaker_helper.engine import resolve_auto
+
+        self.settings = resolve_auto(settings or Settings.load())
         # A concurrency of at least 1 is required for the streaming pipeline.
         self.stream_concurrency = max(1, stream_concurrency)
         # Reuse an injected engine (tests/mocks) or build one from settings.
@@ -211,7 +217,7 @@ class Speaker:
             engine=engine,
             stream_concurrency=decision.stream_concurrency,
         )
-        # Attach the decision for callers that want the provenance/confidence.
+        # Attach the decision for callers that want the provenance behind it.
         spk.route = decision
         return spk
 

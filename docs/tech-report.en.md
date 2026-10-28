@@ -221,10 +221,9 @@ numbers rather than guessed:
   only objective**: the highest-quality engine wins and speed is disregarded —
   structurally, not just rhetorically. RTF does not rank, does not break ties,
   and does not reach the decision: an offline `RouteDecision` carries
-  `mean_rtf=None` and `rtf_source="not_considered"`, and its `confidence` rates
-  the quality evidence alone (a measured timing must not inflate a bare prior
-  to "medium"). The one exception is a *patience* budget the caller sets
-  explicitly, named as the caller's own constraint.
+  `mean_rtf=None` and `rtf_source="not_considered"`. The one exception is a
+  *patience* budget the caller sets explicitly, named as the caller's own
+  constraint.
   One thing outranks that argmax — a language the owner has arbitrated himself
   (`router.OFFLINE_RATIFIED_ENGINE`; French → chatterbox since 2026-10-28).
   The arbitration is applied *after* the quality floor and RTF budget, so those
@@ -235,8 +234,10 @@ numbers rather than guessed:
 
 Quality is round-trip **intelligibility** (text→speech→text WER/chrF) when an
 engine has been measured, else an inherited per-engine prior; every
-`RouteDecision` records which via `quality_source` (measured vs prior), carries a
-`confidence` flag, and a number-citing `justification`. New engines are
+`RouteDecision` records which via `quality_source` (measured vs prior) and
+`rtf_source`, plus a number-citing `justification`. It carries no derived
+confidence grade: provenance is a fact, a three-rung scale over it would be a
+judgement dressed as a measurement. New engines are
 characterised in the companion study and folded back here as data, so the router
 improves as the evidence grows without any code change.
 

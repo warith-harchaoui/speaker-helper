@@ -8,7 +8,10 @@ Warith HARCHAOUI — https://linkedin.com/in/warith-harchaoui
 
 from __future__ import annotations
 
+import dataclasses
+
 from speaker_helper.config import Settings
+from speaker_helper.engine import resolve_auto
 
 
 def test_defaults_need_no_server() -> None:
@@ -17,9 +20,17 @@ def test_defaults_need_no_server() -> None:
     This test used to assert a hostname and a port. That it no longer can is
     the change: the default backend runs in this process, so there is nothing
     to point a URL at.
+
+    The default is ``"auto"`` rather than an engine name: the owner's operating
+    matrix, not a hard-coded default, decides which engine serves a mode —
+    offline goes to chatterbox in every language, streaming to kokoro. Asserted
+    here as the literal default, and resolved below so the matrix itself is
+    pinned rather than merely the sentinel.
     """
     s = Settings.from_mapping({})
-    assert s.backend == "kokoro"
+    assert s.backend == "auto"
+    assert resolve_auto(s).backend == "chatterbox"  # default mode is offline
+    assert resolve_auto(dataclasses.replace(s, mode="streaming")).backend == "kokoro"
     assert s.voice == ""  # empty means "detect the language and pick"
     assert not hasattr(s, "base_url")
 
@@ -40,7 +51,9 @@ def test_a_settings_file_from_the_rest_era_still_loads() -> None:
     """
     s = Settings.from_yaml_text("voicebox: {port: 17600}\nlanguage: fr")
     assert s.language == "fr"
-    assert s.backend == "kokoro"
+    # The file names no backend, so the default sentinel stands and the mode
+    # decides (see test_defaults_need_no_server).
+    assert s.backend == "auto"
 
 
 def test_voice_id_still_names_the_voice() -> None:

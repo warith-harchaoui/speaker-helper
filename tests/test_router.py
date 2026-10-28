@@ -67,7 +67,7 @@ def test_online_picks_fastest_feasible_highest_quality() -> None:
     assert d.engine == "fast_ok"
     assert d.mode == "streaming"
     assert d.first_chunk_sentences == 1 and d.stream_concurrency == 1
-    assert d.confidence == "high"  # both axes measured
+    assert d.quality_source == "measured_chrf"  # both axes measured
 
 
 def test_online_infeasible_raises() -> None:
@@ -246,7 +246,7 @@ def test_reports_take_precedence() -> None:
     d = route(RouteRequest(condition=OFFLINE), reports=reports)
     # Offline quality-only → chatterbox (0.9) wins; provenance is measured.
     assert d.engine == "chatterbox"
-    assert d.confidence == "high"
+    assert d.quality_source == "measured_chrf"
 
 
 def test_offline_decisions_carry_no_rtf_at_all() -> None:
@@ -285,13 +285,16 @@ def test_offline_decisions_carry_no_rtf_at_all() -> None:
     assert "5.0" not in d.justification
 
 
-def test_offline_confidence_rates_quality_evidence_alone() -> None:
-    """A measured RTF must not inflate an offline decision's confidence.
+def test_decisions_report_provenance_and_no_confidence_grade() -> None:
+    """There is no derived confidence score — only where each number came from.
 
-    Rating a bare prior "medium" because we happened to time the engine would
-    dress half-evidence up as evidence on the axis that actually decides.
+    A high/medium/low grade invented by this module would be a judgement
+    dressed as a measurement, and it had already started doing harm: a measured
+    RTF was promoting a bare prior to "medium" on the offline path, where RTF
+    decides nothing. Dropped on the owner's call (2026-10-28). What a caller
+    gets instead is the provenance of each number, and their own judgement.
     """
-    measured_rtf_but_prior_quality = [
+    pts = [
         OperatingPoint(
             "priced_on_a_hunch",
             quality=0.90,
@@ -300,14 +303,12 @@ def test_offline_confidence_rates_quality_evidence_alone() -> None:
             rtf_source="measured",
         ),
     ]
-    d = route(RouteRequest(condition=OFFLINE), points=measured_rtf_but_prior_quality)
-    assert d.confidence == "low"
-    # Online, by contrast, genuinely uses both axes, so the measured RTF counts.
-    online = route(
-        RouteRequest(condition=ONLINE_REALTIME, rtf_ceiling=0.8),
-        points=measured_rtf_but_prior_quality,
-    )
-    assert online.confidence == "medium"
+    for condition in (OFFLINE, ONLINE_REALTIME):
+        d = route(RouteRequest(condition=condition, rtf_ceiling=0.8), points=pts)
+        assert not hasattr(d, "confidence")
+        assert "confidence" not in d.to_dict()
+        # The facts survive; only the invented grade on top is gone.
+        assert d.quality_source == "prior"
 
 
 def test_offline_ties_break_without_consulting_speed() -> None:

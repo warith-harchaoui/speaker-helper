@@ -32,12 +32,17 @@ Python typée, une CLI, une API REST et une GUI web minimale. En local
   (par lots ; seule la qualité compte). Le routeur choisit le
   meilleur moteur et le meilleur mode à partir de preuves qualité↔vitesse mesurées, avec une
   justification chiffrée. Rien n'est deviné.
-- **Temps réel sur CPU.** Le moteur `kokoro` par défaut synthétise plus vite
-  que le temps réel (RTF nettement inférieur à 1.0) — sans GPU.
+- **C'est la matrice d'exploitation qui choisit le moteur, pas un défaut en
+  dur.** `backend: auto` (le défaut) se résout depuis le mode : **le hors-ligne
+  va à `chatterbox`** dans toutes les langues — son modèle Turbo pour l'anglais,
+  son modèle Multilingual (23 langues) ailleurs — et **le streaming va à
+  `kokoro`**, qui synthétise plus vite que le temps réel sur CPU (RTF nettement
+  sous 1.0, sans GPU). Nommez un backend explicitement et il est respecté tel
+  quel.
 - **Agnostique du moteur et rien à lancer.** Le moteur est un détail
   d'implémentation derrière le protocole `TTSEngine` et chaque backend tourne
-  **dans ce processus**. Cinq sont livrés : `kokoro` (le défaut — ONNX
-  Runtime, 54 voix), `openvoice` et `chatterbox` (clonage depuis un
+  **dans ce processus**. Cinq sont livrés : `kokoro` (ONNX Runtime, 54 voix
+  — le défaut du streaming), `openvoice` et `chatterbox` (clonage depuis un
   enregistrement ; le backend chatterbox choisit tout seul son modèle Turbo
   pour l'anglais et son modèle Multilingual — 23 langues — ailleurs),
   `kyutai` (français et anglais natifs du modèle 1.6B de Kyutai, voix tirées
@@ -321,7 +326,8 @@ un moteur et un mode concrets, justifiés par les chiffres, jamais devinés.
   vitesse est ignorée.
 
 Les deux conditions classent la qualité sur des **critères différents** ; chaque
-décision indique lequel (`quality_source`) puis porte un flag de `confidence`.
+décision indique lequel (`quality_source`, `rtf_source`) — la provenance, pas
+une note dérivée.
 `online_realtime` lit l'Elo d'arène publique (`public_elo` : des votes humains
 par paires ; un moteur absent de toute arène publique obtient `0.0` avec
 `no_public_elo` au lieu d'hériter d'un prior flatteur). `offline` lit les priors
@@ -334,7 +340,7 @@ fournissez.
 from speaker_helper import route, RouteRequest, Speaker
 
 decision = route(RouteRequest(condition="online_realtime", language="fr"))
-print(decision.engine, decision.mode, decision.confidence)
+print(decision.engine, decision.mode, decision.quality_source)
 print(decision.justification)
 
 # ou construisez un Speaker directement depuis un point de fonctionnement routé :

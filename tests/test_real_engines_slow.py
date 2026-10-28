@@ -50,6 +50,13 @@ def _kyutai_cached() -> bool:
     return (_HF_HUB / "models--kyutai--tts-1.6b-en_fr").exists()
 
 
+def _chatterbox_cached() -> bool:
+    """Whether the chatterbox weights are already cached (never downloaded here)."""
+    if importlib.util.find_spec("chatterbox") is None:
+        return False
+    return (_HF_HUB / "models--ResembleAI--chatterbox").exists()
+
+
 def _ollama_up() -> bool:
     """Whether a local Ollama daemon answers (the LLM tier's prerequisite)."""
     try:
@@ -123,3 +130,33 @@ def test_kyutai_speaks_french_with_the_female_default() -> None:
     assert result.sample_rate == 24_000
     assert result.voice_id == DEFAULT_VOICE_BY_LANG["fr"]
     asyncio.run(engine.aclose())
+
+
+@pytest.mark.slow
+@pytest.mark.skipif(not _chatterbox_cached(), reason="chatterbox weights not in the HF cache")
+def test_chatterbox_short_text_fails_with_a_diagnosis_not_a_torch_error() -> None:
+    """A fragment too short for upstream's watchdog must fail legibly.
+
+    `AlignmentStreamAnalyzer` is built ONLY for the multilingual model (see
+    `T3.inference`, `if self.hp.is_multilingual`) — the exact variant serving
+    French and every non-English language here. Below roughly four tokens it
+    has no alignment window and dies in `step()` with "max(): Expected
+    reduction dim 1 to have non-zero size", four frames deep in torch.
+    Measured boundary (2026-10-28, chatterbox-tts 0.1.7): "Un." and "A."
+    fail, "Oui." and "Non." succeed. Upstream exposes no flag to disable it,
+    so the backend owes the caller an error that names the cause. This matters
+    in production, not in theory: the sentence splitter emits "Un." as its own
+    chunk, so any French narration containing a short sentence hits it.
+    """
+    from speaker_helper.backends.chatterbox import ChatterboxEngine
+
+    engine = ChatterboxEngine(
+        Settings.from_mapping(
+            {"backend": "chatterbox", "language": "fr", "lexicon": {"enabled": False}}
+        )
+    )
+    # The diagnosis names the engine, the text, and what to do about it.
+    with pytest.raises(RuntimeError, match="alignment watchdog"):
+        asyncio.run(engine.synthesize("Un.", language="fr"))
+    # And the neighbouring length still works, so the guard is not over-broad.
+    assert asyncio.run(engine.synthesize("Oui.", language="fr")).duration_s > 0.0

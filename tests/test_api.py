@@ -81,7 +81,10 @@ def test_route_returns_decision() -> None:
     assert body["mode"] == "streaming"
     assert body["engine"]
     assert body["justification"]
-    assert body["confidence"] in {"high", "medium", "low"}
+    # Provenance is what a caller gets to reason with — there is no derived
+    # confidence grade on the payload any more.
+    assert body["quality_source"]
+    assert "confidence" not in body
 
 
 def test_route_rejects_bad_condition() -> None:
@@ -103,9 +106,15 @@ def test_gui_served_at_root() -> None:
 
 def test_synth_stream_emits_ordered_sse_chunks() -> None:
     """/synth/stream emits SSE chunks in sequence, each carrying WAV audio."""
-    # Act: stream three sentences and collect the SSE data payloads.
+    # Act: stream three sentences and collect the SSE data payloads. The
+    # sentences are full-length on purpose: fragments under MIN_CHUNK_CHARS are
+    # folded into a neighbour by the chunker, so toy inputs like "Un. Deux."
+    # would arrive as a single chunk and test nothing about ordering.
     with _client() as client:
-        resp = client.post("/synth/stream", json={"text": "Un. Deux. Trois."})
+        resp = client.post(
+            "/synth/stream",
+            json={"text": "Bonjour à tous. Comment allez-vous ? Très bien, merci."},
+        )
         assert resp.status_code == 200
         assert resp.headers["content-type"].startswith("text/event-stream")
         # Each SSE frame is a "data: <json>" line; parse only those.

@@ -4,6 +4,82 @@ All notable changes to speaker-helper are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project aims to adhere
 to [Semantic Versioning](https://semver.org/).
 
+## [0.13.0] - 2026-10-28
+
+### Changed
+- **The default path now obeys the operating matrix** (STUDY.md §8 quater).
+  `settings.backend` defaults to **`"auto"`**, resolved from `mode`: offline
+  goes to **chatterbox in every language** (Turbo for English, Multilingual
+  elsewhere), streaming to **kokoro**. Until now the matrix lived only in the
+  router, so a caller who asked (`route`, `Speaker.from_route`) got the right
+  engine while a bare `Speaker()` or `speaker-helper synth` took the
+  configured backend — which defaulted to kokoro. "Offline French uses
+  chatterbox" was true of the router and false of the default path.
+  Resolution goes *through* the router rather than a second hard-coded copy of
+  the matrix, so the French ratification, the per-language priors and the
+  printed justification all come along. An explicitly named backend is still
+  honoured as-is. `Speaker` stores the **resolved** settings, because
+  `settings.engine` is what eval reports label a run with. The online
+  condition declines a language nobody has timed, so streaming falls back to
+  kokoro there — logged, never silent. No startup cost: backends are built
+  lazily and load weights only on first synthesis, so CI stays light.
+  **Breaking** for anything asserting `Settings().backend == "kokoro"`.
+
+### Removed
+- **`RouteDecision.confidence` is gone.** The owner's verdict: the criteria
+  were bogus. They were — and the RTF leak above was the symptom, not the
+  cause. A `high`/`medium`/`low` scale invented by this module put three
+  arbitrary rungs over the facts, collapsed two axes of different natures into
+  one grade, and read as a measurement when it was only our judgement; once
+  that wrapper was accepted, nothing stopped a stopwatch from promoting a bare
+  prior by a rung. The field is removed from the dataclass, the `/route` JSON
+  payload, the CLI verdict line, and the GUI badge — which now colours
+  **provenance** instead (measured green, prior amber) and adds an
+  `owner-ratified` chip when the arbitration fired. What remains is strictly
+  factual and is all a reader needs: `quality_source` (`measured_chrf`,
+  `measured_mos`, `public_elo`, `prior`, `no_public_elo`) and `rtf_source`
+  (`measured`, `estimate`, `unknown`, `not_considered`). Where each number
+  came from, stated plainly; the conclusion belongs to whoever reads it.
+  **Breaking** for anything reading `decision.confidence` or the `confidence`
+  key of a `/route` response.
+
+### Fixed
+- **chatterbox no longer dies with a torch reduction error on a short
+  sentence.** Upstream builds its `AlignmentStreamAnalyzer` **only** for the
+  multilingual model (`T3.inference`, `if self.hp.is_multilingual`) — the exact
+  variant now serving French and every non-English language — and below roughly
+  four tokens it has no alignment window, dying in `step()` with
+  `IndexError: max(): Expected reduction dim 1 to have non-zero size`. Measured
+  boundary (chatterbox-tts 0.1.7, 2026-10-28): `"Un."` and `"A."` fail, `"Oui."`
+  and `"Non."` succeed — token count, not character length. Not theoretical:
+  the sentence splitter emits `"Un."` as its own chunk, so **any French
+  narration containing a short sentence crashed**. Upstream exposes no flag to
+  disable the analyzer, so the backend now raises a `RuntimeError` naming the
+  engine, the text, the cause and the remedy instead of a torch error four
+  frames deep. Pinned by a `@pytest.mark.slow` regression test.
+- **Empty text is refused by the chatterbox backend**, as the kyutai backend
+  already did. Upstream's `punc_norm("")` does not fail — it *substitutes* the
+  English sentence "You need to add some text for me to talk.", which the model
+  then speaks. An unrequested English sentence inside a French narration is
+  worse than a crash: it sounds deliberate.
+- **Both chunkers now fold sub-threshold fragments into a neighbour**
+  (`text.merge_short_fragments`, new and exported; `MIN_CHUNK_CHARS = 4`).
+  Refusing a fragment legibly, as above, still left any French narration
+  containing "Un." unusable, because the sentence splitter emits it as its own
+  chunk. Merging is the conservative repair: **the words spoken and their
+  order are identical** — only the grouping changes, so a short sentence is
+  said in the breath of its neighbour instead of alone. A fragment folds
+  *backwards* into its predecessor, leaving time-to-first-audio untouched; a
+  short *first* chunk has no predecessor and folds forward instead; a lone
+  fragment is returned as-is, since inventing words to pad it would change
+  what is spoken. Applied to the streaming path (`chunk_for_streaming`, where
+  every sentence is its own chunk) and the offline one (`chunk_long_text`,
+  where greedy packing can leave a short sentence alone in the last group).
+  The threshold is a character count because chatterbox's multilingual
+  tokenizer is a *grapheme* tokenizer — token count tracks characters almost
+  exactly — and it sits **on** the measured boundary rather than above it, so
+  grouping changes only where synthesis would otherwise break.
+
 ## [0.12.0] - 2026-10-28
 
 ### Changed

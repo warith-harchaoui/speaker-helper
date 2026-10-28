@@ -362,7 +362,7 @@ def test_offline_routing_follows_the_owner_priors() -> None:
     generic anonymous-panel naturalness, not "réaliste et vivante" to a human
     ear — see STUDY.md §8 bis). Until human listening data lands, the
     language-aware priors ARE the decision, and the router must say so
-    (``quality_source="prior"``, low confidence) rather than dress them up.
+    (``quality_source="prior"``) rather than dress them up.
     """
     # English: chatterbox (its backend auto-picks the Turbo variant).
     en = route(RouteRequest(condition="offline", language="en"))
@@ -373,7 +373,7 @@ def test_offline_routing_follows_the_owner_priors() -> None:
     # kyutai must NOT win — it would read Spanish with a French/English tongue.
     es = route(RouteRequest(condition="offline", language="es"))
     assert (es.engine, es.backend) == ("chatterbox", "chatterbox")
-    assert es.confidence == "low"
+    assert es.quality_source == "prior"
 
 
 def test_offline_french_follows_the_owner_ratification() -> None:
@@ -493,10 +493,10 @@ def test_online_decision_is_elo_ranked_and_rtf_gated() -> None:
     """The online decision cites public Elo and only among engines that keep up."""
     d = route(RouteRequest(condition="online_realtime", language="fr"))
     # kokoro: the only engine with BOTH a public Elo and a measured real-time
-    # RTF on the reference host — evidence on both axes, hence high confidence.
+    # RTF on the reference host — the one candidate evidenced on both axes.
     assert d.engine == "kokoro"
     assert d.quality_source == "public_elo"
-    assert d.confidence == "high"
+    assert d.rtf_source == "measured"
     assert d.mode == "streaming"
 
 

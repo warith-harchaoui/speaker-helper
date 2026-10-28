@@ -26,8 +26,7 @@ Two conditions, two different objectives (this is the scientific core):
   and ``rtf_source`` is ``"not_considered"``, so a timing cannot be mistaken for
   part of the reasoning. The single exception is a *patience* budget the caller
   sets explicitly, which filters candidates and is named as the caller's own
-  constraint. ``confidence`` likewise rates the quality evidence alone. Mode is
-  ``offline``. Where the owner has arbitrated a language himself
+  constraint. Mode is ``offline``. Where the owner has arbitrated a language himself
   (:data:`OFFLINE_RATIFIED_ENGINE` — French since 2026-10-28), his choice takes
   the decision and the justification says which candidate it overrode: an
   arbitration is reported as an arbitration, never folded into the quality
@@ -37,18 +36,26 @@ For the **online** condition the choice is taken only from the Pareto front (the
 non-dominated set), so the router never returns a point some other engine beats
 on both axes while still keeping up. Offline is a pure quality argmax.
 
-Where does the evidence come from? In order of confidence:
+Where does the evidence come from? Strongest first:
 
 1. **Measured reports** — pass a list of :class:`~speaker_helper.eval.runner.EvalReport`
    (from ``run_eval`` / ``run_multilang_eval`` / ``tune_profiles``). Both axes are
-   then measured on *your* host → highest confidence.
+   then measured on *your* host → the strongest evidence available.
 2. **The built-in operating-point catalogue** (:func:`default_operating_points`)
    — seeded from the per-language profiles (kokoro RTF measured in-process on
    this suite's reference host) and the engine quality priors. RTF is known only
    where it was measured; other engines carry a quality prior and an *unknown*
    RTF, and are therefore excluded
    from online routing (we will not claim an engine keeps up if we never timed
-   it). Confidence is flagged on every decision.
+   it).
+
+Every decision states where each of its numbers came from, through
+``quality_source`` and ``rtf_source``. Those are facts about provenance, and
+they are all a reader gets — there is deliberately no derived "confidence"
+grade on top. A three-rung high/medium/low scale invented here would be a
+judgement wearing the costume of a measurement, and it had already started
+doing harm: a measured RTF was quietly promoting a bare prior to "medium" on
+the offline path. Read the provenance and draw your own conclusion.
 
 Further characterisation of new engines is a *study*, not a toolbox concern — run
 it in the ``speak`` experiment repo and fold the resulting numbers back into the
@@ -230,10 +237,6 @@ class RouteDecision:
     quality_source, rtf_source : str
         Provenance of the two axes (see :class:`OperatingPoint`). Offline
         decisions carry ``rtf_source="not_considered"``.
-    confidence : str
-        Online: ``"high"`` (both axes measured), ``"medium"`` (one), ``"low"``
-        (neither). Offline: the confidence in the QUALITY evidence alone —
-        ``"high"`` if measured, ``"low"`` if a prior.
     justification : str
         A human-readable, number-citing explanation of *why* this point won.
     candidates_considered, pareto_size : int
@@ -255,7 +258,6 @@ class RouteDecision:
     mean_rtf: float | None
     quality_source: str
     rtf_source: str
-    confidence: str
     justification: str
     candidates_considered: int
     pareto_size: int
@@ -457,48 +459,6 @@ def _points_from_reports(reports: Sequence[object]) -> list[OperatingPoint]:
     return points
 
 
-def _confidence(point: OperatingPoint, condition: str) -> str:
-    """Rate how trustworthy a point is, on the axes the condition actually uses.
-
-    Quality counts as evidenced whether it came from a round-trip chrF, a
-    UTMOSv2 MOS, or a public arena Elo (human pairwise votes — the online
-    condition's ratified criterion); ``"no_public_elo"`` and ``"prior"`` do not.
-
-    The two conditions weigh different numbers of axes, so they cannot share a
-    scale:
-
-    * **offline** — RTF is not an objective here, so it must not prop up a
-      confidence score either. Rating an offline decision "medium" because we
-      happened to time the engine would dress a bare prior up as half-evidence.
-      Confidence is therefore the confidence in the QUALITY evidence, full
-      stop: measured → ``"high"``, prior → ``"low"``.
-    * **online_realtime** — both axes are load-bearing (quality to maximise,
-      RTF to clear the feasibility ceiling), so both count: two measured axes
-      → ``"high"``, one → ``"medium"``, neither → ``"low"``.
-
-    Parameters
-    ----------
-    point : OperatingPoint
-        The winning candidate.
-    condition : str
-        :data:`ONLINE_REALTIME` or :data:`OFFLINE`.
-
-    Returns
-    -------
-    str
-        ``"high"``, ``"medium"`` or ``"low"``.
-    """
-    measured_q = point.quality_source in ("measured_chrf", "measured_mos", "public_elo")
-    if condition == OFFLINE:
-        return "high" if measured_q else "low"
-    measured_r = point.rtf_source == "measured"
-    if measured_q and measured_r:
-        return "high"
-    if measured_q or measured_r:
-        return "medium"
-    return "low"
-
-
 def route(
     request: RouteRequest,
     *,
@@ -515,8 +475,8 @@ def route(
         Explicit candidate operating points. When ``None`` and ``reports`` is
         also ``None``, the built-in catalogue for ``request.language`` is used.
     reports : sequence of EvalReport or None
-        Measured reports to derive candidates from (highest confidence). Takes
-        precedence over ``points`` when both are given.
+        Measured reports to derive candidates from (the strongest evidence).
+        Takes precedence over ``points`` when both are given.
 
     Returns
     -------
@@ -628,7 +588,6 @@ def _route_online(request: RouteRequest, candidates: list[OperatingPoint]) -> Ro
         mean_rtf=chosen.mean_rtf,
         quality_source=chosen.quality_source,
         rtf_source=chosen.rtf_source,
-        confidence=_confidence(chosen, ONLINE_REALTIME),
         justification=justification,
         candidates_considered=len(candidates),
         pareto_size=len(front),
@@ -641,7 +600,7 @@ def _route_offline(request: RouteRequest, candidates: list[OperatingPoint]) -> R
     Offline has no real-time constraint, so speed is *not* an objective at all —
     we maximise quality over the whole candidate pool. RTF does not rank, does
     not break ties, and does not reach the returned decision (``mean_rtf`` is
-    ``None``, ``rtf_source`` is ``"not_considered"``) or its confidence score.
+    ``None``, ``rtf_source`` is ``"not_considered"``).
     Equal quality is broken by catalogue order, deterministically, rather than by
     reaching for a speed number the condition has no use for. The caller's
     optional patience budget is the sole exception, and is named as the caller's
@@ -734,7 +693,6 @@ def _route_offline(request: RouteRequest, candidates: list[OperatingPoint]) -> R
         mean_rtf=None,
         quality_source=chosen.quality_source,
         rtf_source="not_considered",
-        confidence=_confidence(chosen, OFFLINE),
         justification=justification,
         candidates_considered=len(candidates),
         # No Pareto front is used offline (quality-only), so report 0.

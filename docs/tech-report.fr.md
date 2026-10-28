@@ -237,9 +237,8 @@ les chiffres plutôt que devinés :
   ignorée — structurellement, pas seulement en paroles. Le RTF ne classe pas, ne
   départage pas les ex æquo, et n'atteint pas la décision : une `RouteDecision`
   hors ligne porte `mean_rtf=None` et `rtf_source="not_considered"`, et sa
-  `confidence` note la seule preuve de qualité (un chronométrage mesuré ne doit
-  pas hisser un simple prior à « medium »). Seule exception : un budget de
-  patience que l'appelant fixe explicitement, nommé comme sa contrainte à lui. Une seule chose prime sur cet argmax : une langue que
+  Seule exception : un budget de patience que l'appelant fixe explicitement,
+  nommé comme sa contrainte à lui. Une seule chose prime sur cet argmax : une langue que
   le propriétaire a arbitrée lui-même (`router.OFFLINE_RATIFIED_ENGINE` ;
   français → chatterbox depuis le 2026-10-28). L'arbitrage s'applique *après*
   le plancher de qualité et le budget de RTF — ces veto gardent donc leur
@@ -250,8 +249,10 @@ les chiffres plutôt que devinés :
 
 La qualité est l'**intelligibilité** en aller-retour (texte→parole→texte
 WER/chrF) quand un moteur a été mesuré, sinon un prior hérité par moteur ; chaque
-`RouteDecision` indique lequel via `quality_source` (mesuré ou prior), porte un
-flag de `confidence` et une `justification` chiffrée. Les nouveaux
+`RouteDecision` indique lequel via `quality_source` (mesuré ou prior) et
+`rtf_source`, avec une `justification` chiffrée. Elle ne porte aucune note de
+confiance dérivée : la provenance est un fait, une échelle à trois barreaux
+posée dessus serait un jugement déguisé en mesure. Les nouveaux
 moteurs sont caractérisés dans l'étude compagne et réinjectés ici comme données :
 le routeur s'améliore à mesure que les preuves grandissent, sans
 aucun changement de code.

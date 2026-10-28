@@ -25,6 +25,7 @@ from speaker_helper import (
     create_engine,
     register_backend,
 )
+from speaker_helper.backends.chatterbox import ChatterboxEngine
 from speaker_helper.backends.kokoro import KokoroEngine
 
 
@@ -40,8 +41,16 @@ def test_the_default_backend_needs_no_server() -> None:
     The point of the whole in-process move: somebody who has installed this
     package and configured nothing should get a backend, not a connection
     error naming a port they have never heard of.
+
+    Which backend is now the operating matrix's call, not a constant: the
+    default mode is offline, and the owner has settled offline on chatterbox
+    for every language. Streaming still resolves to kokoro. Both are built in
+    this process; neither wants a port.
     """
-    assert isinstance(create_engine(Settings()), KokoroEngine)
+    assert isinstance(create_engine(Settings()), ChatterboxEngine)
+    assert isinstance(create_engine(Settings.from_mapping({"mode": "streaming"})), KokoroEngine)
+    # An explicitly named backend is never second-guessed by the matrix.
+    assert isinstance(create_engine(Settings.from_mapping({"backend": "kokoro"})), KokoroEngine)
 
 
 def test_create_engine_dispatches_on_backend() -> None:
@@ -122,3 +131,37 @@ def test_speaker_accepts_injected_engine() -> None:
     # Act/Assert: synthesis through the façade still yields decodable audio.
     result = asyncio.run(spk.say("Salut."))
     assert result.wav_bytes[:4] == b"RIFF"
+
+
+def test_the_default_path_obeys_the_owners_operating_matrix() -> None:
+    """The matrix the owner settled, pinned where the default path reads it.
+
+    Stated 2026-10-28: **local-free offline is chatterbox in every language**,
+    with English on its Turbo model and everything else on Multilingual;
+    local-free streaming stays on kokoro for now; the paid-cloud column is
+    undecided (ElevenLabs or NaturalReaders) and has no backend yet.
+
+    This is pinned here, not only in the router, because the gap it closes was
+    exactly that distinction: the router knew the matrix, and the default path
+    — a bare ``Speaker()``, ``speaker-helper synth`` — did not consult it.
+    """
+    from speaker_helper.engine import resolve_auto
+
+    # Offline: chatterbox everywhere, whatever the language.
+    for language in ("fr", "en", "es", "it", "pt", "de"):
+        resolved = resolve_auto(Settings.from_mapping({"language": language}))
+        assert resolved.backend == "chatterbox", language
+
+    # The English exception is the backend's own call, from the language: two
+    # different models behind one backend name.
+    engine = create_engine(Settings.from_mapping({"language": "en"}))
+    assert engine._variant_for("en") == "turbo"
+    for language in ("fr", "es", "it"):
+        assert engine._variant_for(language) == "multilingual", language
+
+    # Streaming: kokoro for now, including languages the router never timed
+    # (it declines those rather than guess, and the fallback is the owner's
+    # stated streaming default — not silence, and not an exception).
+    for language in ("fr", "en", "it"):
+        resolved = resolve_auto(Settings.from_mapping({"language": language, "mode": "streaming"}))
+        assert resolved.backend == "kokoro", language

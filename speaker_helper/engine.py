@@ -44,11 +44,14 @@ Warith HARCHAOUI — https://linkedin.com/in/warith-harchaoui
 
 from __future__ import annotations
 
+import dataclasses
 import io
 import math
 import wave
 from collections.abc import Callable
 from typing import Protocol, runtime_checkable
+
+import os_helper as osh
 
 from speaker_helper.config import Settings
 from speaker_helper.types import AudioResult, Voice, VoiceList, VoiceSample
@@ -143,13 +146,69 @@ def available_backends() -> list[str]:
     return sorted(_REGISTRY)
 
 
+#: Value of ``settings.backend`` meaning "decide from the operating mode".
+AUTO = "auto"
+
+
+def resolve_auto(settings: Settings) -> Settings:
+    """Return ``settings`` with an ``"auto"`` backend/engine decided by mode.
+
+    The project's operating matrix is {offline, streaming} × {local-free,
+    paid-cloud}, and the owner has settled the two local-free cells: **offline
+    goes to chatterbox in every language**, streaming stays on kokoro for now.
+    That matrix already lives in :mod:`speaker_helper.router`, so this resolves
+    through the router rather than hard-coding a second copy that could drift
+    from it — the French ratification, the per-language priors and the printed
+    justification all come along for free.
+
+    Before this existed, the router's answer only reached callers who asked for
+    it (``route``, :meth:`Speaker.from_route`), while a plain ``Speaker()`` or
+    ``speaker-helper synth`` used the configured backend — which defaulted to
+    kokoro. "Offline French uses chatterbox" was therefore true of the router
+    and false of the default path. This closes that gap.
+
+    An explicitly configured backend is never touched: ``backend: kokoro`` in a
+    config file means kokoro, whatever the matrix says.
+
+    Parameters
+    ----------
+    settings : Settings
+        Configuration, possibly carrying ``backend="auto"``.
+
+    Returns
+    -------
+    Settings
+        The same object when nothing was ``"auto"``; otherwise a copy with
+        ``backend`` and ``engine`` resolved.
+    """
+    if (settings.backend or "").lower() != AUTO:
+        return settings
+    from speaker_helper.router import OFFLINE, ONLINE_REALTIME, RouteRequest, route
+
+    condition = ONLINE_REALTIME if settings.mode == "streaming" else OFFLINE
+    try:
+        decision = route(RouteRequest(condition=condition, language=settings.language))
+    except ValueError as exc:
+        # The online condition refuses a language nobody has timed, rather than
+        # claiming an engine keeps up on faith. That is right for a routing
+        # *question*, but it must not leave `synth --stream` with no engine at
+        # all, so we fall back to the owner's stated streaming default. Said out
+        # loud: a silent fallback is how a default stops matching its docs.
+        osh.info("backend=auto: router declined (%s); falling back to kokoro", exc)
+        return dataclasses.replace(settings, backend="kokoro", engine="kokoro")
+    osh.info("backend=auto -> %s. %s", decision.backend, decision.justification)
+    return dataclasses.replace(settings, backend=decision.backend, engine=decision.engine)
+
+
 def create_engine(settings: Settings) -> TTSEngine:
     """Instantiate the backend named by ``settings.backend``.
 
     Parameters
     ----------
     settings : Settings
-        Configuration; its ``backend`` field selects the engine.
+        Configuration; its ``backend`` field selects the engine. ``"auto"``
+        (the default) is resolved from the operating mode first — see
+        :func:`resolve_auto`.
 
     Returns
     -------
@@ -161,6 +220,7 @@ def create_engine(settings: Settings) -> TTSEngine:
     ValueError
         If ``settings.backend`` names no registered backend.
     """
+    settings = resolve_auto(settings)
     name = (settings.backend or "kokoro").lower()
     factory = _REGISTRY.get(name)
     if factory is None:

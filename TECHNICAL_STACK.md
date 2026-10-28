@@ -115,7 +115,8 @@ flowchart TB
   `router` acts. A **condition** — `online_realtime` (speed = RTF, must beat real
   time; maximise quality on the Pareto front among engines that keep up) or
   `offline` (quality only) — maps to a concrete engine + mode, with provenance
-  (`quality_source`), a `confidence` flag, and a number-citing justification.
+  (`quality_source`, `rtf_source`) and a number-citing justification — no
+  derived confidence grade.
 - **Nothing fetched at synthesis time.** The default engine's weights come from
   a pinned `kokoro-onnx` GitHub release and then live in
   `~/.cache/speaker-helper/kokoro`; `install.py` checks the exact byte sizes so

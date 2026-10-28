@@ -9,8 +9,11 @@
 # era is still *accepted* — it is dropped rather than refused, so an old file
 # loads — but it does nothing.
 
-backend: "kokoro"           # kokoro (default) | openvoice | chatterbox | kyutai | mock
-engine: "kokoro"            # a label carried on results; `backend` is what selects
+backend: "auto"             # auto (default) | kokoro | openvoice | chatterbox | kyutai | mock
+                            # auto follows the operating matrix: offline -> chatterbox
+                            # (Turbo for English, Multilingual elsewhere), streaming ->
+                            # kokoro. Name one explicitly and it is honoured as-is.
+engine: "auto"              # a label carried on results; `backend` is what selects
 voice: ""                   # "" → read the text, detect the language, pick its voice
 language: "fr"              # ISO-639-1 target language
 normalize: true             # loudness-normalise the output

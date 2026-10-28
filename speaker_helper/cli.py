@@ -319,7 +319,7 @@ def _cmd_route(args: SimpleNamespace, settings: Settings) -> int:
     sys.stdout.write(
         f"condition={decision.condition} engine={decision.engine} mode={decision.mode}\n"
         f"quality={decision.quality:.3f} ({decision.quality_source}) "
-        f"{rtf_part}confidence={decision.confidence}"
+        f"{rtf_part}".rstrip()
         # An arbitration is headline news: without this the summary line reads
         # like the engine won on the numbers, which is exactly what it did not do.
         + (" owner_ratified=True" if decision.owner_ratified else "")

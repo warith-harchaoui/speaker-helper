@@ -334,27 +334,33 @@ async function routeEngine() {
     }
     const d = await resp.json();
 
-    // Colour-code confidence: high=green, medium=amber, low=red.
-    const conf = String(d.confidence || "").toLowerCase();
-    const confClass =
-      conf === "high"
-        ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-        : conf === "medium"
-        ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
-        : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
+    // Colour by PROVENANCE, not by an invented confidence grade: a number that
+    // was measured reads green, one inherited from a prior reads amber. The
+    // badge states what the quality score IS, and lets the reader judge.
+    const qSrc = String(d.quality_source || "").toLowerCase();
+    const measured = qSrc.startsWith("measured") || qSrc === "public_elo";
+    const srcClass = measured
+      ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+      : "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200";
 
-    const meanRtf = d.mean_rtf != null ? d.mean_rtf : "?";
+    // Offline decisions carry no RTF at all (speed is not an objective there),
+    // so the row is dropped rather than shown as a question mark.
+    const rtfRow =
+      d.mean_rtf != null
+        ? `<div class="flex justify-between gap-4"><dt class="text-slate-500 dark:text-slate-400">mean RTF</dt><dd>${escapeHtml(String(d.mean_rtf))} <span class="text-slate-400">(${escapeHtml(d.rtf_source ?? "?")})</span></dd></div>`
+        : "";
 
     card.innerHTML = `
       <div class="flex flex-wrap items-center gap-2">
         <span class="rounded-md bg-indigo-600 px-2 py-1 text-sm font-semibold text-white">${escapeHtml(d.engine ?? "?")}</span>
         <span class="rounded-md border border-slate-300 px-2 py-1 text-sm dark:border-slate-700">mode: ${escapeHtml(d.mode ?? "?")}</span>
-        <span class="rounded-md px-2 py-1 text-sm font-medium ${confClass}">confidence: ${escapeHtml(d.confidence ?? "?")}</span>
+        <span class="rounded-md px-2 py-1 text-sm font-medium ${srcClass}">quality: ${escapeHtml(d.quality_source ?? "?")}</span>
+        ${d.owner_ratified ? `<span class="rounded-md bg-slate-200 px-2 py-1 text-sm font-medium text-slate-800 dark:bg-slate-700 dark:text-slate-100">owner-ratified</span>` : ""}
       </div>
       <dl class="mt-3 grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
         <div class="flex justify-between gap-4"><dt class="text-slate-500 dark:text-slate-400">backend</dt><dd>${escapeHtml(d.backend ?? "?")}</dd></div>
         <div class="flex justify-between gap-4"><dt class="text-slate-500 dark:text-slate-400">quality</dt><dd>${escapeHtml(String(d.quality ?? "?"))} <span class="text-slate-400">(${escapeHtml(d.quality_source ?? "?")})</span></dd></div>
-        <div class="flex justify-between gap-4"><dt class="text-slate-500 dark:text-slate-400">mean RTF</dt><dd>${escapeHtml(String(meanRtf))} <span class="text-slate-400">(${escapeHtml(d.rtf_source ?? "?")})</span></dd></div>
+        ${rtfRow}
         <div class="flex justify-between gap-4"><dt class="text-slate-500 dark:text-slate-400">first-chunk sentences</dt><dd>${escapeHtml(String(d.first_chunk_sentences ?? "?"))}</dd></div>
       </dl>
       <p class="mt-3 rounded-md bg-white p-3 text-sm leading-relaxed text-slate-700 shadow-sm dark:bg-slate-900 dark:text-slate-200">${escapeHtml(d.justification ?? "")}</p>

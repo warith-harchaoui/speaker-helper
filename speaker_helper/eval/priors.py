@@ -58,11 +58,14 @@ _DEFAULT_PRIOR = 0.80
 #   French at 6–8% CER through an English-first pipeline → en keeps the base,
 #   fr drops well under kyutai's.
 #
-# These are *priors* in the router's vocabulary (quality_source="prior",
-# confidence="low") but they are not guesses: the owner RATIFIED this
-# configuration on 2026-10-26 — fr → kyutai, en → chatterbox (Turbo), other
-# languages → chatterbox (Multilingual) — after récusing automatic MOS
-# predictors as the offline criterion (STUDY.md §8 bis). Human
+# These are *priors* in the router's vocabulary (quality_source="prior") but
+# they are not guesses: the owner RATIFIED this configuration on 2026-10-26 —
+# fr → kyutai, en → chatterbox (Turbo), other languages → chatterbox
+# (Multilingual) — after récusing automatic MOS predictors as the offline
+# criterion (STUDY.md §8 bis). The French half was re-decided on 2026-10-28
+# (STUDY.md §8 ter): the owner's choice now lives in
+# `router.OFFLINE_RATIFIED_ENGINE`, deliberately apart from these numbers,
+# which stay as they are. Human
 # pairwise-listening scores (quality_source="measured_human") are the only
 # measurement meant to supersede these values.
 #

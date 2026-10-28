@@ -29,11 +29,16 @@ minimal web GUI — runnable locally (conda + pip) or as a Docker server.
   run faster than real time) or **offline** (batch; quality is the only
   objective) — and the router picks the best engine + mode from measured
   quality↔speed evidence, with a number-citing justification. No guessing.
-- **Real-time on CPU.** The default `kokoro` engine synthesises faster than
-  real time (real-time factor well below 1.0) — no GPU required.
+- **The operating matrix decides the engine, not a hard-coded default.**
+  `backend: auto` (the default) resolves from the mode: **offline goes to
+  `chatterbox`** in every language — its Turbo model for English, its
+  23-language Multilingual model elsewhere — and **streaming goes to
+  `kokoro`**, which synthesises faster than real time on CPU (RTF well below
+  1.0, no GPU). Name a backend explicitly and it is honoured as-is.
 - **Backend-agnostic, and nothing to launch.** The engine is an implementation
   detail behind a `TTSEngine` protocol, and every backend runs **in this
-  process**. Five ship: `kokoro` (the default — ONNX Runtime, 54 voices),
+  process**. Five ship: `kokoro` (ONNX Runtime, 54 voices — the streaming
+  default),
   `openvoice` and `chatterbox` (cloning from a recording; the chatterbox
   backend auto-picks its Turbo model for English and its 23-language
   Multilingual model elsewhere), `kyutai` (native French and English from
@@ -304,7 +309,8 @@ evidence. You state an operating **condition** and it returns a concrete engine
   only objective**: the highest-quality engine wins, speed disregarded.
 
 The two conditions rank quality on **different criteria**, and every decision
-reports which one it used (`quality_source`) plus a `confidence` flag.
+reports which one it used (`quality_source`, `rtf_source`) — provenance, not
+a derived grade.
 `online_realtime` reads the public arena Elo (`public_elo` — human pairwise
 votes; an engine listed on no public arena scores `0.0` with `no_public_elo`
 rather than inheriting a flattering prior). `offline` reads the owner-ratified
@@ -316,7 +322,7 @@ reports (`measured_chrf`) when you pass them in.
 from speaker_helper import route, RouteRequest, Speaker
 
 decision = route(RouteRequest(condition="online_realtime", language="fr"))
-print(decision.engine, decision.mode, decision.confidence)
+print(decision.engine, decision.mode, decision.quality_source)
 print(decision.justification)
 
 # or build a Speaker straight from a routed operating point:

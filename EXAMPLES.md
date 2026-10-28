@@ -251,7 +251,7 @@ curl -s -X POST localhost:8080/route \
      -d '{"condition": "online_realtime", "language": "fr"}'
 # {"condition":"online_realtime","engine":"kokoro","backend":"kokoro",
 #  "mode":"streaming","quality":0.466,"mean_rtf":0.223,
-#  "quality_source":"public_elo","rtf_source":"measured","confidence":"high",
+#  "quality_source":"public_elo","rtf_source":"measured",
 #  "justification":"…","candidates_considered":3,"pareto_size":1}
 ```
 
@@ -397,13 +397,13 @@ from speaker_helper import RouteRequest, Speaker, route
 # faster than real time (ceiling 0.8). Among those that keep up, maximise
 # quality -> streaming with low time-to-first-audio.
 d = route(RouteRequest(condition="online_realtime", language="fr"))
-print(d.engine, d.mode, d.confidence, d.quality_source)
-# kokoro streaming high public_elo
+print(d.engine, d.mode, d.quality_source, d.rtf_source)
+# kokoro streaming public_elo measured
 
 # offline: quality is the ONLY objective (speed disregarded).
 d2 = route(RouteRequest(condition="offline", language="fr"))
-print(d2.engine, d2.mode, d2.confidence, d2.quality_source)
-# chatterbox offline low prior  <- 'low': offline confidence rates the QUALITY evidence alone
+print(d2.engine, d2.mode, d2.quality_source, d2.rtf_source)
+# chatterbox offline prior not_considered
 
 # French is settled by the owner's ratification, not by the argmax -- and the
 # router says so rather than quietly rewriting the quality numbers.
@@ -433,8 +433,12 @@ says which through `quality_source`:
 - `offline` uses the owner-ratified per-language priors (`prior`), or kokoro's
   measured UTMOSv2 score where one exists (`measured_mos`).
 
-`confidence` is `high` when both axes are evidenced, `medium` when one is,
-`low` when the decision rests on priors alone.
+There is **no derived `confidence` grade** on a decision, by design. A
+high/medium/low scale invented here would be a judgement wearing the costume of
+a measurement — and it had already started doing harm, with a measured RTF
+promoting a bare prior to "medium" on the offline path, where RTF decides
+nothing. You get `quality_source` and `rtf_source`, which are facts, and you
+draw your own conclusion.
 
 Under the hood the online condition selects on the quality↔RTF **Pareto
 front**; you can use that primitive directly on a batch of evaluation reports:
@@ -612,7 +616,7 @@ print(spk.route.mean_rtf)                           # None
 
 # Real-time streaming runs on measured evidence -> kokoro (RTF 0.223 in French)
 spk = Speaker.from_route("online_realtime", language="fr")
-print(spk.route.engine, spk.route.confidence)       # kokoro high
+print(spk.route.engine, spk.route.rtf_source)       # kokoro measured
 ```
 
 Prefer kokoro's polished-narrator steadiness? It stays one setting away
@@ -693,7 +697,7 @@ Routing (§10) and the quality gate (§9):
 ```bash
 speaker-helper --language fr route --condition online_realtime
 # condition=online_realtime engine=kokoro mode=streaming
-# quality=0.466 (public_elo) mean_rtf=0.223 (measured) confidence=high
+# quality=0.466 (public_elo) mean_rtf=0.223 (measured)
 # online_realtime: require mean_rtf <= 0.8 (RTF<1 is the real-time feasibility
 # boundary; margin absorbs TTFA + jitter). 1/3 candidates keep up; on the
 # 1-point Pareto front, chose 'kokoro' …

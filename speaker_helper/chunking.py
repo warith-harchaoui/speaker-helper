@@ -42,7 +42,7 @@ import re
 import os_helper as osh
 
 from speaker_helper.config import Settings
-from speaker_helper.text import split_sentences
+from speaker_helper.text import merge_short_fragments, split_sentences
 
 #: Default per-chunk budget, in characters. ~500 characters is ~30 seconds of
 #: speech — inside every backend's comfort zone (Chatterbox degrades past
@@ -97,12 +97,16 @@ def chunk_long_text(text: str, language: str, settings: Settings) -> list[str]:
         sizes = _llm_group_sizes(sentences, language, max_chars)
     if sizes is None:
         sizes = greedy_group_sizes(sentences, max_chars)
-    # Materialise the groups back into text chunks.
+    # Materialise the groups back into text chunks. Greedy packing fills each
+    # group up to max_chars, so a trailing short sentence can end up alone in
+    # the last group (and the LLM may hand back a size-1 group anywhere); fold
+    # those into a neighbour for the same reason the streaming path does.
     chunks: list[str] = []
     cursor = 0
     for size in sizes:
         chunks.append(" ".join(sentences[cursor : cursor + size]))
         cursor += size
+    chunks = merge_short_fragments(chunks)
     osh.info(
         "chunking: %d chars -> %d chunk(s) of %s sentences",
         len(text),

@@ -119,8 +119,13 @@ class Settings:
     ``SPEAKER_HELPER_*`` environment variables.
     """
 
-    backend: str = "kokoro"
-    engine: str = "kokoro"
+    # "auto" (the default) decides from `mode` through the router, so the
+    # default path obeys the project's operating matrix instead of a hard-coded
+    # engine name: offline goes to chatterbox in every language, streaming
+    # stays on kokoro. Name a backend explicitly and it is honoured as-is.
+    # See :func:`speaker_helper.engine.resolve_auto`.
+    backend: str = "auto"
+    engine: str = "auto"
     voice: str = ""
     voice_sample: str = ""
     voice_id: str = ""
