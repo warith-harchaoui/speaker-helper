@@ -418,7 +418,7 @@ print(d.engine, d.mode, d.confidence, d.quality_source)
 # hors ligne : la qualité est le SEUL objectif (la vitesse est ignorée).
 d2 = route(RouteRequest(condition="offline", language="fr"))
 print(d2.engine, d2.mode, d2.confidence, d2.quality_source)
-# chatterbox offline low prior  <- 'low': offline confidence rates the QUALITY evidence alone
+# chatterbox offline low prior  <- « low » : hors ligne, la confiance note la seule preuve de QUALITÉ
 
 # Le français est tranché par l'arbitrage du propriétaire, pas par l'argmax --
 # et le routeur le dit, au lieu de retoucher discrètement les scores.

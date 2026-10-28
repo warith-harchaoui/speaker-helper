@@ -49,7 +49,7 @@ minimal web GUI — runnable locally (conda + pip) or as a Docker server.
   engines without phoneme access). An entry with neither gets its respelling
   derived **once** by a local LLM (resolved through `best-engine-ai-helper`,
   served by Ollama) and cached; after that, everything is deterministic and
-  offline. See [`lexicon.yaml.example`](lexicon.yaml.example).
+  offline. See [`lexicon.yaml.example`](https://github.com/warith-harchaoui/speaker-helper/blob/main/lexicon.yaml.example).
 - **Long texts don't degrade.** Past ~500 characters, `say()` synthesises
   sentence-group chunks and concatenates them; the local LLM places the cuts
   at discourse boundaries (it only ever *groups* locally-split sentences, so

@@ -54,7 +54,7 @@ Python typée, une CLI, une API REST et une GUI web minimale. En local
   l'un ni l'autre voit sa ré-écriture dérivée **une seule fois** par un LLM
   local (résolu via `best-engine-ai-helper`, servi par Ollama) puis mise en
   cache ; ensuite tout est déterministe et hors-ligne. Voir
-  [`lexicon.yaml.example`](lexicon.yaml.example).
+  [`lexicon.yaml.example`](https://github.com/warith-harchaoui/speaker-helper/blob/main/lexicon.yaml.example).
 - **Les longs textes ne se dégradent pas.** Au-delà d'environ 500 caractères,
   `say()` synthétise par groupes de phrases puis concatène ; le LLM local
   place les coupes aux frontières du discours (il ne fait que *grouper* des
@@ -460,9 +460,9 @@ métriques DeepEval, de façon déterministe et hors-ligne.
 
 ## Configuration
 
-Copiez [`settings.yaml.example`](settings.yaml.example) vers `settings.yaml`
+Copiez [`settings.yaml.example`](https://github.com/warith-harchaoui/speaker-helper/blob/main/settings.yaml.example) vers `settings.yaml`
 (ignoré par git) ou utilisez
-[`speaker_config.json.example`](speaker_config.json.example) comme référence.
+[`speaker_config.json.example`](https://github.com/warith-harchaoui/speaker-helper/blob/main/speaker_config.json.example) comme référence.
 Chaque clé peut être surchargée par une variable d'environnement
 `SPEAKER_HELPER_*` ; les références `${VAR}` dans le YAML sont remplacées depuis
 l'environnement au chargement.
