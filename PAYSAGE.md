@@ -54,7 +54,7 @@ colonne existante ne les captait.
 |---|---|---|---|
 | Hors-ligne / local | API cloud uniquement | local mais avec une étape hébergée | poids sur disque, rien ne sort de la machine |
 | Streaming | par lots seulement, bien plus lent que le temps réel | temps réel dans des conditions favorables | RTF soutenu nettement sous 1 sur un CPU ordinaire |
-| Clonage de voix | voix figées uniquement | une banque de voix publiée, ou un transfert de timbre limité | zero-shot depuis quelques secondes que vous fournissez |
+| Clonage de voix | voix figées uniquement | une banque de voix publiée ou un transfert de timbre limité | zero-shot depuis quelques secondes que vous fournissez |
 | Multilingue | anglais seulement | ~5 à 10 langues | 25+ langues dans un seul modèle ou jeu de voix |
 | Maîtrise de la prononciation | rien d'autre que ré-écrire le texte d'entrée | partielle (balises de phonèmes ou pinyin) | un lexique **plus** l'IPA inséré tel quel dans le flux de phonèmes |
 | Maîtrise de l'expressivité | débit plat et figé | prosodie héritée de l'extrait de référence | un bouton d'émotion / d'intensité explicite et dirigeable |
@@ -71,7 +71,7 @@ Toutes les autres cases sont une lecture des fiches de modèle et des licences
 publiées, notée selon la grille ci-dessus : un jugement, pas un banc d'essai.
 **Pocket TTS est délibérément absent** : il est sur la liste de veille de
 STREAMING.md §3, mais trop peu de choses sont publiées à son sujet pour remplir
-dix cases honnêtement, et une ligne inventée vaudrait moins qu'une ligne
+dix cases honnêtement ; une ligne inventée vaudrait moins qu'une ligne
 manquante.
 
 ## Carte de positionnement
@@ -124,10 +124,10 @@ C'est un centre de gravité différent de celui du reste du domaine :
   réel sur CPU, ce qui en fait le choix routé par défaut de speaker-helper pour
   `online_realtime`), mais ils ne clonent pas les voix et s'arrêtent à une
   bibliothèque ou une CLI.
-- Les **moteurs à streaming natif** — Kyutai TTS, et Hume TADA à ses côtés —
+- Les **moteurs à streaming natif** — Kyutai TTS, Hume TADA à ses côtés —
   sont faits pour émettre le son pendant la génération, pas après. Kyutai parle
   un français et un anglais natifs et livre une banque de voix publiée, mais il
-  ne vous donne pas le clonage, et son RTF soutenu de 0,88 mesuré ici tombe
+  ne vous donne pas le clonage ; son RTF soutenu de 0,88 mesuré ici tombe
   juste au-dessus de notre plafond anti-underrun de 0,8 sur un M2 Max.
   speaker-helper le pilote derrière le même protocole que les autres.
 - Les **passe-plats OS / cloud** — pyttsx3, gTTS, ElevenLabs — abandonnent le
