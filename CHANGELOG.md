@@ -4,6 +4,85 @@ All notable changes to speaker-helper are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project aims to adhere
 to [Semantic Versioning](https://semver.org/).
 
+## [0.12.0] - 2026-10-28
+
+### Changed
+- **Offline French now routes to chatterbox, by the owner's ratification**
+  (STUDY.md §8 ter). The engine is the best *documented* chatterbox that
+  actually speaks French — the **Multilingual** model (23 languages, base
+  prior 0.90); Turbo and base are English-only and were never candidates for
+  this language. No new knob: the backend's `variant="auto"` already resolves
+  every non-English language to Multilingual. English (Turbo) and the other
+  languages (Multilingual) are unchanged, and the **streaming cell is
+  untouched** — its criterion is public Elo × measured RTF, where kokoro
+  remains the only engine both arena-ranked and under the 0.8 anti-underrun
+  ceiling.
+- **An arbitration is now reported as an arbitration.** The decision is held
+  in `router.OFFLINE_RATIFIED_ENGINE` (dated by `OFFLINE_RATIFIED_AS_OF`),
+  deliberately *outside* the quality tables, because an override must not
+  rewrite the evidence it overrides: kyutai's French prior stays 0.92 against
+  chatterbox's 0.78, CER note and all. `RouteDecision` gains
+  `owner_ratified: bool`, and the justification names the candidate it set
+  aside and that candidate's score ("This OVERRIDES the quality argmax …
+  which was 'kyutai' (quality=0.920 [prior]): a decision, not a
+  measurement"). `RouteRequest` gains `respect_ratification` (default `True`)
+  — set it `False` and the unarbitrated argmax reappears, which is what a
+  study comparing engines wants. `quality_floor` and `rtf_budget` still veto:
+  they are applied *before* the ratification.
+  Epistemic status is unchanged from the pair it replaces — one listener's
+  judgement, not a measurement, pending the same replacement (the human
+  pairwise-listening protocol, landing as `quality_source="measured_human"`).
+- **RTF is out of the offline cell entirely — structurally, not by
+  convention.** The rule was already stated (STUDY.md §8 bis: RTF has no place
+  in the exposition of an offline decision) and had already drifted: the
+  offline justification still quoted the winner's `mean_rtf`, and an offline
+  `confidence` climbed to `"medium"` *because* the RTF was measured —
+  promoting a bare prior to half-evidence on the axis that decides nothing.
+  Now: RTF neither ranks nor breaks ties offline (equal quality falls to
+  catalogue order, deterministically); an offline `RouteDecision` carries
+  `mean_rtf=None` and `rtf_source="not_considered"`, so the number cannot leak
+  into a justification, a log line, or a downstream dashboard; `confidence`
+  offline rates the **quality evidence alone** (measured → `"high"`, prior →
+  `"low"`); and the CLI prints no `mean_rtf=…` pair on an offline verdict. The
+  sole exception is the caller's opt-in `rtf_budget`, named in the
+  justification as the caller's own constraint rather than a property of the
+  winner. Visible consequence: offline French moved from `confidence=medium`
+  to `confidence=low` — the honest grade, since nothing underpinning it was
+  measured. **The streaming cell is untouched**: `RTF < 1` remains its
+  feasibility boundary. Three tests pin the rule.
+- **[LANDSCAPE.md](LANDSCAPE.md) / [PAYSAGE.md](PAYSAGE.md) re-scored**, in
+  all three dimensions. **Rows**: Kyutai TTS joins (a backend this suite has
+  shipped since 0.11.0 and the table never listed) along with CosyVoice 2/3;
+  Pocket TTS stays off deliberately — it is on STREAMING.md's watch list, but
+  too little is published to fill ten cells honestly. **Columns**: two new
+  criteria the project's own brief turns on and no column captured —
+  *pronunciation control* (lexicon + verbatim IPA) and *expressivity control*
+  (a directable emotion knob). **Cells**: the multilingual column is now a
+  stated language-count scale rather than a vibe (XTTS 17 → 4, chatterbox
+  23 → 4, kokoro 8 → 3, Tortoise English-only → 1), and streaming follows the
+  numbers measured in 0.11.0 (kokoro → 5, chatterbox → 2). A new **"How the
+  cells are scored"** section writes the rubric down per criterion and says
+  which cells rest on our own measurements (streaming only) and which are a
+  reading of the published model cards. Positioning maps regenerated.
+
+### Fixed
+- **A routing refusal now names the knob that actually refused.** The quality
+  floor is applied before either condition sees the candidates, so the pool it
+  emptied reached the next per-condition filter and was blamed on that one:
+  an offline caller who set only `quality_floor` was told *"no engine meets the
+  offline RTF budget None"* — a knob they never set, with its unset value
+  printed back at them — while an online caller was advised to relax an RTF
+  ceiling that had rejected nothing. The floor is now diagnosed where its
+  effect is known, quoting the best candidate that fell short. Offline's one
+  remaining RTF sentence is nested under `rtf_budget`, so the condition that
+  ranks on quality alone is structurally unable to refuse on speed grounds
+  nobody asked for. `test_quality_floor_applies` asserted a bare `ValueError`,
+  which is how the wrong message survived; it now pins the text.
+- **`backends/chatterbox.py` still told readers the router preferred `kyutai`
+  for French** and kept Multilingual as "the challenger" — true until the
+  ratification above, and shipped in the docstring of the module that now
+  serves that language.
+
 ## [0.11.0] - 2026-10-26
 
 ### Added

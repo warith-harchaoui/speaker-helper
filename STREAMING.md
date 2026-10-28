@@ -124,12 +124,18 @@ Inscription (version 0.11.0, branche `research`) :
 - Le catalogue du routeur est **conscient de la condition** : online, la
   qualité = Elo public (`quality_source="public_elo"` ; absent des arènes →
   `no_public_elo`, classé derrière tout moteur classé) ; offline, rien ne
-  change — la paire ratifiée (STUDY.md §8 bis) reste la décision.
+  change ici — la décision ratifiée (STUDY.md §8 bis, français révisé au
+  §8 ter) reste la décision.
 - `profiles.MEASURED_RTF` : les RTF soutenus mesurés ci-dessus (axe
   performance, jamais récusé) alimentent la porte de faisabilité online.
 - Décisions vérifiées : `online fr/en → kokoro` (`public_elo`, confiance
-  haute — Elo public + RTF mesuré) ; `offline` inchangé
-  (fr → kyutai, en → chatterbox-turbo, autres → chatterbox-multilingual).
+  haute — Elo public + RTF mesuré) ; `offline` → chatterbox partout
+  (fr → chatterbox-multilingual **par arbitrage du propriétaire**, ratifié
+  2026-10-28 et signalé `owner_ratified=True` ; en → chatterbox-turbo,
+  autres → chatterbox-multilingual, tous deux par argmax de qualité).
+  **La case streaming n'est pas touchée** par cette révision : son critère
+  est l'Elo public croisé au RTF, et kokoro y reste le seul moteur à la fois
+  classé en arène et sous le plafond anti-underrun de 0,8.
 
 ## 6. Ce qui ferait bouger le verdict
 

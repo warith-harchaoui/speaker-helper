@@ -20,8 +20,11 @@ Since ``chatterbox-tts`` 0.1.7 the one distribution ships three models, and
   the shippable open models (the 2026-10 survey's English pick — see
   ``STUDY.md`` on the ``research`` branch). English only.
 * ``"multilingual"`` — 23 languages including French. The quality is honest
-  rather than native (the survey records 6–8% French CER), which is why the
-  router prefers ``kyutai`` for French and keeps this as the challenger.
+  rather than native (the survey records 6–8% French CER), and the router
+  sends offline French here anyway: not on those numbers, which still favour
+  ``kyutai``, but on the owner's ratified choice of 2026-10-28
+  (``router.OFFLINE_RATIFIED_ENGINE``, STUDY.md §8 ter). It is also the
+  variant every non-English language gets.
 * ``"base"`` — the original English model, kept for continuity.
 * ``"auto"`` (default) — Turbo for English, Multilingual for anything else,
   base when a chosen variant is missing from the installed package.

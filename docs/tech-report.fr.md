@@ -233,8 +233,20 @@ les chiffres plutôt que devinés :
   sur le front de Pareto qualité↔RTF [@deb2001multiobjective] et sélectionne le
   streaming avec des réglages à faible TTFA.
 - **`offline`** — par lots. Aucune contrainte temps réel, donc **seule la
-  qualité compte** : le moteur de plus haute qualité l'emporte et
-  la vitesse est ignorée.
+  qualité compte** : le moteur de plus haute qualité l'emporte et la vitesse est
+  ignorée — structurellement, pas seulement en paroles. Le RTF ne classe pas, ne
+  départage pas les ex æquo, et n'atteint pas la décision : une `RouteDecision`
+  hors ligne porte `mean_rtf=None` et `rtf_source="not_considered"`, et sa
+  `confidence` note la seule preuve de qualité (un chronométrage mesuré ne doit
+  pas hisser un simple prior à « medium »). Seule exception : un budget de
+  patience que l'appelant fixe explicitement, nommé comme sa contrainte à lui. Une seule chose prime sur cet argmax : une langue que
+  le propriétaire a arbitrée lui-même (`router.OFFLINE_RATIFIED_ENGINE` ;
+  français → chatterbox depuis le 2026-10-28). L'arbitrage s'applique *après*
+  le plancher de qualité et le budget de RTF — ces veto gardent donc leur
+  effet — et il n'est jamais muet : la décision porte `owner_ratified=True` et
+  sa justification nomme le candidat écarté ainsi que son score. Un passage en
+  force ne doit pas réécrire la preuve qu'il écarte : les tables de qualité
+  continuent de dire ce qu'elles disaient.
 
 La qualité est l'**intelligibilité** en aller-retour (texte→parole→texte
 WER/chrF) quand un moteur a été mesuré, sinon un prior hérité par moteur ; chaque

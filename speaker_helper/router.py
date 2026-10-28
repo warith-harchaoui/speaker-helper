@@ -20,11 +20,18 @@ Two conditions, two different objectives (this is the scientific core):
   quality**. Mode is ``streaming`` with low-TTFA knobs (small first chunk, strict
   pipeline). If nothing keeps up, that is reported, not hidden.
 
-* **offline** (batch). There is no real-time constraint — ``RTF`` may exceed 1 —
-  and **quality is the only objective**: speed is disregarded entirely. We pick
-  the highest-quality engine outright (an optional RTF *patience* budget and an
-  equal-quality speed tie-break are the only places RTF appears). Mode is
-  ``offline``.
+* **offline** (batch). There is no real-time constraint, and **quality is the
+  only objective**: speed is not an objective at all. We pick the highest-quality
+  engine outright, and the decision carries **no RTF** — ``mean_rtf`` is ``None``
+  and ``rtf_source`` is ``"not_considered"``, so a timing cannot be mistaken for
+  part of the reasoning. The single exception is a *patience* budget the caller
+  sets explicitly, which filters candidates and is named as the caller's own
+  constraint. ``confidence`` likewise rates the quality evidence alone. Mode is
+  ``offline``. Where the owner has arbitrated a language himself
+  (:data:`OFFLINE_RATIFIED_ENGINE` — French since 2026-10-28), his choice takes
+  the decision and the justification says which candidate it overrode: an
+  arbitration is reported as an arbitration, never folded into the quality
+  numbers.
 
 For the **online** condition the choice is taken only from the Pareto front (the
 non-dominated set), so the router never returns a point some other engine beats
@@ -97,6 +104,34 @@ ENGINE_BACKENDS: dict[str, str] = {
     "openvoice": "openvoice",
 }
 
+# Owner-ratified offline engine, per language. This is a DECISION, not a
+# measurement, and it is kept apart from the quality tables on purpose: the
+# documented evidence stays untouched and keeps saying what it said (for
+# French, kyutai's 0.92 prior still outranks chatterbox's 0.78 — see
+# `TTS_QUALITY_PRIORS_BY_LANG` and its CER note). What this table says is that
+# for the listed languages the owner has arbitrated the offline case himself,
+# so the router must follow the choice rather than the argmax, and say out
+# loud in its justification what it overrode.
+#
+# * **fr → chatterbox** (ratified 2026-10-28). The owner's ear, on the offline
+#   case, prefers chatterbox's French to kyutai's. Which chatterbox: the best
+#   documented one that actually speaks French, i.e. the **Multilingual**
+#   model (23 languages, base prior 0.90) — Turbo and base are English-only,
+#   so they were never candidates here. No knob is needed: the backend's
+#   `variant="auto"` already resolves any non-English language to Multilingual
+#   (see `backends/chatterbox.py::_variant_for`).
+#
+# The honest counterpart: this ordering is one listener's judgement, exactly
+# like the editorial priors it overrides, and it is pending the same
+# replacement — a human pairwise-listening protocol (STUDY.md §8 bis), whose
+# scores would land as `quality_source="measured_human"` and settle the fr
+# case on evidence instead of arbitration.
+OFFLINE_RATIFIED_ENGINE: dict[str, str] = {"fr": "chatterbox"}
+
+#: As-of date of the ratifications above — a decision carries its date, same
+#: rule as `PUBLIC_ELO_AS_OF` and LANDSCAPE.md's licence table.
+OFFLINE_RATIFIED_AS_OF: str = "2026-10-28"
+
 
 @dataclass(frozen=True)
 class OperatingPoint:
@@ -146,14 +181,21 @@ class RouteRequest:
         Online only: the hard ``mean_rtf`` bound an engine must beat to be
         feasible. Defaults to :data:`DEFAULT_RTF_CEILING` (``0.8``).
     rtf_budget : float or None
-        Offline only: optional patience cap on ``mean_rtf`` (``None`` = no cap,
-        quality is all that matters).
+        Offline only: an optional patience cap the **caller** may impose
+        (``None``, the default, = no cap — quality is all that matters). This is
+        the one place RTF can touch an offline route, and it is opt-in: the
+        router never introduces a speed criterion of its own there.
     quality_floor : float or None
         Reject any candidate below this quality, in both conditions (``None`` =
         no floor).
     require_measured_rtf : bool
         Online only: refuse engines whose RTF was never measured (default
         ``True`` — do not claim an untimed engine keeps up).
+    respect_ratification : bool
+        Offline only: honour :data:`OFFLINE_RATIFIED_ENGINE` for this language
+        (default ``True``). Set ``False`` to see the unarbitrated quality
+        argmax — what a study comparing engines wants, and what makes the
+        owner's override visible as an override.
     """
 
     condition: str
@@ -162,6 +204,7 @@ class RouteRequest:
     rtf_budget: float | None = None
     quality_floor: float | None = None
     require_measured_rtf: bool = True
+    respect_ratification: bool = True
 
 
 @dataclass(frozen=True)
@@ -182,18 +225,24 @@ class RouteDecision:
     quality : float
         The chosen point's quality score.
     mean_rtf : float or None
-        The chosen point's mean RTF (``None`` only in the offline, RTF-unknown
-        fallback).
+        The chosen point's mean RTF. **Always ``None`` for an offline
+        decision**: RTF is not an objective there, so it is not reported.
     quality_source, rtf_source : str
-        Provenance of the two axes (see :class:`OperatingPoint`).
+        Provenance of the two axes (see :class:`OperatingPoint`). Offline
+        decisions carry ``rtf_source="not_considered"``.
     confidence : str
-        ``"high"`` (both axes measured), ``"medium"`` (one measured), or
-        ``"low"`` (both from priors/estimates).
+        Online: ``"high"`` (both axes measured), ``"medium"`` (one), ``"low"``
+        (neither). Offline: the confidence in the QUALITY evidence alone —
+        ``"high"`` if measured, ``"low"`` if a prior.
     justification : str
         A human-readable, number-citing explanation of *why* this point won.
     candidates_considered, pareto_size : int
         How many candidates were weighed and how many survived to the Pareto
         front — for auditability.
+    owner_ratified : bool
+        ``True`` when this engine was taken from :data:`OFFLINE_RATIFIED_ENGINE`
+        rather than won on the quality axis. The ``justification`` then names
+        the candidate it overrode and that candidate's score.
     """
 
     condition: str
@@ -210,6 +259,7 @@ class RouteDecision:
     justification: str
     candidates_considered: int
     pareto_size: int
+    owner_ratified: bool = False
 
     def apply(self, settings: Settings | None = None) -> Settings:
         """Return ``settings`` (or fresh defaults) reconfigured for this decision.
@@ -253,7 +303,10 @@ def _quality_for(engine: str, language: str, condition: str) -> tuple[float, str
 
     * **offline** — the ratified editorial choice, encoded as language-aware
       priors (``"prior"``), except kokoro whose per-language UTMOSv2
-      measurement predates the criterion debate (``"measured_mos"``).
+      measurement predates the criterion debate (``"measured_mos"``). These
+      scores stay as documented even where :data:`OFFLINE_RATIFIED_ENGINE`
+      takes the decision out of the argmax's hands: an override must not
+      rewrite the evidence it overrides.
     * **online_realtime** — the **public arena Elo** (human pairwise votes,
       ``"public_elo"``). An engine absent from every public arena has no
       evidence under this criterion: it scores 0.0 with provenance
@@ -404,14 +457,40 @@ def _points_from_reports(reports: Sequence[object]) -> list[OperatingPoint]:
     return points
 
 
-def _confidence(point: OperatingPoint) -> str:
-    """Rate how trustworthy a point is from its two provenance flags."""
-    # Both axes measured → we stand on real numbers; one measured → medium; a
-    # decision resting entirely on priors is explicitly low-confidence. Quality
-    # counts as evidenced whether it came from a round-trip chrF, a UTMOSv2
-    # MOS, or a public arena Elo (human pairwise votes — the online
-    # condition's ratified criterion); "no_public_elo" and "prior" do not.
+def _confidence(point: OperatingPoint, condition: str) -> str:
+    """Rate how trustworthy a point is, on the axes the condition actually uses.
+
+    Quality counts as evidenced whether it came from a round-trip chrF, a
+    UTMOSv2 MOS, or a public arena Elo (human pairwise votes — the online
+    condition's ratified criterion); ``"no_public_elo"`` and ``"prior"`` do not.
+
+    The two conditions weigh different numbers of axes, so they cannot share a
+    scale:
+
+    * **offline** — RTF is not an objective here, so it must not prop up a
+      confidence score either. Rating an offline decision "medium" because we
+      happened to time the engine would dress a bare prior up as half-evidence.
+      Confidence is therefore the confidence in the QUALITY evidence, full
+      stop: measured → ``"high"``, prior → ``"low"``.
+    * **online_realtime** — both axes are load-bearing (quality to maximise,
+      RTF to clear the feasibility ceiling), so both count: two measured axes
+      → ``"high"``, one → ``"medium"``, neither → ``"low"``.
+
+    Parameters
+    ----------
+    point : OperatingPoint
+        The winning candidate.
+    condition : str
+        :data:`ONLINE_REALTIME` or :data:`OFFLINE`.
+
+    Returns
+    -------
+    str
+        ``"high"``, ``"medium"`` or ``"low"``.
+    """
     measured_q = point.quality_source in ("measured_chrf", "measured_mos", "public_elo")
+    if condition == OFFLINE:
+        return "high" if measured_q else "low"
     measured_r = point.rtf_source == "measured"
     if measured_q and measured_r:
         return "high"
@@ -476,7 +555,23 @@ def route(
 
     # A global quality floor applies to both conditions when set.
     if request.quality_floor is not None:
+        best_before = max(candidates, key=lambda c: c.quality)
         candidates = [c for c in candidates if c.quality >= request.quality_floor]
+        # Diagnose an empty pool HERE, where the cause is known. Left to the
+        # per-condition code below, the floor's victims were blamed on that
+        # condition's own filter: an offline caller who set only a quality
+        # floor was told "no engine meets the offline RTF budget None" --
+        # naming a budget they never set, and printing None as its value --
+        # while an online one was advised to relax an RTF ceiling that had
+        # rejected nothing. Both messages sent the caller to the wrong knob.
+        if not candidates:
+            raise ValueError(
+                f"no engine for language {request.language!r} reaches the quality "
+                f"floor {request.quality_floor} under the {request.condition} "
+                f"criterion (best available: {best_before.engine!r} at "
+                f"{best_before.quality:.3f} [{best_before.quality_source}]); "
+                "lower the floor or measure more engines"
+            )
 
     if request.condition == ONLINE_REALTIME:
         decision = _route_online(request, candidates)
@@ -533,7 +628,7 @@ def _route_online(request: RouteRequest, candidates: list[OperatingPoint]) -> Ro
         mean_rtf=chosen.mean_rtf,
         quality_source=chosen.quality_source,
         rtf_source=chosen.rtf_source,
-        confidence=_confidence(chosen),
+        confidence=_confidence(chosen, ONLINE_REALTIME),
         justification=justification,
         candidates_considered=len(candidates),
         pareto_size=len(front),
@@ -544,38 +639,84 @@ def _route_offline(request: RouteRequest, candidates: list[OperatingPoint]) -> R
     """Plan the offline condition: **only synthesis quality matters**.
 
     Offline has no real-time constraint, so speed is *not* an objective at all —
-    we maximise quality over the whole candidate pool. RTF appears only as an
-    optional *patience* budget the caller may set, and as a last-resort tie-break
-    between candidates of exactly equal quality (so a needless compute cost is
-    avoided when quality cannot distinguish them). Engines with an unmeasured RTF
-    stay in the running: not knowing an engine's speed never disqualifies it when
-    speed does not matter.
+    we maximise quality over the whole candidate pool. RTF does not rank, does
+    not break ties, and does not reach the returned decision (``mean_rtf`` is
+    ``None``, ``rtf_source`` is ``"not_considered"``) or its confidence score.
+    Equal quality is broken by catalogue order, deterministically, rather than by
+    reaching for a speed number the condition has no use for. The caller's
+    optional patience budget is the sole exception, and is named as the caller's
+    constraint. Engines with an unmeasured RTF stay in the running: not knowing
+    an engine's speed cannot disqualify it when speed does not matter.
+
+    One thing outranks the argmax: an owner ratification for the language
+    (:data:`OFFLINE_RATIFIED_ENGINE`). It is applied *after* the quality floor
+    and the RTF budget — so those vetoes still bite — and it is always declared,
+    via ``owner_ratified=True`` and a justification naming what it set aside.
     """
     # Apply only the optional patience budget; RTF-unknown engines are kept
     # (offline never rejects a candidate for being slow unless a budget says so).
     pool = candidates
     if request.rtf_budget is not None:
         pool = [c for c in candidates if c.mean_rtf is None or c.mean_rtf <= request.rtf_budget]
-    if not pool:
-        raise ValueError(f"no engine meets the offline RTF budget {request.rtf_budget}")
+        # Nested under the budget on purpose. `candidates` is non-empty by
+        # route()'s own guards, so with no budget set `pool is candidates` and
+        # this cannot fire -- which is the point: offline does not care about
+        # speed, so it must not be able to refuse on speed grounds the caller
+        # never asked for. The budget is the one RTF knob offline honours, it
+        # is opt-in and off by default, and this is the only sentence offline
+        # is allowed to spend on RTF.
+        if not pool:
+            raise ValueError(
+                f"no engine meets the offline RTF budget {request.rtf_budget} for "
+                f"language {request.language!r}; offline ranks on quality alone, "
+                "so raising or dropping the budget is the usual fix"
+            )
     # Pure quality argmax over the entire pool (ties broken toward the faster
     # engine only when quality is identical). No Pareto gate: dropping a
     # higher-quality engine because its RTF is unknown would violate the
     # offline objective of caring about quality alone.
-    chosen = _best_quality(pool, tie_break_faster=True)
-    rtf_str = "n/a" if chosen.mean_rtf is None else f"{chosen.mean_rtf:.3f}"
-    justification = (
-        f"offline: quality is the ONLY objective (no real-time constraint). "
-        f"Maximise quality over {len(pool)} candidate(s)"
-        + (
-            f" within optional RTF budget {request.rtf_budget}"
-            if request.rtf_budget is not None
-            else ""
-        )
-        + f"; chose '{chosen.engine}' (quality={chosen.quality:.3f} "
-        f"[{chosen.quality_source}], mean_rtf={rtf_str} [{chosen.rtf_source}]). "
-        f"mode=offline (whole-text synthesis; speed disregarded)."
+    argmax = _best_quality(pool, tie_break_faster=False)
+    # The owner may have arbitrated this language himself. When he has, his
+    # choice wins over the argmax — but never silently: the overridden
+    # candidate and its score go into the justification, so a reader sees both
+    # the decision and the evidence it set aside.
+    chosen, overridden = argmax, None
+    if request.respect_ratification:
+        ratified = OFFLINE_RATIFIED_ENGINE.get((request.language or "").lower().split("-")[0])
+        if ratified is not None and ratified != argmax.engine:
+            match = next((c for c in pool if c.engine == ratified), None)
+            if match is not None:
+                chosen, overridden = match, argmax
+    # The caller's optional patience cap is the ONLY reason RTF may be named in
+    # an offline exposé, and then only as the caller's own constraint — never
+    # as a property of the winner, which would read as a reason it won.
+    budget_clause = (
+        f" within the caller's optional RTF patience budget {request.rtf_budget}"
+        if request.rtf_budget is not None
+        else ""
     )
+    if overridden is not None:
+        justification = (
+            f"offline: engine fixed by the owner's ratified choice for "
+            f"{request.language!r} (as of {OFFLINE_RATIFIED_AS_OF}) — "
+            f"'{chosen.engine}' (quality={chosen.quality:.3f} "
+            f"[{chosen.quality_source}]). This OVERRIDES the quality argmax over "
+            f"{len(pool)} candidate(s){budget_clause}, which was "
+            f"'{overridden.engine}' (quality={overridden.quality:.3f} "
+            f"[{overridden.quality_source}]): a decision, not a measurement. "
+            f"Pass respect_ratification=False for the unarbitrated ranking. "
+            f"mode=offline (whole-text synthesis; speed is not an objective "
+            f"and no RTF enters this decision)."
+        )
+    else:
+        justification = (
+            f"offline: quality is the ONLY objective (no real-time constraint). "
+            f"Maximise quality over {len(pool)} candidate(s){budget_clause}"
+            f"; chose '{chosen.engine}' (quality={chosen.quality:.3f} "
+            f"[{chosen.quality_source}]). "
+            f"mode=offline (whole-text synthesis; speed is not an objective "
+            f"and no RTF enters this decision)."
+        )
     return RouteDecision(
         condition=OFFLINE,
         engine=chosen.engine,
@@ -585,14 +726,20 @@ def _route_offline(request: RouteRequest, candidates: list[OperatingPoint]) -> R
         first_chunk_sentences=1,
         stream_concurrency=1,
         quality=chosen.quality,
-        mean_rtf=chosen.mean_rtf,
+        # Deliberately None, whatever the catalogue knows about this engine's
+        # speed. Offline does not rank on RTF, so an offline decision has no
+        # RTF to report — carrying one invites a reader (or a dashboard) to
+        # treat it as part of the reasoning. Structural, not cosmetic: the
+        # number cannot leak because it is not there.
+        mean_rtf=None,
         quality_source=chosen.quality_source,
-        rtf_source=chosen.rtf_source,
-        confidence=_confidence(chosen),
+        rtf_source="not_considered",
+        confidence=_confidence(chosen, OFFLINE),
         justification=justification,
         candidates_considered=len(candidates),
         # No Pareto front is used offline (quality-only), so report 0.
         pareto_size=0,
+        owner_ratified=overridden is not None,
     )
 
 

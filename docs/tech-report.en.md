@@ -218,7 +218,20 @@ numbers rather than guessed:
   the router **maximises quality** on the quality↔RTF Pareto front [@deb2001multiobjective]
   and selects streaming with low-TTFA knobs.
 - **`offline`** — batch. There is no real-time constraint, so **quality is the
-  only objective**: the highest-quality engine wins and speed is disregarded.
+  only objective**: the highest-quality engine wins and speed is disregarded —
+  structurally, not just rhetorically. RTF does not rank, does not break ties,
+  and does not reach the decision: an offline `RouteDecision` carries
+  `mean_rtf=None` and `rtf_source="not_considered"`, and its `confidence` rates
+  the quality evidence alone (a measured timing must not inflate a bare prior
+  to "medium"). The one exception is a *patience* budget the caller sets
+  explicitly, named as the caller's own constraint.
+  One thing outranks that argmax — a language the owner has arbitrated himself
+  (`router.OFFLINE_RATIFIED_ENGINE`; French → chatterbox since 2026-10-28).
+  The arbitration is applied *after* the quality floor and RTF budget, so those
+  vetoes still bite, and it is never silent: the decision carries
+  `owner_ratified=True` and its justification names the candidate it set aside
+  and that candidate's score. An override must not rewrite the evidence it
+  overrides, so the quality tables keep saying what they said.
 
 Quality is round-trip **intelligibility** (text→speech→text WER/chrF) when an
 engine has been measured, else an inherited per-engine prior; every

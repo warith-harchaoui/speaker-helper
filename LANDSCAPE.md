@@ -11,28 +11,64 @@ a short reference, and drops into an AI pipeline through a typed
 `dict`/`path` API exposed over many surfaces at once. A project optimised for a
 very different job (a cloud API, a single OS voice, a research checkpoint) is
 not penalised in the abstract — the score just reflects fit to *this* niche.
+The per-criterion rubric is spelled out under
+[How the cells are scored](#how-the-cells-are-scored), together with which
+cells rest on measurements of our own and which are a reading of the published
+model cards.
 
 ## At a glance
 
 <!-- TABLE:START -->
-| Speech Synthesis | Offline / local | Streaming | Voice cloning | Multilingual | AI-pipeline ergonomics | Multi-surface | Light install | Commercial licence |
-| --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **speaker-helper** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
-| Coqui XTTS | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐ | ⭐ | ⭐ |
-| Piper | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
-| Kokoro | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
-| Chatterbox | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐ | ⭐ | ⭐⭐ | ⭐⭐⭐⭐⭐ |
-| F5-TTS | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐ | ⭐ | ⭐⭐ | ⭐ |
-| OpenVoice | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐ | ⭐ | ⭐⭐ | ⭐⭐⭐⭐⭐ |
-| Hume TADA | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐ | ⭐ | ⭐⭐ | ⭐⭐⭐⭐ |
-| IndexTTS 2.5 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐ | ⭐ | ⭐ | ⭐⭐⭐⭐⭐ |
-| Fish Speech | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐ | ⭐ | ⭐ | ⭐ |
-| Bark | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐ | ⭐ | ⭐ | ⭐⭐⭐⭐⭐ |
-| Tortoise-TTS | ⭐⭐⭐⭐⭐ | ⭐ | ⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐ | ⭐ | ⭐ | ⭐⭐⭐⭐⭐ |
-| pyttsx3 | ⭐⭐⭐⭐⭐ | ⭐ | ⭐ | ⭐⭐ | ⭐⭐ | ⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
-| gTTS | ⭐ | ⭐ | ⭐ | ⭐⭐⭐⭐ | ⭐⭐ | ⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐ |
-| ElevenLabs (cloud) | ⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐ |
+| Speech Synthesis | Offline / local | Streaming | Voice cloning | Multilingual | Pronunciation control | Expressivity control | AI-pipeline ergonomics | Multi-surface | Light install | Commercial licence |
+| --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **speaker-helper** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
+| Coqui XTTS | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐ | ⭐⭐⭐ | ⭐⭐⭐ | ⭐ | ⭐ | ⭐ |
+| Piper | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐ | ⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
+| Kokoro | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐ | ⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
+| Chatterbox | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐ | ⭐⭐ | ⭐⭐⭐⭐⭐ |
+| Kyutai TTS | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐ | ⭐⭐ | ⭐ | ⭐⭐⭐ | ⭐⭐ | ⭐ | ⭐⭐ | ⭐⭐⭐⭐ |
+| CosyVoice 2/3 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐ | ⭐ | ⭐⭐⭐⭐⭐ |
+| F5-TTS | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐ | ⭐⭐⭐ | ⭐⭐ | ⭐ | ⭐⭐ | ⭐ |
+| OpenVoice | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐ | ⭐⭐⭐ | ⭐⭐ | ⭐ | ⭐⭐ | ⭐⭐⭐⭐⭐ |
+| Hume TADA | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐ | ⭐⭐ | ⭐⭐⭐⭐ |
+| IndexTTS 2.5 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐ | ⭐ | ⭐⭐⭐⭐⭐ |
+| Fish Speech | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐ | ⭐⭐⭐ | ⭐⭐ | ⭐ | ⭐ | ⭐ |
+| Bark | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐ | ⭐⭐⭐⭐ | ⭐ | ⭐⭐⭐⭐ | ⭐⭐ | ⭐ | ⭐ | ⭐⭐⭐⭐⭐ |
+| Tortoise-TTS | ⭐⭐⭐⭐⭐ | ⭐ | ⭐⭐⭐⭐ | ⭐ | ⭐ | ⭐⭐⭐ | ⭐⭐ | ⭐ | ⭐ | ⭐⭐⭐⭐⭐ |
+| pyttsx3 | ⭐⭐⭐⭐⭐ | ⭐ | ⭐ | ⭐⭐ | ⭐⭐ | ⭐ | ⭐⭐ | ⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
+| gTTS | ⭐ | ⭐ | ⭐ | ⭐⭐⭐⭐⭐ | ⭐ | ⭐ | ⭐⭐ | ⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐ |
+| ElevenLabs (cloud) | ⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐ |
 <!-- TABLE:END -->
+
+## How the cells are scored
+
+The scale is deliberately coarse and the rubric is written down, so a cell can
+be argued with rather than merely disbelieved. Two columns are **new in
+0.12.0** — pronunciation and expressivity — because they are what the project's
+own brief turns on (a lexicon applied by default; a voice that is "realistic
+and lively"), and no previous column captured either.
+
+| Criterion | ⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
+|---|---|---|---|
+| Offline / local | cloud API only | local but with a hosted step | weights on disk, nothing leaves the machine |
+| Streaming | batch only, many times slower than real time | real time under favourable conditions | sustained RTF well under 1 on a commodity CPU |
+| Voice cloning | fixed voices only | a published voice bank, or limited timbre transfer | zero-shot from a few seconds you supply |
+| Multilingual | English only | ~5–10 languages | 25+ languages in one model or voice set |
+| Pronunciation control | nothing but respelling the input text | partial (phoneme or pinyin tags) | a lexicon **plus** verbatim IPA spliced into the phoneme stream |
+| Expressivity control | flat, fixed delivery | prosody inherited from the reference clip | an explicit, directable emotion / intensity knob |
+| AI-pipeline ergonomics | a research script to vendor | importable, with rough edges | typed `dict`/`path` API built to be called |
+| Multi-surface | library only | library + CLI | library + CLI + REST + GUI + MCP |
+| Light install | multi-GB, heavy deps | a few GB | small, few dependencies |
+| Commercial licence | non-commercial | permissive with real conditions | permissive (MIT / Apache-2.0) |
+
+Provenance, since it differs by cell. **Streaming** is the only column with
+measurements of our own on the rows this suite ships — kokoro 0.21–0.24,
+kyutai 0.88, chatterbox 2.3 en / 5.6 fr, sustained through `Speaker.stream` on
+an M2 Max ([STREAMING.md](STREAMING.md)). Every other cell is a reading of the
+published model cards and licences, scored against the rubric above: a
+judgement, not a benchmark. **Pocket TTS is deliberately absent**: it is on the
+watch list in STREAMING.md §3, but too little is published about it to fill ten
+cells honestly, and a fabricated row would be worse than a missing one.
 
 ## Positioning map
 
@@ -41,13 +77,16 @@ not penalised in the abstract — the score just reflects fit to *this* niche.
 
 ![Positioning map](https://raw.githubusercontent.com/warith-harchaoui/speaker-helper/main/assets/landscape.png)
 
-The map is a 2-D summary of the eight criteria, so read it as a shape, not a scoreboard. `speaker-helper` is at the top-right corner. The axes read **Horizontal: Practicality ↔ Versatility** and **Vertical: Autonomy ↔ Efficiency**.
+The map is a 2-D summary of the ten criteria, so read it as a shape, not a
+scoreboard. `speaker-helper` is at the top-right corner. The axes read
+**Horizontal: Resourceful ↔ Adaptable** (~34% of the variance) and
+**Vertical: Practical ↔ Articulate** (~25%) — together ~60% of the table.
 
-The map reveals a clear distinction between approaches prioritizing ease of use and those emphasizing broader capabilities. Options clustered on the left side of the map generally excel in straightforward application and deployment, with factors like ease of installation and a simple AI pipeline being key drivers. Conversely, those on the right side demonstrate a greater breadth of functionality, often incorporating features like multilingual support and streaming capabilities, though this sometimes comes at the cost of immediate practicality.
+The map reveals a clear distinction between options that prioritize ease of use and those that emphasize flexibility. The horizontal axis separates those that excel at readily available features – like straightforward installation or built-in multilingual support – from those that offer a greater degree of customization and adaptability to varied conditions. Several options, including Tortoise-TTS, F5-TTS, IndexTTS 2.5, Fish Speech, Chatterbox, OpenVoice, Hume TADA, CosyVoice 2/3, Bark, Coqui XTTS, Kyutai TTS, and pyttsx3, cluster on the left, demonstrating a focus on resourceful capabilities. Conversely, speaker-helper, Piper, Kokoro, gTTS, and ElevenLabs (cloud) are positioned on the right, highlighting their adaptability.
 
-Several options find themselves grouped together in the lower right corner, suggesting a shared focus on versatility and a degree of independence from centralized services. These include Coqui XTTS, Fish Speech, and Hume TADA, all offering a wider range of features but potentially requiring more technical setup. Interestingly, speaker-helper occupies the upper right corner, demonstrating a strong balance of both versatility and efficiency, a position it holds while others, like the options in the lower left, prioritize autonomy over streamlined operation.
+The vertical axis differentiates between options that prioritize clear and expressive speech and those that emphasize practicality and simplicity. Those leaning towards articulation, such as speaker-helper, CosyVoice 2/3, ElevenLabs (cloud), IndexTTS 2.5, Hume TADA, Coqui XTTS, Chatterbox, Fish Speech, Kokoro, OpenVoice, Bark, Piper, F5-TTS, and Tortoise-TTS, demonstrate a strength in expressive control and voice cloning. Meanwhile, gTTS and pyttsx3, situated at the bottom, prioritize a more straightforward and functional approach.
 
-The upper left quadrant showcases a different set of strengths, with Piper, Kokoro, pyttsx3, and gTTS all performing well in terms of efficiency and ease of use. While speaker-helper leads overall, these options represent a compelling alternative for users who value a quick and reliable experience above all else. The divergence in positioning highlights that there is no single "best" option; the ideal choice depends heavily on the specific priorities of the user.
+Notably, speaker-helper leads in adaptability and articulation, occupying the top-right corner. However, it’s interesting to see how several options – Coqui XTTS, Chatterbox, CosyVoice 2/3, F5-TTS, OpenVoice, Hume TADA, IndexTTS 2.5, and Fish Speech – all gather in the top-left corner, demonstrating a shared emphasis on resourceful capabilities alongside a focus on expressive output.  gTTS and pyttsx3, on the other hand, find themselves in the bottom-left, representing a combination of resourcefulness and practicality, though for different reasons.
 <!-- FIGURE:END -->
 
 ## Positioning
@@ -68,8 +107,8 @@ in lock-step — Python, CLI, REST, and a web GUI.
 That is a different centre of gravity from the field:
 
 - The **model projects** — Coqui XTTS, Chatterbox, F5-TTS, OpenVoice, Bark,
-  Tortoise, and from 2026 Hume TADA, IndexTTS 2.5 and Fish Speech — are
-  excellent *engines*. They clone well and run offline, but each
+  Tortoise, and from 2026 Hume TADA, IndexTTS 2.5, CosyVoice 2/3 and Fish
+  Speech — are excellent *engines*. They clone well and run offline, but each
   is a library or checkpoint: no cross-engine router, no committed eval gate, no
   CLI/REST/GUI trio, and a heavy `torch` install. speaker-helper is happy
   to *drive* several of them behind its protocol rather than compete with any one.
@@ -77,6 +116,12 @@ That is a different centre of gravity from the field:
   real-time factor (Kokoro synthesises well under real time on CPU, which is why
   it is speaker-helper's default routed choice for `online_realtime`), but they
   do not clone voices and stop at a library/CLI.
+- The **native-streaming engines** — Kyutai TTS, and Hume TADA alongside it —
+  are built to emit audio as they generate rather than after. Kyutai speaks
+  native French and English and ships a published voice bank, but it does not
+  hand you voice cloning, and its sustained 0.88 RTF measured here lands just
+  above our 0.8 anti-underrun ceiling on an M2 Max. speaker-helper drives it
+  behind the same protocol as the rest.
 - The **OS / cloud shims** — pyttsx3, gTTS, ElevenLabs — trade the local model
   away. pyttsx3 and gTTS are trivially light but give you one OS voice or a cloud
   round-trip with no cloning; ElevenLabs is genuinely best-in-class on streaming
@@ -102,9 +147,12 @@ publishes MIT code with CC-BY-NC weights, and Fish Speech's S2 Pro is
 non-commercial — all three are excellent and all three are unusable in a
 product. What is left for commercial work is narrower than a quality ranking
 suggests: Kokoro (Apache-2.0), Piper, OpenVoice v2, Bark (MIT), Tortoise
-(Apache-2.0), IndexTTS 2.5 (Apache-2.0), and Chatterbox (MIT, with watermarked
-output). Hume TADA sits in between — MIT code over weights under the Llama 3.2
-Community License, permissive until you are very large. A router that optimised
+(Apache-2.0), IndexTTS 2.5 and CosyVoice 2/3 (Apache-2.0), and Chatterbox
+(MIT, with watermarked output). Two sit in between, permissive *with a
+condition you must actually honour*: Hume TADA (MIT code over Llama 3.2
+Community License weights, permissive until you are very large) and Kyutai TTS
+(CC-BY-4.0 weights, and CC-BY-4.0 / CC0 voice banks — commercial use is fine,
+attribution is not optional). A router that optimised
 quality alone would hand you a licence violation with a justification attached,
 which is why `commercial` belongs beside `condition` as a stated constraint.
 
@@ -138,6 +186,15 @@ neural engines rather than a one-file OS shim.
 - **IndexTTS 2.5** — zero-shot cloning with explicit emotion and speed control,
   streaming with synchronised text, and Apache-2.0 weights: the permissive
   option when cloning quality matters and shipping matters equally.
+- **Kyutai TTS** — you want French and English spoken by a model that was
+  trained on them natively, emitting audio as it generates (delayed-streams,
+  ~220 ms announced) rather than after. Accept the trade: a published voice
+  bank instead of cloning your own reference, and CC-BY attribution in your
+  product.
+- **CosyVoice 2/3** — zero-shot cloning from about three seconds, streaming in
+  the ~150 ms class, natural-language style instructions, and Apache-2.0: the
+  broadest feature set of the permissive cloners, at the price of a heavy
+  install.
 - **Fish Speech** — you are benchmarking against the quality ceiling and the
   work is research or personal; the licence rules out a product.
 - **Bark / Tortoise-TTS** — expressive or high-fidelity offline generation where

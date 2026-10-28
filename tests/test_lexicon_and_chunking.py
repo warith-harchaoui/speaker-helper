@@ -10,9 +10,12 @@ contract — "integrated by default, deterministic once derived":
 * **Chunking** (:mod:`speaker_helper.chunking`) — long texts cut at sentence
   groups; the LLM only places boundaries and its answer is structurally
   validated, so text integrity never depends on it.
-* **Routing** (:mod:`speaker_helper.router`) — offline French goes to kyutai,
-  offline English to chatterbox, other languages to chatterbox's multilingual
-  model; every proposed engine maps to a backend that can serve it.
+* **Routing** (:mod:`speaker_helper.router`) — offline English goes to
+  chatterbox (Turbo) and other languages to its multilingual model; offline
+  French goes to chatterbox too, but by the owner's 2026-10-28 ratification
+  rather than by the quality argmax, and the router must declare the override
+  instead of hiding it. Every proposed engine maps to a backend that can
+  serve it.
 
 Every LLM call is monkeypatched: CI has no Ollama, and these tests must stay
 deterministic either way.
@@ -346,7 +349,8 @@ def test_chunked_say_merges_into_one_result() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Language routing: fr → kyutai, en → chatterbox, others → chatterbox (mtl)
+# Language routing: fr → chatterbox (ratified), en → chatterbox (Turbo),
+# others → chatterbox (Multilingual)
 # ---------------------------------------------------------------------------
 
 
@@ -360,18 +364,53 @@ def test_offline_routing_follows_the_owner_priors() -> None:
     language-aware priors ARE the decision, and the router must say so
     (``quality_source="prior"``, low confidence) rather than dress them up.
     """
-    # French: kyutai (the survey's native-French editorial pick).
-    fr = route(RouteRequest(condition="offline", language="fr"))
-    assert (fr.engine, fr.backend) == ("kyutai", "kyutai")
-    assert fr.quality_source == "prior"
     # English: chatterbox (its backend auto-picks the Turbo variant).
     en = route(RouteRequest(condition="offline", language="en"))
     assert (en.engine, en.backend) == ("chatterbox", "chatterbox")
+    assert en.quality_source == "prior"
+    assert en.owner_ratified is False  # it won the argmax on its own
     # Any other language: chatterbox too (the multilingual variant serves it);
     # kyutai must NOT win — it would read Spanish with a French/English tongue.
     es = route(RouteRequest(condition="offline", language="es"))
     assert (es.engine, es.backend) == ("chatterbox", "chatterbox")
     assert es.confidence == "low"
+
+
+def test_offline_french_follows_the_owner_ratification() -> None:
+    """French offline is the owner's arbitration — and says so.
+
+    Ratified 2026-10-28: **fr → chatterbox** (the Multilingual model, the best
+    documented chatterbox that speaks French; Turbo and base are English-only).
+    This is a DECISION, so the router must (a) follow it, (b) flag it as an
+    arbitration rather than a measurement, and (c) leave the evidence it
+    overrode intact and visible — kyutai's 0.92 French prior still stands in
+    the tables, and still wins when the ratification is switched off.
+    """
+    fr = route(RouteRequest(condition="offline", language="fr"))
+    assert (fr.engine, fr.backend) == ("chatterbox", "chatterbox")
+    assert fr.owner_ratified is True
+    # The override is declared in the justification, naming what it set aside.
+    assert "OVERRIDES" in fr.justification
+    assert "kyutai" in fr.justification
+    # The quality axis is NOT rewritten to justify the choice: the decision
+    # carries chatterbox's own documented French prior, lower than kyutai's.
+    assert fr.quality == engine_quality_prior("chatterbox", "fr")
+    assert fr.quality < engine_quality_prior("kyutai", "fr")
+    # Switch the arbitration off and the unarbitrated argmax reappears.
+    raw = route(RouteRequest(condition="offline", language="fr", respect_ratification=False))
+    assert raw.engine == "kyutai"
+    assert raw.owner_ratified is False
+    # A region subtag or an upper-cased code is still French: the lookup
+    # normalises the tag, rather than falling through to the argmax in silence.
+    for tag in ("fr-FR", "FR", "fr-ca"):
+        tagged = route(RouteRequest(condition="offline", language=tag))
+        assert (tagged.engine, tagged.owner_ratified) == ("chatterbox", True), tag
+    # The caller's own vetoes come first: a floor of 0.85 drops chatterbox
+    # (0.78 in French) before the arbitration is consulted, and the router
+    # then reports honestly that it overrode nothing.
+    floored = route(RouteRequest(condition="offline", language="fr", quality_floor=0.85))
+    assert (floored.engine, floored.owner_ratified) == ("kyutai", False)
+    assert "OVERRIDES" not in floored.justification
 
 
 def test_language_aware_priors() -> None:

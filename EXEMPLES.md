@@ -418,13 +418,22 @@ print(d.engine, d.mode, d.confidence, d.quality_source)
 # hors ligne : la qualité est le SEUL objectif (la vitesse est ignorée).
 d2 = route(RouteRequest(condition="offline", language="fr"))
 print(d2.engine, d2.mode, d2.confidence, d2.quality_source)
-# kyutai offline medium prior
+# chatterbox offline low prior  <- 'low': offline confidence rates the QUALITY evidence alone
 
+# Le français est tranché par l'arbitrage du propriétaire, pas par l'argmax --
+# et le routeur le dit, au lieu de retoucher discrètement les scores.
+print(d2.owner_ratified)                            # True
 print(d2.justification)
-# offline: quality is the ONLY objective (no real-time constraint). Maximise
-# quality over 3 candidate(s); chose 'kyutai' (quality=0.920 [prior],
-# mean_rtf=0.880 [measured]). mode=offline (whole-text synthesis; speed
-# disregarded).
+# offline: engine fixed by the owner's ratified choice for 'fr' (as of
+# 2026-10-28) -- 'chatterbox' (quality=0.780 [prior]). This OVERRIDES the
+# quality argmax over 3 candidate(s), which was 'kyutai' (quality=0.920
+# [prior]): a decision, not a measurement. Pass respect_ratification=False
+# for the unarbitrated ranking. mode=offline (whole-text synthesis; speed is
+# not an objective and no RTF enters this decision).
+
+# Couper l'arbitrage pour voir le classement non arbitré :
+print(route(RouteRequest(condition="offline", language="fr",
+                         respect_ratification=False)).engine)   # kyutai
 
 # construire un Speaker directement depuis un point de fonctionnement routé :
 spk = Speaker.from_route("online_realtime", language="fr")
@@ -593,9 +602,11 @@ print(chunk_for_streaming(text, first_chunk_sentences=1))
 ## 15. Les règles de langue, de bout en bout
 
 Les défauts hors ligne sont le **choix éditorial du propriétaire** issu de
-l'étude d'octobre 2026 ([`STUDY.md`](STUDY.md)), affiché honnêtement comme tel
-(`quality_source="prior"`) : les prédicteurs automatiques de naturalité ont été
-évalués puis **récusés comme critère hors ligne** — ils notent une
+l'étude d'octobre 2026 ([`STUDY.md`](STUDY.md)) — le français re-tranché le
+2026-10-28 (§8 ter) — affiché honnêtement comme tel (`quality_source="prior"`,
+et `owner_ratified=True` là où un arbitrage a primé sur le classement) : les
+prédicteurs automatiques de naturalité ont été évalués puis **récusés comme
+critère hors ligne** — ils notent une
 « naturalité » générique de panel anonyme, pas « réaliste et vivante » à
 l'oreille humaine (voir `STUDY.md` §8 bis). Les métriques automatiques restent
 des garde-fous (plancher WER, détection d'anomalies, contrôle F0 féminin),
@@ -605,9 +616,11 @@ remplaçant prévu. Chaque voix par défaut est **féminine**, dans chaque moteu
 ```python
 from speaker_helper import Speaker
 
-# Français -> kyutai (français natif ; MLX sur Mac, RTF mesuré 0,88)
+# Français -> chatterbox, par l'arbitrage du propriétaire du 2026-10-28 (le
+# modèle Multilingual -- le meilleur chatterbox documenté qui parle français ;
+# Turbo et base sont anglophones uniquement). Un arbitrage, signalé comme tel.
 spk = Speaker.from_route("offline", language="fr")
-print(spk.route.engine, spk.route.quality_source)   # kyutai prior
+print(spk.route.engine, spk.route.owner_ratified)   # chatterbox True
 
 # Anglais -> chatterbox (son backend choisit tout seul le modèle Turbo, vivant)
 spk = Speaker.from_route("offline", language="en")
@@ -615,7 +628,12 @@ print(spk.route.engine)                             # chatterbox
 
 # Toute autre langue -> le modèle Multilingual de chatterbox (23 langues)
 spk = Speaker.from_route("offline", language="es")
-print(spk.route.engine, spk.route.rtf_source)       # chatterbox unknown
+# rtf_source vaut "not_considered" et mean_rtf vaut None sur TOUTE décision
+# hors ligne, aussi bien chronométré soit le moteur : le hors-ligne ne classe
+# pas sur la vitesse, donc il n'en rapporte aucune. En citer une inviterait à
+# la lire comme une raison.
+print(spk.route.engine, spk.route.rtf_source)       # chatterbox not_considered
+print(spk.route.mean_rtf)                           # None
 
 # Le streaming temps réel roule sur du mesuré -> kokoro (RTF 0,223 en français)
 spk = Speaker.from_route("online_realtime", language="fr")

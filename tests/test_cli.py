@@ -54,14 +54,34 @@ def test_route_offline_prints_decision() -> None:
     """`route --condition offline` prints a quality-only decision.
 
     ``--language`` is a *global* option, so it precedes the sub-command:
-    ``--language fr route ...``.
+    ``--language en route ...``. English is used here because French is
+    settled by the owner's ratification rather than by the argmax (see
+    :func:`test_route_offline_french_announces_the_ratification`).
     """
     runner = CliRunner()
-    result = runner.invoke(cli, ["--language", "fr", "route", "--condition", "offline"])
+    result = runner.invoke(cli, ["--language", "en", "route", "--condition", "offline"])
     assert result.exit_code == 0
     # Offline picks the highest-quality engine and says so in the justification.
     assert "condition=offline" in result.output
     assert "quality is the ONLY objective" in result.output
+    # Nothing was arbitrated here, so the flag must stay off the summary line.
+    assert "owner_ratified" not in result.output
+
+
+def test_route_offline_french_announces_the_ratification() -> None:
+    """French offline prints the arbitration instead of pretending to an argmax.
+
+    The engine did not win on the numbers — the owner chose it — so the CLI
+    has to say so on the headline line, and the justification has to name the
+    candidate that was set aside.
+    """
+    runner = CliRunner()
+    result = runner.invoke(cli, ["--language", "fr", "route", "--condition", "offline"])
+    assert result.exit_code == 0
+    assert "engine=chatterbox" in result.output
+    assert "owner_ratified=True" in result.output
+    assert "OVERRIDES the quality argmax" in result.output
+    assert "kyutai" in result.output
 
 
 def test_global_option_after_subcommand_is_rejected() -> None:

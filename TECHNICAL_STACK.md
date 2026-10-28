@@ -79,7 +79,7 @@ flowchart TB
 | Backends | `backends/` | `kokoro.py` (default, ONNX in-process), `openvoice.py`, `chatterbox.py` |
 | Install | `install.py` | fetches Kokoro's ~340 MB from a pinned release, size-checked |
 | Façade | `speaker.py` | `Speaker` — `say` / `stream` / `clone_voice` / `warmup` / `from_profile` / `from_route` |
-| Router | `router.py` | condition (`online_realtime` / `offline`) → engine + mode from measured quality↔speed evidence |
+| Router | `router.py` | condition (`online_realtime` / `offline`) → engine + mode from measured quality↔speed evidence, minus the languages the owner has arbitrated himself (`OFFLINE_RATIFIED_ENGINE`, flagged `owner_ratified`) |
 | Profiles | `profiles.py` | per-language hyperparameters (producer/consumer) + measured RTF/quality |
 | Text | `text.py` | sentence splitting for low time-to-first-audio |
 | CLI | `cli.py` | `synth`, `voices`, `clone`, `eval`, `speak-from`, `route`, `serve` — one click group over the shared `_cmd_*` handlers |

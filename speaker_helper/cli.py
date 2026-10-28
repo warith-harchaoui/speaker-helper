@@ -307,12 +307,23 @@ def _cmd_route(args: SimpleNamespace, settings: Settings) -> int:
         )
         osh.info("wrote decision JSON to %s", args.json_out)
     # User-facing verdict on stdout: the headline choice plus the justification.
-    rtf = "n/a" if decision.mean_rtf is None else f"{decision.mean_rtf:.3f}"
+    # No RTF on an offline verdict. Speed is not an objective there, so the
+    # router hands us mean_rtf=None; printing "mean_rtf=n/a" would still put the
+    # word in front of the reader and invite them to wonder what it would have
+    # been. The pair appears only for the condition that ranks on it.
+    rtf_part = (
+        ""
+        if decision.mean_rtf is None
+        else f"mean_rtf={decision.mean_rtf:.3f} ({decision.rtf_source}) "
+    )
     sys.stdout.write(
         f"condition={decision.condition} engine={decision.engine} mode={decision.mode}\n"
         f"quality={decision.quality:.3f} ({decision.quality_source}) "
-        f"mean_rtf={rtf} ({decision.rtf_source}) confidence={decision.confidence}\n"
-        f"{decision.justification}\n"
+        f"{rtf_part}confidence={decision.confidence}"
+        # An arbitration is headline news: without this the summary line reads
+        # like the engine won on the numbers, which is exactly what it did not do.
+        + (" owner_ratified=True" if decision.owner_ratified else "")
+        + f"\n{decision.justification}\n"
     )
     return 0
 

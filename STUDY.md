@@ -15,7 +15,7 @@ Quatre modes d'exploitation, croisement de deux axes :
 
 | | **Local gratuit (open source)** | **Cloud payant (propriétaire)** |
 |---|---|---|
-| **Offline (différé)** | ← **la présente recherche** → **fr kyutai · en chatterbox-turbo · autres multilingual** (ratifié) | **pré-choisi : ElevenLabs** (décision 2026-10-26 ; clef API à obtenir ; backend à écrire) |
+| **Offline (différé)** | ← **la présente recherche** → **fr chatterbox-multilingual · en chatterbox-turbo · autres multilingual** (ratifié ; le fr révisé le 2026-10-28, §8 ter) | **pré-choisi : ElevenLabs** (décision 2026-10-26 ; clef API à obtenir ; backend à écrire) |
 | **Streaming (temps réel)** | → **[STREAMING.md](STREAMING.md)** → **fr/en kokoro** (Elo public × RTF) | **pré-choisi : ElevenLabs** (même décision ; Cartesia Sonic en challenger d'arène) |
 
 Deux cases hors-diagonale existent aussi, documentées en §7 pour mémoire : le
@@ -356,7 +356,8 @@ Conséquence appliquée (révision du repli ci-dessus) : les tables
 `MEASURED_QUALITY`/`MEASURED_RTF` sont **retirées du routage** (les nombres
 restent consignés ici et dans `~/speak/out/ab_voices.json`) ; les défauts
 offline redeviennent le choix éditorial du §8 — **fr → kyutai, en →
-chatterbox-Turbo** — affiché honnêtement comme prior de confiance basse. Les
+chatterbox-Turbo** — affiché honnêtement comme prior de confiance basse.
+(Le volet français de cette paire a été révisé depuis : voir §8 ter.) Les
 métriques automatiques ne servent plus qu'en garde-fous : plancher
 d'intelligibilité (WER/chrF), détection d'anomalies, contrôle F0 du genre.
 Le remplaçant prévu du critère est un protocole d'écoute humaine par paires
@@ -371,6 +372,82 @@ langues → chatterbox (Multilingual)** — appuyée, au-delà du choix éditori
 par la littérature à jugement humain (arènes de préférences, retours publiés
 sur le français d'unmute, test aveugle Turbo vs ElevenLabs) plutôt que par
 les prédicteurs automatiques.
+
+## 8 ter. Révision du français (ratifiée 2026-10-28)
+
+**Décision du propriétaire : en offline local gratuit, le français passe à
+chatterbox, pas à kyutai.** Le moteur retenu est le **meilleur chatterbox à
+qualité documentée qui parle effectivement français**, c'est-à-dire le modèle
+**Multilingual** (23 langues, prior de base 0,90) — Turbo et base sont
+anglophones uniquement et n'étaient donc pas candidats pour cette langue.
+Aucun réglage n'est nécessaire : `variant="auto"` résout déjà toute langue
+non-anglaise vers Multilingual (`backends/chatterbox.py::_variant_for`).
+
+Ce qui change, et ce qui ne change pas :
+
+| | Avant (2026-10-26) | Après (2026-10-28) |
+|---|---|---|
+| Moteur offline fr | kyutai (`tts-1.6b-en_fr`) | **chatterbox Multilingual** |
+| Moteur offline en | chatterbox Turbo | chatterbox Turbo (inchangé) |
+| Moteur offline es/autres | chatterbox Multilingual | inchangé |
+| Moteur streaming fr/en | kokoro | inchangé (Elo public × RTF) |
+| Prior qualité fr | kyutai 0,92 · chatterbox 0,78 | **inchangés** |
+
+La dernière ligne est le point important. **L'arbitrage ne réécrit pas la
+preuve qu'il écarte.** Les priors par langue d'`eval/priors.py` continuent de
+dire ce qu'ils disaient — kyutai 0,92 contre chatterbox 0,78 en français, avec
+sa note de CER 6–8 % — et c'est le routeur qui porte la décision, dans une
+table séparée (`router.OFFLINE_RATIFIED_ENGINE`, datée par
+`OFFLINE_RATIFIED_AS_OF`). Conséquences vérifiables :
+
+- la décision sort avec `owner_ratified=True` et une justification qui
+  **nomme ce qu'elle écrase** (« OVERRIDES the quality argmax … which was
+  'kyutai' (quality=0.920) ») ;
+- `respect_ratification=False` restitue le classement non arbitré, donc
+  kyutai — l'étude garde accès au argmax brut ;
+- un `quality_floor` et un `rtf_budget` gardent leur droit de veto : ils sont
+  appliqués **avant** l'arbitrage.
+
+### Le RTF sort complètement de la case offline (2026-10-28)
+
+Rappel du propriétaire, le même jour : **« pour le offline, on s'en fout du
+RTF ; pour le streaming, oui, c'est important. »** La règle existait depuis le
+§8 bis (« le RTF n'a rien à faire dans l'exposé d'une décision offline ») mais
+n'était tenue que par convention — et elle avait dérivé : la justification
+offline citait encore le `mean_rtf` du gagnant, et pire, la `confidence` d'une
+décision offline montait à `medium` *parce que* le RTF était mesuré, hissant un
+simple prior au rang de demi-preuve sur l'axe qui ne décide de rien.
+
+Elle est désormais **structurelle**, ce qui veut dire qu'elle ne peut plus
+dériver :
+
+- le RTF **ne classe pas** et **ne départage plus les ex æquo** (l'égalité de
+  qualité se tranche dans l'ordre du catalogue, de façon déterministe) ;
+- une `RouteDecision` hors ligne porte `mean_rtf=None` et
+  `rtf_source="not_considered"` — le nombre n'est pas là, il ne peut donc fuir
+  ni dans une justification, ni dans un log, ni dans un tableau de bord en aval ;
+- la `confidence` hors ligne note **la seule preuve de qualité** : mesurée →
+  `high`, prior → `low`. Plus de `medium` offert par un chronomètre ;
+- la CLI n'imprime plus de couple `mean_rtf=…` sur un verdict offline ;
+- seule exception, assumée : un **budget de patience** que l'appelant fixe
+  lui-même (`rtf_budget`, désactivé par défaut), nommé dans la justification
+  comme *sa* contrainte, jamais comme une propriété du gagnant.
+
+Conséquence visible : le français offline est passé de `confidence=medium` à
+`confidence=low`. C'est la bonne note — la décision repose sur un arbitrage
+au-dessus d'un prior, et rien de ce qui la fonde n'a été mesuré. Trois tests
+verrouillent la règle (`test_offline_decisions_carry_no_rtf_at_all`,
+`test_offline_confidence_rates_quality_evidence_alone`,
+`test_offline_ties_break_without_consulting_speed`). Le streaming, lui, ne
+bouge pas d'un iota : sa frontière de faisabilité `RTF < 1` reste le cœur du
+critère.
+
+C'est le même statut épistémique que la paire qu'elle remplace : le jugement
+d'une oreille, pas une mesure, et en attente du même remplaçant — le protocole
+d'écoute humaine par paires (§8 bis), dont les scores arriveront en
+`quality_source="measured_human"` et trancheront le cas français sur preuve
+plutôt que par arbitrage. Le trou de données reste entier : aucune arène
+publique ne classe les moteurs ouverts en français (STREAMING.md §1).
 
 ## 9. Sources principales
 

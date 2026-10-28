@@ -403,13 +403,22 @@ print(d.engine, d.mode, d.confidence, d.quality_source)
 # offline: quality is the ONLY objective (speed disregarded).
 d2 = route(RouteRequest(condition="offline", language="fr"))
 print(d2.engine, d2.mode, d2.confidence, d2.quality_source)
-# kyutai offline medium prior
+# chatterbox offline low prior  <- 'low': offline confidence rates the QUALITY evidence alone
 
+# French is settled by the owner's ratification, not by the argmax -- and the
+# router says so rather than quietly rewriting the quality numbers.
+print(d2.owner_ratified)                            # True
 print(d2.justification)
-# offline: quality is the ONLY objective (no real-time constraint). Maximise
-# quality over 3 candidate(s); chose 'kyutai' (quality=0.920 [prior],
-# mean_rtf=0.880 [measured]). mode=offline (whole-text synthesis; speed
-# disregarded).
+# offline: engine fixed by the owner's ratified choice for 'fr' (as of
+# 2026-10-28) -- 'chatterbox' (quality=0.780 [prior]). This OVERRIDES the
+# quality argmax over 3 candidate(s), which was 'kyutai' (quality=0.920
+# [prior]): a decision, not a measurement. Pass respect_ratification=False
+# for the unarbitrated ranking. mode=offline (whole-text synthesis; speed is
+# not an objective and no RTF enters this decision).
+
+# Switch the arbitration off to see the unarbitrated ranking:
+print(route(RouteRequest(condition="offline", language="fr",
+                         respect_ratification=False)).engine)   # kyutai
 
 # build a Speaker straight from a routed operating point:
 spk = Speaker.from_route("online_realtime", language="fr")
@@ -571,9 +580,10 @@ print(chunk_for_streaming(text, first_chunk_sentences=1))
 ## 15. The language rules, end to end
 
 The offline defaults are the **owner's editorial choice** from the 2026-10
-survey ([`STUDY.md`](STUDY.md)), honestly flagged as such
-(`quality_source="prior"`): automatic naturalness predictors were evaluated and
-**rejected as the offline criterion** — they score a generic anonymous-panel
+survey ([`STUDY.md`](STUDY.md)) — French re-decided on 2026-10-28 (§8 ter) —
+honestly flagged as such (`quality_source="prior"`, and `owner_ratified=True`
+where a choice overrode the ranking): automatic naturalness predictors were
+evaluated and **rejected as the offline criterion** — they score a generic anonymous-panel
 "naturalness", not "realistic and lively" to a human ear (see `STUDY.md`
 §8 bis). Automatic metrics remain as guardrails (WER floor, anomaly gate,
 female-F0 check), never as the ranking; a human pairwise-listening protocol is
@@ -582,17 +592,23 @@ the planned replacement. Every default voice is **female** in every engine:
 ```python
 from speaker_helper import Speaker
 
-# French -> kyutai (native French; MLX on Macs, measured RTF 0.88)
+# French -> chatterbox, by the owner's ratification of 2026-10-28 (the
+# Multilingual model -- the best documented chatterbox that speaks French;
+# Turbo and base are English-only). An arbitration, flagged as one.
 spk = Speaker.from_route("offline", language="fr")
-print(spk.route.engine, spk.route.quality_source)   # kyutai prior
+print(spk.route.engine, spk.route.owner_ratified)   # chatterbox True
 
 # English -> chatterbox (its backend auto-picks the lively Turbo model)
 spk = Speaker.from_route("offline", language="en")
 print(spk.route.engine)                             # chatterbox
 
-# Any other language -> chatterbox's 23-language Multilingual model
+# Any other language -> chatterbox's 23-language Multilingual model.
+# rtf_source is "not_considered" and mean_rtf is None on EVERY offline
+# decision, however well-timed the engine: offline does not rank on speed, so
+# it reports no speed. Quoting one would invite you to read it as a reason.
 spk = Speaker.from_route("offline", language="es")
-print(spk.route.engine, spk.route.rtf_source)       # chatterbox unknown
+print(spk.route.engine, spk.route.rtf_source)       # chatterbox not_considered
+print(spk.route.mean_rtf)                           # None
 
 # Real-time streaming runs on measured evidence -> kokoro (RTF 0.223 in French)
 spk = Speaker.from_route("online_realtime", language="fr")
