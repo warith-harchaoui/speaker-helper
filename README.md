@@ -134,6 +134,10 @@ an operating condition into a concrete engine + mode from measured evidence; the
 
 ---
 
+## How it works
+
+![How speaker-helper works: text in, speech out, with the engine chosen by a router that shows its reasoning](https://raw.githubusercontent.com/warith-harchaoui/speaker-helper/main/assets/diagrams/how-it-works.png)
+
 ## Installation
 
 **Prerequisites** — **Python 3.10–3.13** and **git**, **libsndfile**, **ffmpeg**, cross-platform. `soundfile` needs the native `libsndfile` library, and `audio-helper` (voice-clone trimming / concatenation) uses `ffmpeg`:

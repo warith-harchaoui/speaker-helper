@@ -143,6 +143,10 @@ d'**évaluation** produit ces preuves.
 
 ---
 
+## Comment ça marche
+
+![Comment speaker-helper fonctionne : du texte en entrée, de la parole en sortie, le moteur choisi par un routeur qui montre son raisonnement](https://raw.githubusercontent.com/warith-harchaoui/speaker-helper/main/assets/diagrams/comment-ca-marche.png)
+
 ## Installation
 
 **Prérequis** — **Python 3.10–3.13** et **git**, **libsndfile**, **ffmpeg**, multiplateforme. `soundfile` nécessite la bibliothèque native `libsndfile` et `audio-helper` (découpe/concaténation pour le clonage) utilise `ffmpeg` :

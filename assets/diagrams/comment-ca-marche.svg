@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1388 432" width="1388" height="432" role="img" aria-labelledby="sph-title sph-desc" font-family="Roboto, 'Helvetica Neue', Arial, sans-serif">
+  <title id="sph-title">Comment speaker-helper fonctionne : du texte en entrée, de la parole en sortie, le moteur choisi par un routeur qui montre son raisonnement</title>
+  <desc id="sph-desc">Une plaque de gauche à droite, image inverse de vocal-helper. Entrée : une phrase, une réponse, ou un document entier. Le travail, en trois étapes numérotées : le texte est découpé en morceaux prononçables puis passé dans un lexique de prononciation, pour que les noms propres et les sigles sortent juste ; un routeur choisit le moteur selon la condition d'usage, hors-ligne pour la qualité ou streaming pour un délai borné, et imprime le raisonnement du choix ; le moteur retenu synthétise dans ce processus, sans serveur à lancer. Sortie : de l'audio, plus la piste horodatée qui permet à une page de suivre mot à mot.</desc>
+  <style>
+    .panel      { fill: #ffffff; stroke: #d6d6d6; stroke-width: 1.5; }
+    .panel-label{ fill: #6b6b6b; font-size: 13px; font-weight: 600; letter-spacing: .08em; }
+    .io         { fill: #F8F8F8; stroke: #9a9a9a; stroke-width: 1.5; }
+    .stage      { fill: #FFF4E0; stroke: #FF9500; stroke-width: 1.5; }
+    .core       { fill: #007AFF; stroke: #0062CC; stroke-width: 1.5; }
+    .surface    { fill: #EAF3FF; stroke: #007AFF; stroke-width: 1.5; }
+    .n-title    { font-size: 15px; font-weight: 600; fill: #111111; }
+    .n-sub      { font-size: 12px; fill: #5a5a5a; }
+    .on-dark    { fill: #ffffff; font-size: 15px; font-weight: 600; }
+    .on-dark-sub{ fill: #d8e8ff; font-size: 12px; }
+    .flow       { fill: none; stroke: #9a9a9a; stroke-width: 2; }
+    .tie        { fill: none; stroke: #007AFF; stroke-width: 1.5; }
+    .caption    { font-size: 12.5px; fill: #5a5a5a; font-style: italic; }
+    .step       { font-size: 11px; font-weight: 700; fill: #B26A00;
+                  font-family: 'Roboto Mono', ui-monospace, monospace; }
+    .surf-label { font-size: 13px; font-weight: 600; fill: #0062CC; }
+
+    @media (prefers-color-scheme: dark) {
+      .panel      { fill: #1b1b1d; stroke: #3a3a3d; }
+      .panel-label{ fill: #a0a0a6; }
+      .io         { fill: #2a2a2e; stroke: #6f6f76; }
+      .stage      { fill: #3a2d12; stroke: #FF9500; }
+      .surface    { fill: #10243d; stroke: #4da2ff; }
+      .n-title    { fill: #f2f2f4; }
+      .n-sub      { fill: #b4b4ba; }
+      .flow       { stroke: #7a7a82; }
+      .tie        { stroke: #4da2ff; }
+      .caption    { fill: #a0a0a6; }
+      .step       { fill: #FFCC00; }
+      .surf-label { fill: #4da2ff; }
+    }
+  </style>
+  <defs><marker id="ah-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#9a9a9a"/></marker></defs>
+  <text class="panel-label" x="28" y="40">ENTRÉE</text>
+  <rect class="io" x="28" y="87" width="237" height="78" rx="10"/>
+  <text class="n-title" x="146" y="120" text-anchor="middle">une phrase, un document</text>
+  <text class="n-sub" x="146" y="139" text-anchor="middle">du texte, dans la langue voulue</text>
+  <path class="flow" d="M271 126 H287" marker-end="url(#ah-arrow)"/>
+  <rect class="panel" x="291" y="54" width="802" height="144" rx="12"/>
+  <text class="panel-label" x="311" y="76">CE QU'ELLE FAIT</text>
+  <rect class="stage" x="311" y="94" width="245" height="78" rx="10"/>
+  <text class="n-title" x="433" y="127" text-anchor="middle">découper + prononcer</text>
+  <text class="n-sub" x="433" y="146" text-anchor="middle">groupes de phrases, lexique, IPA</text>
+  <text class="step" x="322" y="110">1</text>
+  <path class="flow" d="M560 133 H576" marker-end="url(#ah-arrow)"/>
+  <rect class="stage" x="582" y="94" width="250" height="78" rx="10"/>
+  <text class="n-title" x="707" y="127" text-anchor="middle">router le moteur</text>
+  <text class="n-sub" x="707" y="146" text-anchor="middle">qualité hors-ligne ou délai borné</text>
+  <text class="step" x="593" y="110">2</text>
+  <path class="flow" d="M836 133 H852" marker-end="url(#ah-arrow)"/>
+  <rect class="stage" x="858" y="94" width="215" height="78" rx="10"/>
+  <text class="n-title" x="966" y="127" text-anchor="middle">synthétiser sur place</text>
+  <text class="n-sub" x="966" y="146" text-anchor="middle">aucun serveur à lancer</text>
+  <text class="step" x="869" y="110">3</text>
+  <path class="flow" d="M1099 126 H1115" marker-end="url(#ah-arrow)"/>
+  <text class="panel-label" x="1119" y="40">SORTIE</text>
+  <rect class="io" x="1119" y="87" width="241" height="78" rx="10"/>
+  <text class="n-title" x="1240" y="120" text-anchor="middle">parole + piste horodatée</text>
+  <text class="n-sub" x="1240" y="139" text-anchor="middle">pour qu'une page suive</text>
+  <rect class="core" x="484" y="232" width="420" height="54" rx="10"/>
+  <text class="on-dark" x="694" y="253" text-anchor="middle">une bibliothèque, appelée pareil partout</text>
+  <text class="on-dark-sub" x="694" y="272" text-anchor="middle">os-helper dessous pour la journalisation et les fichiers</text>
+  <path class="tie" d="M694 286 V314 H430 V332"/>
+  <path class="tie" d="M694 314 H958 V332"/>
+  <path class="tie" d="M430 314 V332"/>
+  <rect class="surface" x="355" y="332" width="150" height="46" rx="9"/>
+  <text class="surf-label" x="430" y="360" text-anchor="middle">API Python</text>
+  <path class="tie" d="M606 314 V332"/>
+  <rect class="surface" x="531" y="332" width="150" height="46" rx="9"/>
+  <text class="surf-label" x="606" y="360" text-anchor="middle">CLI (click)</text>
+  <path class="tie" d="M782 314 V332"/>
+  <rect class="surface" x="707" y="332" width="150" height="46" rx="9"/>
+  <text class="surf-label" x="782" y="360" text-anchor="middle">FastAPI + MCP</text>
+  <path class="tie" d="M958 314 V332"/>
+  <rect class="surface" x="883" y="332" width="150" height="46" rx="9"/>
+  <text class="surf-label" x="958" y="360" text-anchor="middle">skill d'agent</text>
+  <text class="caption" x="694" y="412" text-anchor="middle">Le routeur dit quel moteur il a choisi puis ce qu'il a écarté : une voix surprenante devient explicable plutôt que mystérieuse.</text>
+</svg>
