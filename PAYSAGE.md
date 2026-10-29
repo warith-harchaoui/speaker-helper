@@ -274,3 +274,15 @@ quelqu'un : la date fait partie de l'affirmation.
 - [Open-sourcing TADA](https://www.hume.ai/blog/opensource-tada) — Hume AI
 - [Faster IndexTTS-2: accelerating and streaming autoregressive zero-shot TTS](https://arxiv.org/html/2607.21042v1) — arXiv
 - [Deploying open-source TTS on GPU cloud](https://www.spheron.network/blog/deploy-open-source-tts-gpu-cloud-2026/) — Spheron
+
+## Idées à reprendre
+
+Étudié plutôt que deviné : ce que chaque voisin fait mieux, puis ce que cette bibliothèque devrait changer pour l'égaler. Rien ici n'est un engagement : c'est la liste de lecture dont part la version suivante.
+
+- **`Piper` — un étage toujours disponible** — Minuscule, rapide, uniquement processeur. Un synthétiseur qui route entre moteurs a besoin d'un plancher qu'il atteint toujours : sans GPU ni poids en cache, il faut bien que quelque chose parle. Piper est la réponse habituelle.
+
+- **`Kokoro` — 82 M de paramètres, Apache-2.0, environ 30× le temps réel** — Autour d'1 Go de VRAM contre près de 4 Go pour XTTS v2, puis à peu près dix fois plus rapide. Il ne clone pas de voix, ce qui en fait précisément le bon défaut pour la narration puis le mauvais pour un locuteur cloné.
+
+- **La licence comme critère de routage, non comme note de bas de page** — XTTS v2 est en CPML, non commercial. Chatterbox est en MIT puis clone quand même. Un routeur qui choisit sur la seule qualité peut remettre en silence à un appelant commercial un modèle qu'il n'a pas le droit de livrer. La table des moteurs devrait porter la licence puis la laisser opposer son veto.
+
+- **`Chatterbox` — le contrôle expressif, avec une mise en garde** — MIT, clone depuis une courte référence, puis a gagné 65,3 % des comparaisons à l'aveugle face à ElevenLabs. À noter au regard de l'expérience de ce dépôt : c'est le défaut français actuel ici et le gate de fidélité tient du pile ou face depuis, ce qui plaide pour attacher le seuil au moteur plutôt qu'à un unique seuil global.
