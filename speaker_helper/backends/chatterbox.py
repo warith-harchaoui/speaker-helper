@@ -365,23 +365,55 @@ class ChatterboxEngine:
         )
 
     async def list_voices(self, engine: str | None = None) -> VoiceList:
-        """One entry, and it is honest about what it is.
+        """One entry: the reference this engine will actually clone.
 
-        This engine has no catalogue: it renders from a reference recording or
-        from its default speaker. Returning an empty list would read as "not
-        loaded yet"; returning a fake catalogue would be worse.
+        This engine has no catalogue to list — it renders by cloning. What it
+        does have is a *current* reference, settled in :meth:`__init__`, and
+        naming that is more useful than naming the abstraction. Returning an
+        empty list would read as "not loaded yet"; returning a fake catalogue
+        would be worse.
+
+        The gender is the point. ``__init__`` falls back to the bundled female
+        reference precisely so this engine keeps a female voice in every
+        language, and reporting that as a blank left callers picking a narrator
+        — the CLI, the GUI, an agent reading the HTTP API — with no way to see
+        it. Provenance travels with the name because CC BY 4.0 asks for
+        attribution wherever the voice is named.
         """
-        return VoiceList(
-            engine="chatterbox",
-            voices=[
-                Voice(
-                    voice_id="default",
-                    name="Chatterbox default speaker",
-                    language=self._settings.language,
-                    engine="chatterbox",
-                )
-            ],
-        )
+        from speaker_helper.cloning import DEFAULT_CLONE_AUDIO, DEFAULT_CLONE_NAME
+
+        language = self._settings.language
+        if self._reference is not None and self._reference == DEFAULT_CLONE_AUDIO:
+            voice = Voice(
+                voice_id=DEFAULT_CLONE_NAME,
+                name="Bundled female reference — CML-TTS (CC BY 4.0)",
+                language=language,
+                gender="female",
+                engine="chatterbox",
+            )
+        elif self._reference is not None:
+            # Somebody else's recording. It is the voice that will speak, so it
+            # is the voice to name; its gender is theirs to state and not ours
+            # to infer, and a wrong label is harder to notice than a blank one.
+            voice = Voice(
+                voice_id=self._reference.stem,
+                name=f"Cloned from {self._reference.name}",
+                language=language,
+                gender="",
+                engine="chatterbox",
+            )
+        else:
+            # The bundle is missing and nothing was configured, so the model's
+            # own speaker reads — and its gender is nothing the model card
+            # promises.
+            voice = Voice(
+                voice_id="default",
+                name="Chatterbox default speaker",
+                language=language,
+                gender="",
+                engine="chatterbox",
+            )
+        return VoiceList(engine="chatterbox", voices=[voice])
 
     async def health(self) -> dict:
         """Whether this engine could synthesise, without loading the model."""

@@ -4,6 +4,21 @@ All notable changes to speaker-helper are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project aims to adhere
 to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- **The chatterbox catalogue now names a female voice.** `list_voices` answered
+  a single `default` entry with a blank gender, while `ChatterboxEngine.__init__`
+  has always fallen back to the bundled CC BY 4.0 reference precisely so the
+  engine keeps a female voice in every language. README and LISEZMOI documented
+  that reference; `voices` was the one surface that did not, so anyone choosing
+  a narrator from the CLI, the GUI or the HTTP API saw an engine with no female
+  voice and reached for another one. The listed voice is now the reference the
+  engine will actually clone: `ref-fr-female` with `gender="female"` and its
+  attribution when the bundle is in use, the configured recording with an
+  unstated gender when `voice_sample` points elsewhere, and the model's own
+  speaker only when neither exists.
+
 ## [0.13.0] - 2026-10-28
 
 ### Changed

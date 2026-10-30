@@ -27,6 +27,7 @@ from speaker_helper.backends.chatterbox import (
     emotion_to_exaggeration,
 )
 from speaker_helper.backends.openvoice import EMOTION_STYLE, OpenVoiceEngine
+from speaker_helper.cloning import DEFAULT_CLONE_NAME
 from speaker_helper.config import Settings
 
 # ── Chatterbox: emotion and intensity onto one dial ────────────────────────
@@ -119,3 +120,50 @@ def test_chatterbox_refuses_empty_text_before_loading_a_model() -> None:
     for blank in ("", "   ", "\n\t "):
         with pytest.raises(ValueError, match="empty"):
             asyncio.run(engine.synthesize(blank))
+
+
+# ── Chatterbox: what the catalogue says about the voice that will speak ────
+
+
+def test_chatterbox_lists_the_bundled_reference_as_female() -> None:
+    """The listed voice must carry the gender the engine actually guarantees.
+
+    ``ChatterboxEngine.__init__`` deliberately falls back to the bundled
+    CC BY 4.0 reference rather than the model's own speaker, because "a female
+    voice in every language" is a contract this engine keeps and the model card
+    promises nothing about its built-in speaker. That guarantee was invisible:
+    the catalogue answered ``default`` with a blank gender, so anyone choosing a
+    narrator from ``voices`` — the CLI, the GUI, an agent reading the HTTP API —
+    saw an engine with no female voice and reached for another one.
+
+    The gender is the assertion; the id and provenance travel with it because
+    CC BY 4.0 asks for attribution wherever the voice is named.
+    """
+    engine = ChatterboxEngine(Settings.from_mapping({"backend": "chatterbox", "language": "en"}))
+    listing = asyncio.run(engine.list_voices())
+
+    assert listing.engine == "chatterbox"
+    assert listing.voices, "chatterbox must name the voice it will clone"
+    female = [v for v in listing.voices if v.gender == "female"]
+    assert female, f"no female voice listed: {[(v.voice_id, v.gender) for v in listing.voices]}"
+    assert female[0].voice_id == DEFAULT_CLONE_NAME
+    assert "CC BY 4.0" in female[0].name
+
+
+def test_chatterbox_does_not_claim_a_gender_for_somebody_elses_recording() -> None:
+    """A custom ``voice_sample`` is reported, and its gender is left unstated.
+
+    Guessing it would be worse than the blank the dataclass already means:
+    whoever supplied the recording is the one who knows, and a wrong label is
+    harder to notice than a missing one.
+    """
+    engine = ChatterboxEngine(
+        Settings.from_mapping(
+            {"backend": "chatterbox", "language": "en", "voice_sample": "/tmp/somebody-else.wav"}
+        )
+    )
+    listing = asyncio.run(engine.list_voices())
+
+    assert listing.voices
+    assert listing.voices[0].gender == ""
+    assert "somebody-else" in listing.voices[0].voice_id
