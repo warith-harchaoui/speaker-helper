@@ -84,23 +84,26 @@ from speaker_helper.text import chunk_for_streaming, merge_short_fragments, spli
 
 # Dataclasses exchanged across the public surface.
 from speaker_helper.types import (
+    DEFAULT_SPEECH_BITRATE,
     AudioResult,
     Mode,
     StreamChunk,
     Voice,
     VoiceList,
     VoiceSample,
+    write_audio,
 )
 
 # Curated real presets, resolvable by language and gender.
 from speaker_helper.voices import PRESET_VOICES, voice_for, voices_for
 
-__version__ = "0.13.0"
+__version__ = "0.14.0"
 
 # Explicit, sorted public API: only these names are re-exported from the
 # package root; the sub-modules above hold the implementation.
 __all__ = [
     "DEFAULT_PROFILES",
+    "DEFAULT_SPEECH_BITRATE",
     "PRESET_VOICES",
     "AudioResult",
     "LanguageProfile",
@@ -122,6 +125,7 @@ __all__ = [
     "Timeline",
     "coerce_segments",
     "cues_to_vtt",
+    "write_audio",
     "resolve_spoken_math",
     "PACE_SPEED",
     "speakable",

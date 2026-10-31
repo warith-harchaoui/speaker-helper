@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "speaker-helper"
-version = "0.13.0"
+version = "0.14.0"
 description = "Speaker Helper — speech synthesis that runs in your process: say a sentence, stream a reply, or narrate a document with the timed track that lets a page follow along. Kokoro by default (no server), voice cloning through OpenVoice and Chatterbox. The inverse of vocal-helper: text in, speech out. Library + CLI + REST API + MCP + skill, with a built-in evaluation gate."
 readme = "README.md"
 requires-python = ">=3.10,<3.14"
@@ -55,7 +55,7 @@ dependencies = [
     # make_temporary_directory, download_file) are long-standing basics,
     # and raising a floor without exercising it would just be a guess.
     "os-helper>=1.7.2,<4",
-    "audio-helper>=1.6.0",
+    "audio-helper>=2.6.0",
     "pyyaml>=6.0",
     "numpy>=1.24",
     "soundfile>=0.12",

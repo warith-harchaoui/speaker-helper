@@ -6,6 +6,49 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-10-31
+
+### Added
+
+- **A result knows how to land in the container it is asked for.**
+  `write_audio` on both `AudioResult` and `NarrationResult`, plus the module
+  function `speaker_helper.types.write_audio`, and the extension decides:
+  `.wav` hands the bytes over untouched, anything lossy is encoded by
+  `audio-helper`.
+
+  Callers used to write `result.wav_bytes` to whatever path they were given,
+  so `-o out.mp3` produced a WAV file wearing an MP3 extension -- it plays,
+  so nothing complains, and only its size tells. Anyone who genuinely needed
+  an MP3 reached for ffmpeg themselves: sixteen narrations on one site did
+  exactly that, with `-codec:a libmp3lame -b:a 64k -ar 24000 -ac 1` carried
+  in a shell script, which is knowledge that belongs in the audio packages
+  and nowhere else. The encoding is not this package's craft; it is called
+  here rather than reimplemented, and `audio-helper` is imported lazily so
+  the WAV path, which is most of them, pays nothing for it.
+
+  The sample rate and channel count are read from the payload's own RIFF
+  header rather than taken from a neighbouring field, so a conversion cannot
+  disagree with the audio it is converting.
+
+- **`DEFAULT_SPEECH_BITRATE`, 64 kb/s**, and it is a deliberate opinion
+  rather than a passthrough. `audio-helper` carries the input's bitrate over
+  when asked for nothing, which is right for a conversion and says nothing
+  here: what this package hands over is always an uncompressed WAV, so there
+  is no bitrate to carry, and ffmpeg's own fallback for a 24 kHz mono stream
+  is 32 kb/s, audibly worse for a voice. `audio-helper` is the generic signal
+  brick and rightly holds no opinion about speech; this one is the speech
+  brick, so it holds one.
+
+- **`--bitrate` on `synth`, `narrate` and `speak-from`**, and `-o` on those
+  three now names a container rather than labelling a WAV.
+
+### Changed
+
+- `audio-helper` floor raised to **2.6.0**, the release where
+  `sound_converter` gained a `bitrate` argument. Below it a 64 kb/s narration
+  cannot be asked for at all.
+
+
 ### Fixed
 - **The chatterbox catalogue now names a female voice.** `list_voices` answered
   a single `default` entry with a blank gender, while `ChatterboxEngine.__init__`

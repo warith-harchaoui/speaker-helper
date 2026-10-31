@@ -23,13 +23,111 @@ Warith HARCHAOUI — https://linkedin.com/in/warith-harchaoui
 
 from __future__ import annotations
 
+import io
+import tempfile
+import wave
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Literal
 
 # A synthesis run targets one of two modes: ``offline`` optimises
 # throughput/quality, ``streaming`` optimises time to first audio by splitting
 # the text and emitting chunks as they are ready.
 Mode = Literal["offline", "streaming"]
+
+#: Default bitrate when audio is written to a lossy container. Speech at
+#: 64 kb/s mono is the rate this suite ships narrations at, and it is a
+#: deliberate opinion rather than a passthrough. ``audio-helper`` carries the
+#: input's bitrate over when asked for nothing, which is right for a
+#: conversion but says nothing here: what this package hands over is always an
+#: uncompressed WAV, so there is no bitrate to carry, and the fallback is
+#: ffmpeg's own choice of 32 kb/s for a 24 kHz mono stream, audibly worse for
+#: a voice. ``audio-helper`` is the generic signal brick and rightly holds no
+#: opinion about speech; this one is the speech brick, so it holds one.
+DEFAULT_SPEECH_BITRATE = "64k"
+
+
+def write_audio(
+    wav_bytes: bytes,
+    path: str | Path,
+    *,
+    bitrate: str | int | None = DEFAULT_SPEECH_BITRATE,
+) -> Path:
+    """Write a WAV payload to ``path``, encoding it if ``path`` is not a WAV.
+
+    Parameters
+    ----------
+    wav_bytes : bytes
+        A complete WAV file (RIFF header + PCM), as every result object here
+        carries it.
+    path : str or pathlib.Path
+        Where to write. **The extension decides the container**: ``.wav``
+        writes the bytes untouched, anything else (``.mp3``, ``.m4a``,
+        ``.ogg``) is encoded by ``audio-helper``.
+    bitrate : str or int or None, optional
+        Bitrate for a lossy container: bits per second (``64000``) or an
+        ffmpeg-style string (``"64k"``). Defaults to
+        :data:`DEFAULT_SPEECH_BITRATE`. None hands the choice down to
+        ``audio-helper``, which carries the input's bitrate over; the payload
+        here is always an uncompressed WAV, so nothing is carried and ffmpeg
+        decides. Meaningless for a WAV target, where it is ignored.
+
+    Returns
+    -------
+    pathlib.Path
+        The path written.
+
+    Raises
+    ------
+    RuntimeError
+        If a lossy container is asked for and ``audio-helper`` is missing.
+
+    Notes
+    -----
+    Callers used to write ``result.wav_bytes`` to whatever name they were
+    given, so ``-o out.mp3`` produced a WAV file wearing an MP3 extension, and
+    anyone who genuinely wanted an MP3 reached for ffmpeg themselves. The
+    encoding is not this package's craft: it belongs to ``audio-helper``, and
+    is called here rather than reimplemented. ``audio-helper`` is imported
+    lazily so the WAV path, which is most of them, pays nothing for it.
+
+    The sample rate and channel count are read from the payload's own RIFF
+    header rather than taken from a neighbouring field, so the conversion
+    cannot disagree with the audio it is converting.
+    """
+    target = Path(path)
+    if target.parent != Path(""):
+        target.parent.mkdir(parents=True, exist_ok=True)
+
+    if target.suffix.lower() in ("", ".wav"):
+        target.write_bytes(wav_bytes)
+        return target
+
+    try:
+        import audio_helper as ah
+    except ImportError as exc:  # pragma: no cover - depends on the install
+        raise RuntimeError(
+            f"writing {target.name} means encoding, which audio-helper does.\n"
+            "    pip install 'audio-helper>=2.6.0'\n"
+            "Or ask for a .wav, which needs no encoder."
+        ) from exc
+
+    with wave.open(io.BytesIO(wav_bytes), "rb") as handle:
+        frame_rate = handle.getframerate()
+        channels = handle.getnchannels()
+
+    with tempfile.TemporaryDirectory(prefix="speaker-helper-write-") as tmp:
+        source = Path(tmp) / "audio.wav"
+        source.write_bytes(wav_bytes)
+        ah.sound_converter(
+            str(source),
+            str(target),
+            freq=frame_rate,
+            channels=channels,
+            bitrate=bitrate,
+            overwrite=True,
+        )
+    return target
 
 
 @dataclass(frozen=True)
@@ -107,6 +205,17 @@ class AudioResult:
         # raise, so report ``inf`` — treated as "infinitely slower than real
         # time" and caught as an anomaly downstream.
         return self.compute_s / self.duration_s if self.duration_s > 0 else float("inf")
+
+    def write_audio(
+        self, path: str | Path, *, bitrate: str | int | None = DEFAULT_SPEECH_BITRATE
+    ) -> Path:
+        """Write the audio to ``path``; the extension picks the container.
+
+        See :func:`write_audio` for the rules. Prefer this over writing
+        ``wav_bytes`` by hand: the extension is then honoured instead of being
+        a label on a WAV file.
+        """
+        return write_audio(self.wav_bytes, path, bitrate=bitrate)
 
 
 @dataclass

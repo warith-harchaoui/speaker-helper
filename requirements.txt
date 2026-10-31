@@ -16,7 +16,7 @@
 #     pip install -e .                     # same, from the package metadata
 
 os-helper>=1.7.2,<4
-audio-helper>=1.6.0
+audio-helper>=2.6.0
 pyyaml>=6.0
 numpy>=1.24
 soundfile>=0.12

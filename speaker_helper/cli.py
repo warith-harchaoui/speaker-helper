@@ -65,6 +65,7 @@ import os_helper as osh
 from speaker_helper import __version__
 from speaker_helper.config import Settings
 from speaker_helper.speaker import Speaker
+from speaker_helper.types import DEFAULT_SPEECH_BITRATE
 
 if TYPE_CHECKING:
     # Imported only for type-checking so the runtime import path stays lazy
@@ -157,7 +158,9 @@ def _cmd_synth(args: SimpleNamespace, settings: Settings) -> int:
             else:
                 # Offline path: one call yields the whole audio at once.
                 result = await spk.say(text)
-                Path(args.out).write_bytes(result.wav_bytes)
+                result.write_audio(
+                    args.out, bitrate=getattr(args, "bitrate", DEFAULT_SPEECH_BITRATE)
+                )
                 osh.info(
                     "wrote %s (%.2fs audio, RTF %.2f)", args.out, result.duration_s, result.rtf
                 )
@@ -189,8 +192,7 @@ def _cmd_narrate(args: SimpleNamespace, settings: Settings) -> int:
     async def run() -> int:
         async with Speaker(settings) as spk:
             result = await spk.narrate(segments)
-        args.out.parent.mkdir(parents=True, exist_ok=True)
-        args.out.write_bytes(result.wav_bytes)
+        result.write_audio(args.out, bitrate=getattr(args, "bitrate", DEFAULT_SPEECH_BITRATE))
         cues_path = args.out.with_suffix(".vtt")
         cues_path.write_text(result.to_vtt(), encoding="utf-8")
         sys.stdout.write(
@@ -461,7 +463,7 @@ def _cmd_speak_from(args: SimpleNamespace, settings: Settings) -> int:
             src = await from_microphone(args.seconds)
         async with Speaker(settings) as spk:
             result = await revoice(src, spk)
-            Path(args.out).write_bytes(result.wav_bytes)
+            result.write_audio(args.out, bitrate=getattr(args, "bitrate", DEFAULT_SPEECH_BITRATE))
             osh.info(
                 "re-voiced %s -> %s (%.2fs audio, RTF %.2f)",
                 src.origin,
@@ -635,15 +637,21 @@ def cli(ctx: click.Context, **globals_: object) -> None:
     "out",
     type=click.Path(path_type=Path),
     default=Path("out.wav"),
-    help="Output WAV path.",
+    help="Output path; the extension picks the container (.wav, .mp3, .m4a).",
 )
 @click.option("--stream", is_flag=True, default=False, help="Streaming mode: report TTFA/cadence.")
+@click.option(
+    "--bitrate",
+    default=DEFAULT_SPEECH_BITRATE,
+    show_default=True,
+    help="Bitrate when --out names a lossy container (.mp3, .m4a). Ignored for .wav.",
+)
 @click.pass_context
-def synth(ctx: click.Context, text: str | None, out: Path, stream: bool) -> None:
-    """Synthesise TEXT (or stdin) to a WAV file."""
+def synth(ctx: click.Context, text: str | None, out: Path, stream: bool, bitrate: str) -> None:
+    """Synthesise TEXT (or stdin) to an audio file."""
     # text=None tells the handler to read the utterance from stdin;
     # --stream selects the low-TTFA streaming path over whole-text synthesis.
-    _run(ctx, "synth", text=text, out=out, stream=stream)
+    _run(ctx, "synth", text=text, out=out, stream=stream, bitrate=bitrate)
 
 
 @cli.command()
@@ -706,7 +714,7 @@ def route(
     "--out",
     type=click.Path(path_type=Path),
     default=Path("narration.wav"),
-    help="Output WAV; the cues are written beside it as .vtt.",
+    help="Output audio; the cues are written beside it as .vtt.",
 )
 @click.option(
     "--read-math",
@@ -714,15 +722,23 @@ def route(
     default=None,
     help="Speak the notation as words in LANG, leaving the cues as the page reads.",
 )
+@click.option(
+    "--bitrate",
+    default=DEFAULT_SPEECH_BITRATE,
+    show_default=True,
+    help="Bitrate when --out names a lossy container (.mp3, .m4a). Ignored for .wav.",
+)
 @click.pass_context
-def narrate(ctx: click.Context, segments: Path, out: Path, read_math: str | None) -> None:
+def narrate(
+    ctx: click.Context, segments: Path, out: Path, read_math: str | None, bitrate: str
+) -> None:
     """Read a document aloud, and write the timed track that follows it.
 
     SEGMENTS is a JSON list of blocks, each with `text` and optionally `say`,
     `pause_before_ms`, `pause_after_ms`, `pace` and `emotion`. A list of plain
     strings works too.
     """
-    _run(ctx, "narrate", segments=segments, out=out, read_math=read_math)
+    _run(ctx, "narrate", segments=segments, out=out, read_math=read_math, bitrate=bitrate)
 
 
 @cli.command(name="install-voice")
@@ -806,14 +822,22 @@ def eval_cmd(
     "out",
     type=click.Path(path_type=Path),
     default=Path("out.wav"),
-    help="Output WAV path.",
+    help="Output path; the extension picks the container (.wav, .mp3, .m4a).",
+)
+@click.option(
+    "--bitrate",
+    default=DEFAULT_SPEECH_BITRATE,
+    show_default=True,
+    help="Bitrate when --out names a lossy container (.mp3, .m4a). Ignored for .wav.",
 )
 @click.pass_context
-def speak_from(ctx: click.Context, source: str, url: str | None, seconds: float, out: Path) -> None:
+def speak_from(
+    ctx: click.Context, source: str, url: str | None, seconds: float, out: Path, bitrate: str
+) -> None:
     """Re-voice audio from a source (youtube / podcast / microphone)."""
     # --url is required for youtube/podcast (the handler validates it); the mic
     # source uses --seconds instead. The source is transcribed then re-spoken.
-    _run(ctx, "speak-from", source=source, url=url, seconds=seconds, out=out)
+    _run(ctx, "speak-from", source=source, url=url, seconds=seconds, out=out, bitrate=bitrate)
 
 
 @cli.command()

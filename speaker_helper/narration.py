@@ -57,7 +57,10 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field, replace
+from pathlib import Path
 from typing import Any, Literal
+
+from .types import DEFAULT_SPEECH_BITRATE, write_audio
 
 # How fast to read, by name rather than by number. Names travel between a
 # document's structure and an engine's dial; a float does not survive the trip
@@ -293,6 +296,18 @@ class NarrationResult:
     def to_vtt(self) -> str:
         """The timed track, as WebVTT."""
         return cues_to_vtt(self.cues)
+
+    def write_audio(
+        self, path: str | Path, *, bitrate: str | int | None = DEFAULT_SPEECH_BITRATE
+    ) -> Path:
+        """Write the narration to ``path``; the extension picks the container.
+
+        See :func:`speaker_helper.types.write_audio`. A forty-minute narration
+        is the case that makes this matter: as WAV it is over a hundred
+        megabytes, as a 64 kb/s MP3 it is under twenty, and the page that
+        plays it has to download whichever one was written.
+        """
+        return write_audio(self.wav_bytes, path, bitrate=bitrate)
 
 
 def format_timestamp(seconds: float) -> str:
