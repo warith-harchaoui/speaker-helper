@@ -54,7 +54,7 @@ dependencies = [
     # info/warning/error, join, file_exists, temporary_folder,
     # make_temporary_directory, download_file) are long-standing basics,
     # and raising a floor without exercising it would just be a guess.
-    "os-helper>=1.7.2,<4",
+    "os-helper>=1.7.2,<5",
     "audio-helper>=2.6.0",
     "pyyaml>=6.0",
     "numpy>=1.24",

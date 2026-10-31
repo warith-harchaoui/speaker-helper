@@ -15,7 +15,7 @@
 #     pip install -r requirements.txt      # runtime only
 #     pip install -e .                     # same, from the package metadata
 
-os-helper>=1.7.2,<4
+os-helper>=1.7.2,<5
 audio-helper>=2.6.0
 pyyaml>=6.0
 numpy>=1.24
