@@ -39,27 +39,20 @@ Python typée, une CLI, une API REST et une GUI web minimale. En local
   `kokoro`**, qui synthétise plus vite que le temps réel sur CPU (RTF nettement
   sous 1.0, sans GPU). Nommez un backend explicitement et il est respecté tel
   quel.
-- **Agnostique du moteur et rien à lancer.** Le moteur est un détail
-  d'implémentation derrière le protocole `TTSEngine` et chaque backend tourne
-  **dans ce processus**. Cinq sont livrés : `kokoro` (ONNX Runtime, 54 voix
-  — le défaut du streaming), `openvoice` et `chatterbox` (clonage depuis un
-  enregistrement ; le backend chatterbox choisit tout seul son modèle Turbo
-  pour l'anglais et son modèle Multilingual — 23 langues — ailleurs),
-  `kyutai` (français et anglais natifs du modèle 1.6B de Kyutai, voix tirées
-  d'une banque d'embeddings publiée) et un `mock` déterministe pour les tests
-  et la CI. Ajouter un backend, c'est un seul appel à `register_backend`.
+- **Agnostique du moteur, puis rien à lancer.** Le moteur est un détail d'implémentation derrière le protocole `TTSEngine`, puis chaque backend tourne **dans ce processus**. Cinq sont livrés :
+  - `kokoro` — ONNX Runtime, 54 voix ; le défaut du streaming ;
+  - `openvoice` puis `chatterbox` — clonage depuis un enregistrement. Le backend chatterbox choisit tout seul son modèle Turbo pour l'anglais, son modèle Multilingual — 23 langues — ailleurs ;
+  - `kyutai` — français puis anglais natifs du modèle 1.6B de Kyutai, voix tirées d'une banque d'embeddings publiée ;
+  - `mock` — déterministe, pour les tests puis la CI.
+
+  Ajouter un backend, c'est un seul appel à `register_backend`.
 - **Clonage de voix, partout.** Pointez vers un enregistrement, speaker-helper
   clone la voix — dans la bibliothèque, la CLI, l'API REST et la GUI. Les
   transcriptions manquantes sont produites automatiquement avec
   [`vocal-helper`](https://github.com/warith-harchaoui).
-- **Un lexique de prononciation, appliqué d'office.** Déclarez une fois, dans
-  un `lexicon.yaml`, comment un mot se prononce — en IPA exact (épissé tel
-  quel dans le flux de phonèmes de kokoro, déterministe) ou en ré-écriture
-  orthographique (pour les moteurs sans accès phonémique). Une entrée sans ni
-  l'un ni l'autre voit sa ré-écriture dérivée **une seule fois** par un LLM
-  local (résolu via `best-engine-ai-helper`, servi par Ollama) puis mise en
-  cache ; ensuite tout est déterministe et hors-ligne. Voir
-  [`lexicon.yaml.example`](https://github.com/warith-harchaoui/speaker-helper/blob/main/lexicon.yaml.example).
+- **Un lexique de prononciation, appliqué d'office.** Déclarez une fois, dans un `lexicon.yaml`, comment un mot se prononce : en IPA exact (épissé tel quel dans le flux de phonèmes de kokoro, donc déterministe) ou en ré-écriture orthographique (pour les moteurs sans accès phonémique).
+
+  Une entrée sans ni l'un ni l'autre voit sa ré-écriture dérivée **une seule fois** par un LLM local (résolu via `best-engine-ai-helper`, servi par Ollama) puis mise en cache. Ensuite tout est déterministe puis hors-ligne. Voir [`lexicon.yaml.example`](https://github.com/warith-harchaoui/speaker-helper/blob/main/lexicon.yaml.example).
 - **Les longs textes ne se dégradent pas.** Au-delà d'environ 500 caractères,
   `say()` synthétise par groupes de phrases puis concatène ; le LLM local
   place les coupes aux frontières du discours (il ne fait que *grouper* des
@@ -329,16 +322,10 @@ un moteur et un mode concrets, justifiés par les chiffres, jamais devinés.
   qualité compte** : le moteur de plus haute qualité l'emporte, la
   vitesse est ignorée.
 
-Les deux conditions classent la qualité sur des **critères différents** ; chaque
-décision indique lequel (`quality_source`, `rtf_source`) — la provenance, pas
-une note dérivée.
-`online_realtime` lit l'Elo d'arène publique (`public_elo` : des votes humains
-par paires ; un moteur absent de toute arène publique obtient `0.0` avec
-`no_public_elo` au lieu d'hériter d'un prior flatteur). `offline` lit les priors
-par langue ratifiés par le propriétaire (`prior`) — ou bien une mesure là où il
-en existe une : le score UTMOSv2 de kokoro (`measured_mos`), voire le chrF
-aller-retour de vos propres rapports d'évaluation (`measured_chrf`) si vous les
-fournissez.
+Les deux conditions classent la qualité sur des **critères différents** ; chaque décision indique lequel (`quality_source`, `rtf_source`) — la provenance, pas une note dérivée.
+
+- `online_realtime` lit l'Elo d'arène publique (`public_elo`) : des votes humains par paires. Un moteur absent de toute arène publique obtient `0.0` avec `no_public_elo`, au lieu d'hériter d'un prior flatteur.
+- `offline` lit les priors par langue ratifiés par le propriétaire (`prior`) — ou bien une mesure là où il en existe une : le score UTMOSv2 de kokoro (`measured_mos`), voire le chrF aller-retour de vos propres rapports d'évaluation (`measured_chrf`) si vous les fournissez.
 
 ```python
 from speaker_helper import route, RouteRequest, Speaker

@@ -35,16 +35,13 @@ minimal web GUI — runnable locally (conda + pip) or as a Docker server.
   23-language Multilingual model elsewhere — and **streaming goes to
   `kokoro`**, which synthesises faster than real time on CPU (RTF well below
   1.0, no GPU). Name a backend explicitly and it is honoured as-is.
-- **Backend-agnostic, and nothing to launch.** The engine is an implementation
-  detail behind a `TTSEngine` protocol, and every backend runs **in this
-  process**. Five ship: `kokoro` (ONNX Runtime, 54 voices — the streaming
-  default),
-  `openvoice` and `chatterbox` (cloning from a recording; the chatterbox
-  backend auto-picks its Turbo model for English and its 23-language
-  Multilingual model elsewhere), `kyutai` (native French and English from
-  Kyutai's 1.6B model, voices from a published embedding bank), and a
-  deterministic `mock` for tests and CI. A new backend is one
-  `register_backend` call.
+- **Backend-agnostic, and nothing to launch.** The engine is an implementation detail behind a `TTSEngine` protocol, and every backend runs **in this process**. Five ship:
+  - `kokoro` — ONNX Runtime, 54 voices; the streaming default;
+  - `openvoice` and `chatterbox` — cloning from a recording. The chatterbox backend auto-picks its Turbo model for English and its 23-language Multilingual model elsewhere;
+  - `kyutai` — native French and English from Kyutai's 1.6B model, voices from a published embedding bank;
+  - `mock` — deterministic, for tests and CI.
+
+  A new backend is one `register_backend` call.
 - **Voice cloning, everywhere.** Point at a recording and speaker-helper clones
   the voice — in the library, CLI, REST API, and GUI. Missing transcripts are
   derived automatically with [`vocal-helper`](https://github.com/warith-harchaoui).
@@ -312,15 +309,10 @@ evidence. You state an operating **condition** and it returns a concrete engine
 - **`offline`** — batch. There is no real-time constraint, so **quality is the
   only objective**: the highest-quality engine wins, speed disregarded.
 
-The two conditions rank quality on **different criteria**, and every decision
-reports which one it used (`quality_source`, `rtf_source`) — provenance, not
-a derived grade.
-`online_realtime` reads the public arena Elo (`public_elo` — human pairwise
-votes; an engine listed on no public arena scores `0.0` with `no_public_elo`
-rather than inheriting a flattering prior). `offline` reads the owner-ratified
-per-language priors (`prior`), or a measurement where one exists — kokoro's
-UTMOSv2 score (`measured_mos`), or the round-trip chrF of your own evaluation
-reports (`measured_chrf`) when you pass them in.
+The two conditions rank quality on **different criteria**, and every decision reports which one it used (`quality_source`, `rtf_source`) — provenance, not a derived grade.
+
+- `online_realtime` reads the public arena Elo (`public_elo`): human pairwise votes. An engine listed on no public arena scores `0.0` with `no_public_elo`, rather than inheriting a flattering prior.
+- `offline` reads the owner-ratified per-language priors (`prior`) — or a measurement where one exists: kokoro's UTMOSv2 score (`measured_mos`), or the round-trip chrF of your own evaluation reports (`measured_chrf`) when you pass them in.
 
 ```python
 from speaker_helper import route, RouteRequest, Speaker
