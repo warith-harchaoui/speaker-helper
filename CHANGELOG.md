@@ -6,6 +6,18 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.14.1] - 2026-11-01
+
+### Fixed
+
+- **The published metadata capped `os-helper<4`, so nobody installing from the
+  index could reach 4.0.0.** The ceiling was raised in this repository on
+  2026-10-31, but a wheel's `Requires-Dist` is frozen at upload: until this
+  release a fresh resolve still pulled os-helper 3.1.0 and the raised ceiling
+  reached no installer at all. This release is what carries the `<5` to the
+  index. This package never calls `hashfile` or `hashfolder`, the two functions whose
+  contract 4.0.0 tightened, so the ceiling was the only thing in the way.
+
 ## [0.14.0] - 2026-10-31
 
 ### Added
