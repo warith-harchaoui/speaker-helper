@@ -56,6 +56,12 @@ Python typée, une CLI, une API REST et une GUI web minimale. En local
 - **Un lexique de prononciation, appliqué d'office.** Déclarez une fois, dans un `lexicon.yaml`, comment un mot se prononce : en IPA exact (épissé tel quel dans le flux de phonèmes de kokoro, donc déterministe) ou en ré-écriture orthographique (pour les moteurs sans accès phonémique).
 
   Une entrée sans ni l'un ni l'autre voit sa ré-écriture dérivée **une seule fois** par un LLM local (résolu via `best-engine-ai-helper`, servi par Ollama) puis mise en cache. Ensuite tout est déterministe puis hors-ligne. Voir [`lexicon.yaml.example`](https://github.com/warith-harchaoui/speaker-helper/blob/main/lexicon.yaml.example).
+- **Les nombres sont dits, pas devinés.** Dates, heures, montants puis nombres
+  sont écrits en toutes lettres avant qu'un moteur ne les lise (français,
+  anglais, déterministe, `speaker_helper.spoken_numbers`) : `14/11` devient une
+  date, `9h30` une heure, `3 200 €` un montant ; les identifiants comme `4G`
+  ou `RN7` restent tels quels. Les cues d'une narration gardent les chiffres de
+  la page. `numbers_to_words: false` dans `settings.yaml` le coupe.
 - **Les longs textes ne se dégradent pas.** Au-delà d'environ 500 caractères,
   `say()` synthétise par groupes de phrases puis concatène ; le LLM local
   place les coupes aux frontières du discours (il ne fait que *grouper* des
@@ -463,9 +469,10 @@ métriques DeepEval, de façon déterministe et hors-ligne.
 Copiez [`settings.yaml.example`](https://github.com/warith-harchaoui/speaker-helper/blob/main/settings.yaml.example) vers `settings.yaml`
 (ignoré par git) ou utilisez
 [`speaker_config.json.example`](https://github.com/warith-harchaoui/speaker-helper/blob/main/speaker_config.json.example) comme référence.
-Chaque clé peut être surchargée par une variable d'environnement
-`SPEAKER_HELPER_*` ; les références `${VAR}` dans le YAML sont remplacées depuis
-l'environnement au chargement.
+Sept clés se surchargent aussi depuis l'environnement : `SPEAKER_HELPER_BACKEND`,
+`_ENGINE`, `_VOICE`, `_VOICE_SAMPLE`, `_VOICE_ID`, `_LANGUAGE` puis `_LEXICON`
+(le serveur MCP lit `SPEAKER_HELPER_MCP_HOST` / `_PORT`) ; les références
+`${VAR}` dans le YAML sont remplacées depuis l'environnement au chargement.
 
 ---
 

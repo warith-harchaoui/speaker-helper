@@ -55,6 +55,12 @@ minimal web GUI — runnable locally (conda + pip) or as a Docker server.
   derived **once** by a local LLM (resolved through `best-engine-ai-helper`,
   served by Ollama) and cached; after that, everything is deterministic and
   offline. See [`lexicon.yaml.example`](https://github.com/warith-harchaoui/speaker-helper/blob/main/lexicon.yaml.example).
+- **Numbers are said, not guessed.** Dates, times, amounts and numbers are
+  spelled out as words before an engine reads them (French and English,
+  deterministic, `speaker_helper.spoken_numbers`): `14/11` becomes a date,
+  `9h30` a time, `3 200 €` an amount, while identifiers such as `4G` or `RN7`
+  stay as written. A narration's cues keep the page's digits.
+  `numbers_to_words: false` in `settings.yaml` turns it off.
 - **Long texts don't degrade.** Past ~500 characters, `say()` synthesises
   sentence-group chunks and concatenates them; the local LLM places the cuts
   at discourse boundaries (it only ever *groups* locally-split sentences, so
@@ -443,8 +449,10 @@ custom metrics — deterministic and offline.
 
 Copy [`settings.yaml.example`](https://github.com/warith-harchaoui/speaker-helper/blob/main/settings.yaml.example) to `settings.yaml` (it is
 gitignored) or use [`speaker_config.json.example`](https://github.com/warith-harchaoui/speaker-helper/blob/main/speaker_config.json.example)
-as a reference. Every key can be overridden by a `SPEAKER_HELPER_*` environment
-variable; `${VAR}` references inside the YAML are expanded from the environment.
+as a reference. Seven keys can also be overridden from the environment:
+`SPEAKER_HELPER_BACKEND`, `_ENGINE`, `_VOICE`, `_VOICE_SAMPLE`, `_VOICE_ID`,
+`_LANGUAGE` and `_LEXICON` (the MCP server reads `SPEAKER_HELPER_MCP_HOST` /
+`_PORT`); `${VAR}` references inside the YAML are expanded from the environment.
 
 ---
 

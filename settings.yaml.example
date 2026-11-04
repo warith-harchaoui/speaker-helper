@@ -29,6 +29,10 @@ first_chunk_sentences: 1    # streaming: 1 → lowest time-to-first-audio
 #   audio: "my_voice.wav"
 #   reference_text: ""
 
+# Dates, times, amounts and numbers are spelled out as words before the engine
+# reads them (French and English; a narration's cues keep the digits).
+# numbers_to_words: true
+
 # Pronunciation lexicon: per-word overrides applied automatically on every
 # synthesis (see lexicon.yaml.example at the repo root). All keys OPTIONAL.
 # `path` defaults to ./lexicon.yaml when that file exists; `enabled` defaults
