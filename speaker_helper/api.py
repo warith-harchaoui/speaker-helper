@@ -137,6 +137,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # request handler below closes over (one pooled HTTP client for the app).
     settings = settings or Settings.load()
     speaker = Speaker(settings)
+    # /synth/stream is the streaming cell of the matrix. When the backend's
+    # engine depends on the mode (`auto`, `elevenlabs`) and the configured mode
+    # is offline, it needs its own Speaker — built on first use, so a server
+    # that never streams never loads a second engine. Otherwise it is the same.
+    from speaker_helper.engine import for_streaming
+
+    stream_settings = for_streaming(settings)
+    streamers: list[Speaker] = [] if stream_settings is not settings else [speaker]
+
+    def stream_speaker() -> Speaker:
+        """The Speaker that serves streaming requests (see above)."""
+        if not streamers:
+            streamers.append(Speaker(stream_settings))
+        return streamers[0]
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -155,6 +169,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         yield
         # On shutdown, release whatever the engine holds (ONNX session, …).
         await speaker.aclose()
+        if streamers and streamers[0] is not speaker:
+            await streamers[0].aclose()
 
     # Wire the lifespan into the app so warmup/teardown run around serving.
     app = FastAPI(title="speaker-helper", version=_version(), lifespan=lifespan)
@@ -289,7 +305,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             try:
                 # Forward each streaming chunk to the client the moment it is
                 # ready, so playback can start before the whole text is done.
-                async for chunk in speaker.stream(req.text, language=req.language):
+                async for chunk in stream_speaker().stream(req.text, language=req.language):
                     # Serialise chunk metadata + audio into the SSE payload.
                     # ttfa_s is only meaningful on the first chunk (else None).
                     payload = {

@@ -209,6 +209,48 @@ def resolve_auto(settings: Settings) -> Settings:
     return dataclasses.replace(settings, backend=decision.backend, engine=decision.engine)
 
 
+#: Backends whose engine depends on ``settings.mode``: ``auto`` routes on it,
+#: ``elevenlabs`` picks its model from it. Every other backend is the same
+#: engine in both modes, so a streaming call can reuse it as is.
+MODE_DEPENDENT_BACKENDS: frozenset[str] = frozenset({AUTO, "elevenlabs"})
+
+
+def for_streaming(settings: Settings) -> Settings:
+    """The settings a streaming call should run with.
+
+    A streaming request (``synth --stream``, ``POST /synth/stream``) is the
+    streaming cell of the matrix whatever ``mode`` the configuration was
+    written for: with ``backend: auto`` and the default ``mode: offline`` it
+    would otherwise stream through chatterbox, two to five times slower than
+    real time, and ElevenLabs would use its offline model.
+
+    Parameters
+    ----------
+    settings : Settings
+        The configured settings.
+
+    Returns
+    -------
+    Settings
+        ``settings`` itself when the mode is already ``"streaming"`` or the
+        backend does not depend on it; otherwise a copy with
+        ``mode="streaming"``.
+
+    Examples
+    --------
+    >>> for_streaming(Settings.from_mapping({"backend": "auto"})).mode
+    'streaming'
+    >>> s = Settings.from_mapping({"backend": "kokoro"})
+    >>> for_streaming(s) is s
+    True
+    """
+    if settings.mode == "streaming":
+        return settings
+    if (settings.backend or AUTO).lower() not in MODE_DEPENDENT_BACKENDS:
+        return settings
+    return dataclasses.replace(settings, mode="streaming")
+
+
 def create_engine(settings: Settings) -> TTSEngine:
     """Instantiate the backend named by ``settings.backend``.
 

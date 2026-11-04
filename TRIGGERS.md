@@ -109,6 +109,8 @@ is `vocal-helper`, and the loop over both is `discussion-helper`.
 - **The default engine depends on the mode.** `backend: auto` resolves offline
   to Chatterbox and streaming to Kokoro; `speaker-helper route` prints the
   decision with its numbers. A backend named explicitly is honoured as-is.
+- **A streaming request is the streaming cell**, whatever `mode` the settings
+  name: `synth --stream` and `POST /synth/stream` use kokoro under `auto`.
 - **Offline is judged on quality, not speed.** RTF only matters when
   streaming; Chatterbox and Audio8 are slower than real time and that is fine
   for a file.

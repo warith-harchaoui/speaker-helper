@@ -120,6 +120,13 @@ def _cmd_synth(args: SimpleNamespace, settings: Settings) -> int:
         osh.error("no text provided (argument or stdin)")
         return 2
 
+    if args.stream:
+        # --stream is the streaming cell of the matrix, whatever mode the
+        # configuration names: kokoro under `auto`, not chatterbox.
+        from speaker_helper.engine import for_streaming
+
+        settings = for_streaming(settings)
+
     async def run() -> int:
         """Drive one synthesis (streaming or offline) and write the WAV.
 

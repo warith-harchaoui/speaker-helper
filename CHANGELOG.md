@@ -57,6 +57,18 @@ to [Semantic Versioning](https://semver.org/).
   owner's ear can decide. `pip install 'speaker-helper[qwen3tts]'`. Ming-3.0
   (RTF 1.19) was measured and not added.
 
+### Fixed
+
+- **`synth --stream` and `POST /synth/stream` streamed through chatterbox.**
+  Under the default `mode: offline`, `backend: auto` resolved to the offline
+  cell, so a streaming request ran two to five times slower than real time
+  (and ElevenLabs would have used its offline model). Both surfaces now run
+  the streaming cell (`engine.for_streaming`): kokoro under `auto`,
+  `eleven_v4_turbo` for ElevenLabs. A named local backend is the same engine
+  in both modes and is not loaded twice; the API builds its streaming
+  Speaker only on the first streaming request. `tests/test_each_mode_gets_its_engine.py`
+  pins all four cells and the female default of every backend.
+
 ### Changed
 
 - **`PUBLIC_ELO` re-pulled on 2026-11-04** from TTS Arena V2's own JSON:
