@@ -6,6 +6,43 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **An `audio8` backend: Edge0's Audio8-TTS-Realistic (0.6B, Apache-2.0,
+  23 languages), offline, through `mlx-audio` on Apple Silicon.** It renders
+  by cloning and always from a reference: without one the model's own speaker
+  measured male (median F0 139 Hz in French), so the bundled female reference
+  and its transcript are the default; with it French measured F0 274 Hz and a
+  TitaNet similarity of 0.72 to the reference (chatterbox: 0.66). Output is
+  resampled from the codec's 44.1 kHz to the suite's 24 kHz so mixed-engine
+  narrations keep their cue times, and the frame budget defaults to the
+  context's 2,048 positions — upstream's 512 stops a take at ~24 s, shorter
+  than one 500-character chunk (measured: 32 s). `pip install
+  'speaker-helper[audio8]'` (`mlx-audio>=0.6.4`: 0.6.1 cannot load the 4-bit
+  checkpoint). Off a Mac it reports itself unavailable — the PyTorch path is
+  not wired. Its routing prior sits below chatterbox's in every language, so
+  **no routing decision changes** until the owner has listened.
+
+- **Dates, times, amounts and numbers are said as words before an engine
+  reads them** (`speaker_helper.spoken_numbers`, French and English,
+  deterministic, no dependency). Measured cause: Audio8 read "le 14/11" as an
+  hour and swallowed "Correction :" in a digit-heavy sentence; with the
+  rewrite whisper hears "le 14 novembre … Correction, non pas le 14". It
+  covers `14/11`, `9h30`, `2:30 p.m.`, `3 200 €`, `12,50 €`, `3 M€`, `$3,200`,
+  `7,94 %`, `1er`, `14th`, grouped/decimal/negative numbers, leading zeros and
+  English years, and leaves identifiers (`4G`, `RN7`, `H2O`) alone. Applied to
+  what is spoken only: a narration's cues keep the page's digits. On by
+  default; `numbers_to_words: false` turns it off. Other languages pass
+  through unchanged.
+
+### Changed
+
+- `TRIGGERS.md`, the skill and the CLI's `--backend` help no longer say
+  "Kokoro by default": the default is `backend: auto`, resolved from the mode
+  (offline → chatterbox, streaming → kokoro), and they now name `kyutai`,
+  `audio8`, the lexicon applied on every call and the female voice in every
+  language.
+
 ## [0.14.1] - 2026-11-01
 
 ### Fixed

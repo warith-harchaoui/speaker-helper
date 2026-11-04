@@ -3,15 +3,17 @@ name: speaker-helper
 description: >-
   Turn text into speech, locally and in-process — one sentence, a streamed
   reply, or a whole document read aloud with a WebVTT track saying where each
-  block is spoken so a page can follow along. Kokoro by default (82M through
-  ONNX, Apache-2.0 code *and* weights, 54 voices, no server to start, faster
-  than real time on CPU); OpenVoice and Chatterbox clone a voice from a short
-  recording. Picks the voice from the language the text is actually written
-  in, speaks LaTeX as words rather than spelling it out, and reports the dials
-  a backend does not have instead of pretending. Use when the user says "read
+  block is spoken so a page can follow along. The engine follows the mode:
+  offline → Chatterbox (Turbo for English, Multilingual elsewhere), streaming →
+  Kokoro (82M ONNX, faster than real time on CPU); Kyutai (native French),
+  Audio8 (realism-tuned cloner, Apple Silicon) and OpenVoice are one
+  `--backend` away. A female voice in every language by default, the
+  pronunciation lexicon applied on every call, LaTeX spoken as words, and the
+  dials a backend does not have reported instead of pretended. Use when the user says "read
   this aloud", "text to speech", "TTS", "narrate this post / article /
   document", "make a voiceover", "say this out loud", "which voice", "clone
   this voice", "sound like this recording", "audiobook", "low-latency speech",
+  "offline or streaming", "a lifelike female voice", "pronunciation lexicon",
   or names `speaker-helper`, `speaker-helper-mcp`, `import speaker_helper`. Do
   NOT use for speech → text, captions of a recording, or "who spoke when" —
   that is the inverse toolbox, `vocal-helper`. The exhaustive trigger
@@ -100,6 +102,20 @@ that bit somebody:
   out. A narration without them can be played; only one with them can be
   followed.
 
+## Which engine speaks
+
+Nothing to pick by default: `backend: auto` follows `mode`. Offline (a file,
+quality first, speed irrelevant) → Chatterbox, Turbo for English and
+Multilingual for everything else; streaming (real time) → Kokoro.
+`speaker-helper route` prints that decision with its evidence. Name a backend
+to override it — `kyutai` (native French), `audio8` (Apple Silicon,
+`pip install 'speaker-helper[audio8]'`), `openvoice`, `kokoro`, `chatterbox`.
+
+A `lexicon.yaml` beside you (names, acronyms, jargon) is applied on every
+call; engines without phoneme input receive its respellings. Dates, times,
+amounts and numbers are spelled out first (French, English), so `14/11` is
+read as a date and not guessed at; the cues keep the digits.
+
 ## Cloning a voice
 
 ```bash
@@ -107,7 +123,10 @@ speaker-helper --backend chatterbox --voice-sample ref.wav \
   synth "This should sound like the reference."
 ```
 
-Kokoro refuses a voice sample rather than ignoring it, and names these two.
+Chatterbox, Audio8 and OpenVoice clone; with no sample, Chatterbox and Audio8
+clone the bundled female reference (CC BY 4.0). Audio8 also needs the exact
+transcript (`ref.txt` beside the file, or derived with vocal-helper). Kokoro
+and Kyutai refuse a voice sample rather than ignoring it.
 Six to sixty seconds of clean speech is plenty — the reference supplies
 timbre, it does not teach the model to talk.
 

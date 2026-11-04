@@ -351,7 +351,7 @@ class Speaker:
 
         # Lexicon first (one pass over the whole text), chunking second — so a
         # respelling never straddles a chunk boundary.
-        spoken = self._respelled(text, language)
+        spoken = self._spoken(text, language)
         chunks = chunk_long_text(spoken, language or self.settings.language, self.settings)
         if len(chunks) <= 1:
             return await self.engine.synthesize(spoken, language=language)
@@ -465,7 +465,7 @@ class Speaker:
         # The lexicon rewrites the whole text before chunking — rewriting per
         # chunk would re-scan the same words and could split one across a
         # chunk boundary the sentence splitter chose.
-        text = self._respelled(text, language)
+        text = self._spoken(text, language)
         # Producer side: split the text into chunks (first one kept small so the
         # first audio comes out fast). Nothing to do for empty input.
         chunks = chunk_for_streaming(text, self.settings.first_chunk_sentences)
@@ -563,7 +563,7 @@ class Speaker:
                     # The lexicon applies to what is *spoken* (text or its
                     # `say` override), never to the page's own text — cues
                     # keep showing the document's words.
-                    self._respelled(seg.spoken, language),
+                    self._spoken(seg.spoken, language),
                     language=language,
                     **self._voice_and_speed(voice, seg),
                 )
@@ -639,6 +639,27 @@ class Speaker:
             language=first.language,
             ignored_hints=sorted(ignored),
         )
+
+    def _spoken(self, text: str, language: str | None) -> str:
+        """The text an engine is handed: numbers as words, then the lexicon.
+
+        Numbers go first so a lexicon entry written for a word ("quatorze")
+        still matches once "14" has become one; the lexicon is applied second,
+        exactly as before. Both rewrite what is *spoken* only — callers keep
+        the original text for cues and results.
+        """
+        # The digit test first: detecting the language is not free, and most
+        # sentences hold no number at all.
+        if self.settings.numbers_to_words and any(ch.isdigit() for ch in text):
+            from speaker_helper.spoken_numbers import verbalize
+
+            lang = language
+            if not lang:
+                from speaker_helper.backends.kokoro import detect_language
+
+                lang = detect_language(text, fallback=self.settings.language)
+            text = verbalize(text, lang)
+        return self._respelled(text, language)
 
     def _respelled(self, text: str, language: str | None) -> str:
         """Apply the lexicon's respelling tier when the backend needs it.

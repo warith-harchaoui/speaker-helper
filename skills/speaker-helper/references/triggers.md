@@ -71,6 +71,18 @@ block landed.
 - `voice sample`
 - `make it sound like me`
 
+### The engine ask
+
+- `offline TTS`
+- `which engine for French`
+- `the most lifelike local voice`
+- `a female voice that sounds alive`
+- `voix féminine et vivante`
+- `pronunciation lexicon`
+- `pronounce this name correctly`
+- `read the dates and amounts correctly`
+- `numbers read wrong`
+
 ### The latency ask
 
 - `low-latency speech`
@@ -86,6 +98,9 @@ block landed.
 - `import speaker_helper`
 - `Speaker(...)`
 - `kokoro`
+- `kyutai`
+- `audio8`
+- `Audio8-TTS-Realistic`
 - `openvoice`
 - `chatterbox`
 

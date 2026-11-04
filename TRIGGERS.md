@@ -5,10 +5,15 @@ and the natural-language phrasings, commands, functions, and file types that
 should invoke it.
 
 `speaker-helper` turns **text into speech**, inside your process. It is the
-inverse of `vocal-helper`: text in, audio out. It runs locally by default
-(Kokoro, no server), clones a voice from a reference sample (OpenVoice,
-Chatterbox), and can narrate a whole document while emitting the **timed track**
-that lets a page follow along word by word.
+inverse of `vocal-helper`: text in, audio out. It runs locally, with no
+server, and picks its engine from the **mode** (`backend: auto`, the default):
+offline → Chatterbox (Turbo for English, Multilingual for every other
+language), streaming → Kokoro. Other engines are one `--backend` away: Kyutai
+(native French), Audio8 (realism-tuned cloner, Apple Silicon), OpenVoice. It
+clones a voice from a reference sample, speaks with a **female voice** in every
+language unless told otherwise, applies the **pronunciation lexicon** on every
+call, and can narrate a whole document while emitting the **timed track** that
+lets a page follow along word by word.
 
 It does **not** transcribe, diarize, translate, or hold a conversation.
 Those are `vocal-helper` (speech → text), `md2star` (documents), and
@@ -45,11 +50,13 @@ Those are `vocal-helper` (speech → text), `md2star` (documents), and
 
 **Voice identity**
 - "clone this voice", "use my own voice", "make it sound like this sample"
+- "a female voice", "une voix féminine et vivante"
 - "which voices are available?", "list the presets", "pick a French voice"
 - "cloner une voix à partir d'un échantillon"
 
 **Engine and placement decisions**
 - "which TTS engine should I use on this machine?", "local or cloud?"
+- "offline or streaming?", "the most lifelike local voice", "a voice that sounds alive"
 - "is a GPU needed for this?", "what runs offline?"
 - "quel moteur de synthèse pour cette machine ?"
 
@@ -62,7 +69,8 @@ Those are `vocal-helper` (speech → text), `md2star` (documents), and
 | Input | Meaning |
 |-------|---------|
 | plain text, `.md`, `.txt` | what to say — `narrate` reflows prose and respects headings |
-| `.wav` reference clip | the voice to clone |
+| `.wav` reference clip (+ `.txt` transcript) | the voice to clone — Audio8 needs the transcript, vocal-helper derives it when missing |
+| `lexicon.yaml` | how to pronounce names, acronyms, jargon — applied on every call |
 | a dataset directory | the corpus `eval` scores against |
 
 | Output | Meaning |
@@ -95,5 +103,17 @@ is `vocal-helper`, and the loop over both is `discussion-helper`.
   is reported, not guessed around.
 - **Spoken maths is a real step**, not a formatting detail: `speak_math` and
   `resolve_spoken_math` turn `x^2` into words a listener can follow.
-- **Nothing is uploaded** by the default path: Kokoro runs in-process, with no
-  server and no network.
+- **The default engine depends on the mode.** `backend: auto` resolves offline
+  to Chatterbox and streaming to Kokoro; `speaker-helper route` prints the
+  decision with its numbers. A backend named explicitly is honoured as-is.
+- **Offline is judged on quality, not speed.** RTF only matters when
+  streaming; Chatterbox and Audio8 are slower than real time and that is fine
+  for a file.
+- **Digits are said as words** (French, English) before any engine reads them:
+  `le 14/11 à 9h30, 3 200 €` reaches the engine as "le quatorze novembre à
+  neuf heures trente, trois mille deux cents euros". Cues keep the digits;
+  `numbers_to_words: false` turns it off.
+- **A missing `lexicon.yaml` is not an error**: the lexicon is on by default
+  and simply inert when there is no file.
+- **Nothing is uploaded**: every in-tree engine runs on this machine; only the
+  first use downloads weights.
