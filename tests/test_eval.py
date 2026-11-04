@@ -368,7 +368,38 @@ async def test_run_eval_live_kokoro(needs_kokoro: None) -> None:
     async with Speaker(settings) as spk:
         await spk.warmup()
         report = await run_eval(spk, load_dataset()[:3])
-    # Assert: all three cases ran fast and clean, matching the CI contract.
+    # Assert: all three cases ran clean, matching the CI contract...
     assert report.n_cases == 3
-    assert report.mean_rtf < 1.0  # faster than real time, the operating point
     assert report.anomaly_rate == 0.0
+    # ...and fast — a claim only an unloaded machine can check. Warmed up as
+    # above, a failure here on an idle machine is a real regression; on a
+    # loaded one (load 45 on 12 cores gave 1.52 on 2026-11-04, the same
+    # engine measuring 0.22 idle) it says nothing about kokoro.
+    if report.mean_rtf >= 1.0:
+        from conftest import skip_timing_if_loaded
+
+        skip_timing_if_loaded(f"kokoro mean RTF {report.mean_rtf:.2f}")
+    assert report.mean_rtf < 1.0  # faster than real time, the operating point
+
+
+def test_a_slow_timing_on_a_loaded_machine_is_skipped_not_failed(monkeypatch) -> None:
+    """Load above half the cores: the timing is not evidence, and says so."""
+    import os
+
+    from conftest import skip_timing_if_loaded
+
+    monkeypatch.setattr(os, "cpu_count", lambda: 12)
+    monkeypatch.setattr(os, "getloadavg", lambda: (45.2, 30.0, 28.0))
+    with pytest.raises(pytest.skip.Exception, match=r"load 45\.2 on 12 cores"):
+        skip_timing_if_loaded("kokoro mean RTF 1.52")
+
+
+def test_a_slow_timing_on_an_idle_machine_still_fails(monkeypatch) -> None:
+    """Idle machine: no excuse, the assertion that follows is allowed to fail."""
+    import os
+
+    from conftest import skip_timing_if_loaded
+
+    monkeypatch.setattr(os, "cpu_count", lambda: 12)
+    monkeypatch.setattr(os, "getloadavg", lambda: (1.5, 1.0, 1.0))
+    skip_timing_if_loaded("kokoro mean RTF 1.52")  # returns: nothing to excuse
