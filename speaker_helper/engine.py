@@ -10,7 +10,7 @@ the CLI, the evaluation layer — talks only to the :class:`TTSEngine` protocol
 defined here. Swapping or adding a backend is therefore a local change: write a
 class with four coroutines and register it.
 
-Six backends ship in-tree. None is "the default" on its own: ``backend="auto"``
+Seven backends ship in-tree. None is "the default" on its own: ``backend="auto"``
 resolves from the operating mode (offline → chatterbox, Turbo for English;
 streaming → kokoro — see :func:`resolve_auto`).
 
@@ -20,6 +20,9 @@ streaming → kokoro — see :func:`resolve_auto`).
   picked from a published embedding bank rather than cloned.
 * ``audio8`` — Edge0's realism-tuned 0.6B cloner (MLX, Apple Silicon),
   always conditioned on a reference — the bundled female one by default.
+* ``elevenlabs`` — the paid cloud cells (``eleven_v4`` offline,
+  ``eleven_v4_turbo`` streaming). The only backend that sends text off the
+  machine, so ``auto`` never picks it.
 * ``mock`` — :class:`MockEngine`, a deterministic, dependency-light
   synthesiser that needs no server and no model. It makes the test suite and
   the evaluation layer runnable in CI, and it proves the abstraction: the
@@ -286,6 +289,16 @@ def _audio8_factory(settings: Settings) -> TTSEngine:
 
 
 register_backend("audio8", _audio8_factory)
+
+
+def _elevenlabs_factory(settings: Settings) -> TTSEngine:
+    """Build the ElevenLabs cloud backend (paid; never chosen by ``auto``)."""
+    from speaker_helper.backends.elevenlabs import ElevenLabsEngine
+
+    return ElevenLabsEngine(settings)
+
+
+register_backend("elevenlabs", _elevenlabs_factory)
 
 
 # ---------------------------------------------------------------------------

@@ -9,7 +9,8 @@ inverse of `vocal-helper`: text in, audio out. It runs locally, with no
 server, and picks its engine from the **mode** (`backend: auto`, the default):
 offline → Chatterbox (Turbo for English, Multilingual for every other
 language), streaming → Kokoro. Other engines are one `--backend` away: Kyutai
-(native French), Audio8 (realism-tuned cloner, Apple Silicon), OpenVoice. It
+(native French), Audio8 (realism-tuned cloner, Apple Silicon), OpenVoice, and
+ElevenLabs for the paid cloud cells (named explicitly, never by default). It
 clones a voice from a reference sample, speaks with a **female voice** in every
 language unless told otherwise, applies the **pronunciation lexicon** on every
 call, and can narrate a whole document while emitting the **timed track** that
@@ -57,6 +58,7 @@ Those are `vocal-helper` (speech → text), `md2star` (documents), and
 **Engine and placement decisions**
 - "which TTS engine should I use on this machine?", "local or cloud?"
 - "offline or streaming?", "the most lifelike local voice", "a voice that sounds alive"
+- "use ElevenLabs", "cloud TTS", "paid voice for production"
 - "is a GPU needed for this?", "what runs offline?"
 - "quel moteur de synthèse pour cette machine ?"
 
@@ -115,5 +117,7 @@ is `vocal-helper`, and the loop over both is `discussion-helper`.
   `numbers_to_words: false` turns it off.
 - **A missing `lexicon.yaml` is not an error**: the lexicon is on by default
   and simply inert when there is no file.
-- **Nothing is uploaded**: every in-tree engine runs on this machine; only the
-  first use downloads weights.
+- **Nothing is uploaded** unless you name `--backend elevenlabs`: every other
+  engine runs on this machine, and only the first use downloads weights.
+  ElevenLabs needs `ELEVENLABS_API_KEY`; `health` says so without spending a
+  request.

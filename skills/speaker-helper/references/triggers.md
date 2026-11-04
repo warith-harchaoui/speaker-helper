@@ -102,6 +102,8 @@ block landed.
 - `audio8`
 - `Audio8-TTS-Realistic`
 - `openvoice`
+- `elevenlabs`
+- `ElevenLabs`
 - `chatterbox`
 
 ## Negative triggers — do **not** fire on these

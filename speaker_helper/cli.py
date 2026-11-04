@@ -605,7 +605,7 @@ def _run(ctx: click.Context, command: str, **fields: object) -> None:
     default=None,
     help=(
         "TTS backend: auto (default: chatterbox offline, kokoro streaming), "
-        "kokoro, chatterbox, kyutai, audio8, openvoice or mock."
+        "kokoro, chatterbox, kyutai, audio8, openvoice, elevenlabs (cloud, paid) or mock."
     ),
 )
 @click.option("--voice-sample", default=None, help="Reference recording to clone.")

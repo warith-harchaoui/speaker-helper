@@ -7,7 +7,8 @@ description: >-
   offline → Chatterbox (Turbo for English, Multilingual elsewhere), streaming →
   Kokoro (82M ONNX, faster than real time on CPU); Kyutai (native French),
   Audio8 (realism-tuned cloner, Apple Silicon) and OpenVoice are one
-  `--backend` away. A female voice in every language by default, the
+  `--backend` away, and ElevenLabs serves the paid cloud cells when named. A
+  female voice in every language by default, the
   pronunciation lexicon applied on every call, LaTeX spoken as words, and the
   dials a backend does not have reported instead of pretended. Use when the user says "read
   this aloud", "text to speech", "TTS", "narrate this post / article /
@@ -109,7 +110,9 @@ quality first, speed irrelevant) → Chatterbox, Turbo for English and
 Multilingual for everything else; streaming (real time) → Kokoro.
 `speaker-helper route` prints that decision with its evidence. Name a backend
 to override it — `kyutai` (native French), `audio8` (Apple Silicon,
-`pip install 'speaker-helper[audio8]'`), `openvoice`, `kokoro`, `chatterbox`.
+`pip install 'speaker-helper[audio8]'`), `openvoice`, `kokoro`, `chatterbox`,
+or `elevenlabs` for the paid cloud (`ELEVENLABS_API_KEY`; `eleven_v4` offline,
+`eleven_v4_turbo` streaming). `auto` never picks the paid one.
 
 A `lexicon.yaml` beside you (names, acronyms, jargon) is applied on every
 call; engines without phoneme input receive its respellings. Dates, times,

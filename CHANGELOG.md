@@ -35,6 +35,18 @@ to [Semantic Versioning](https://semver.org/).
   default; `numbers_to_words: false` turns it off. Other languages pass
   through unchanged.
 
+- **An `elevenlabs` backend for the paid cloud cells of the matrix.** The mode
+  picks the model — `eleven_v4` offline, `eleven_v4_turbo` streaming (models
+  page, read 2026-11-04) — and audio comes back as `pcm_24000`, the suite's
+  rate. The lexicon reaches `eleven_v4` as inline `/IPA/`, the form its docs
+  say it reads, and every other model as a respelling. Standard library only
+  (no HTTP dependency); the key comes from `ELEVENLABS_API_KEY`, travels in the
+  header only, and an HTTP error names the status, never the key. It is not a
+  routing candidate, so `backend: auto` never reaches a paid service. The
+  default voice ("Sarah", premade, labelled female) has not been chosen by
+  ear: fix one per language with `elevenlabs.voice_by_lang`. Tested against a
+  fake service; never run against the real one (no key yet).
+
 ### Changed
 
 - `TRIGGERS.md`, the skill and the CLI's `--backend` help no longer say
