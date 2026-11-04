@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-11-04
+
 ### Added
 
 - **An `audio8` backend: Edge0's Audio8-TTS-Realistic (0.6B, Apache-2.0,
@@ -79,6 +81,12 @@ to [Semantic Versioning](https://semver.org/).
   STUDY.md §8 quinquies carry the dated readings.
 - **LANDSCAPE / PAYSAGE**: an Audio8-TTS-Realistic row, scored on the same
   rubric; positioning maps regenerated with `standpoint`.
+- **The `[stt]` extra admits vocal-helper 4.x** (`<5`). Its one call,
+  `transcribe_pcm(pcm, sr, language=...)`, is unchanged there; with `<4` a
+  fresh install would have stayed on vocal-helper 3.3.2.
+- README / LISEZMOI: the spoken-numbers step and its `numbers_to_words`
+  switch, and the environment overrides as they are (seven keys, not every
+  key).
 - `TRIGGERS.md`, the skill and the CLI's `--backend` help no longer say
   "Kokoro by default": the default is `backend: auto`, resolved from the mode
   (offline → chatterbox, streaming → kokoro), and they now name `kyutai`,
@@ -492,8 +500,6 @@ to [Semantic Versioning](https://semver.org/).
   behaviour, with the failing numbers. They now carry both measurements and
   date the fix. Both READMEs already said the gate warms up before timing —
   which only becomes true with this release.
-
-## [Unreleased]
 
 ## [0.9.1] - 2026-10-25
 
