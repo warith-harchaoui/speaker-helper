@@ -1,5 +1,5 @@
 """
-The two engines that clone, and the dials they do and do not have.
+The engines that clone, and the dials they do and do not have.
 
 Neither test here loads a model: the arithmetic that maps a document's words
 — "cheerful", "high" — onto an engine's dial is where the mistakes live, and
@@ -20,6 +20,7 @@ import asyncio
 
 import pytest
 
+from speaker_helper.backends.audio8 import Audio8Engine, resample
 from speaker_helper.backends.chatterbox import (
     EMOTION_EXAGGERATION_BASE,
     PACE_CFG_WEIGHT,
@@ -85,7 +86,7 @@ def test_the_neutral_emotion_maps_to_the_default_style() -> None:
 # ── Both: cloning needs a reference, and says so ───────────────────────────
 
 
-@pytest.mark.parametrize("engine_class", [ChatterboxEngine, OpenVoiceEngine])
+@pytest.mark.parametrize("engine_class", [ChatterboxEngine, OpenVoiceEngine, Audio8Engine])
 def test_cloning_with_no_sample_is_refused(engine_class: type) -> None:
     """An empty clone would silently fall back to the default speaker.
 
@@ -97,7 +98,7 @@ def test_cloning_with_no_sample_is_refused(engine_class: type) -> None:
         asyncio.run(engine.clone_voice("someone", []))
 
 
-@pytest.mark.parametrize("engine_class", [ChatterboxEngine, OpenVoiceEngine])
+@pytest.mark.parametrize("engine_class", [ChatterboxEngine, OpenVoiceEngine, Audio8Engine])
 def test_health_names_what_is_missing_without_loading_a_model(engine_class: type) -> None:
     """A probe that pays for torch is not a probe."""
     report = asyncio.run(engine_class(Settings()).health())
@@ -167,3 +168,52 @@ def test_chatterbox_does_not_claim_a_gender_for_somebody_elses_recording() -> No
     assert listing.voices
     assert listing.voices[0].gender == ""
     assert "somebody-else" in listing.voices[0].voice_id
+
+
+# ── Audio8: always a reference, and the output at the suite's rate ─────────
+
+
+def test_audio8_clones_the_bundled_female_reference_when_none_is_given() -> None:
+    """Without a reference the model's own speaker measured male (F0 139 Hz).
+
+    So "no voice configured" must mean the bundled female reference, never the
+    model's default — and the catalogue must say so, as chatterbox's does.
+    """
+    engine = Audio8Engine(Settings.from_mapping({"backend": "audio8", "language": "fr"}))
+    listing = asyncio.run(engine.list_voices())
+
+    assert listing.engine == "audio8"
+    assert [(v.voice_id, v.gender) for v in listing.voices] == [(DEFAULT_CLONE_NAME, "female")]
+
+
+def test_audio8_finds_the_bundled_transcript_without_asr() -> None:
+    """Audio8 needs the exact transcript of its reference; the bundle has one."""
+    from speaker_helper.backends.audio8 import reference_transcript
+    from speaker_helper.cloning import DEFAULT_CLONE_AUDIO, default_reference_text
+
+    assert reference_transcript(DEFAULT_CLONE_AUDIO, language="fr") == default_reference_text()
+
+
+def test_audio8_refuses_empty_text_before_loading_a_model() -> None:
+    """Same refusal as the other backends, before any weights are touched."""
+    engine = Audio8Engine(Settings.from_mapping({"backend": "audio8", "language": "fr"}))
+    with pytest.raises(ValueError, match="empty"):
+        asyncio.run(engine.synthesize("  "))
+
+
+def test_audio8_resampling_keeps_duration_and_pitch() -> None:
+    """44.1 kHz in, 24 kHz out: same length in seconds, same tone frequency.
+
+    A wrong rate here would not sound broken on its own; it would shift every
+    narration cue after the first segment.
+    """
+    import numpy as np
+
+    t = np.arange(44_100) / 44_100
+    tone = np.sin(2 * np.pi * 440.0 * t)
+    out = resample(tone, 44_100, 24_000)
+
+    assert out.shape == (24_000,)
+    peak_hz = np.argmax(np.abs(np.fft.rfft(out))) * 24_000 / out.size
+    assert peak_hz == pytest.approx(440.0, abs=1.0)
+    assert np.max(np.abs(out)) == pytest.approx(1.0, abs=0.01)

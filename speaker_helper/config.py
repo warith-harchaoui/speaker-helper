@@ -112,6 +112,10 @@ class Settings:
     first_chunk_sentences : int
         Streaming only: sentences in the first emitted chunk (1 → lowest
         time-to-first-audio, which is the number a conversation feels).
+    numbers_to_words : bool
+        Spell dates, times, amounts and numbers out as words before the engine
+        reads them (French and English; see :mod:`speaker_helper.spoken_numbers`).
+        On by default; the cues of a narration keep the page's digits.
 
     Notes
     -----
@@ -133,6 +137,7 @@ class Settings:
     normalize: bool = True
     mode: str = "offline"
     first_chunk_sentences: int = 1
+    numbers_to_words: bool = True
     # Backend-specific knobs for the ``mock`` engine (rtf, chars_per_sec,
     # sample_rate, amplitude, frequency_hz). Ignored by other backends.
     mock: dict[str, Any] = field(default_factory=dict)
@@ -151,6 +156,10 @@ class Settings:
     # cfg_coef, temp). Ignored by other backends; see
     # :class:`speaker_helper.backends.kyutai.KyutaiEngine`.
     kyutai: dict[str, Any] = field(default_factory=dict)
+    # Backend-specific knobs for the ``audio8`` engine (repo, temperature,
+    # top_p, top_k, seed, max_tokens). Ignored by other backends; see
+    # :class:`speaker_helper.backends.audio8.Audio8Engine`.
+    audio8: dict[str, Any] = field(default_factory=dict)
     # Long-text chunking (see :mod:`speaker_helper.chunking`). Keys:
     # ``enabled`` (default True), ``llm`` (default True — let the local LLM
     # place chunk boundaries at discourse breaks; greedy packing otherwise),

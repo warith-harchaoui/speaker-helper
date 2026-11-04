@@ -10,18 +10,22 @@ the CLI, the evaluation layer — talks only to the :class:`TTSEngine` protocol
 defined here. Swapping or adding a backend is therefore a local change: write a
 class with four coroutines and register it.
 
-Five backends ship in-tree:
+Six backends ship in-tree. None is "the default" on its own: ``backend="auto"``
+resolves from the operating mode (offline → chatterbox, Turbo for English;
+streaming → kokoro — see :func:`resolve_auto`).
 
-* ``kokoro`` — the default. In this process, no server, 54 built-in voices.
+* ``kokoro`` — in this process, no server, 54 built-in voices.
 * ``openvoice``, ``chatterbox`` — cloning, from a reference recording.
 * ``kyutai`` — native French (and English) from Kyutai's 1.6B model; voices
   picked from a published embedding bank rather than cloned.
+* ``audio8`` — Edge0's realism-tuned 0.6B cloner (MLX, Apple Silicon),
+  always conditioned on a reference — the bundled female one by default.
 * ``mock`` — :class:`MockEngine`, a deterministic, dependency-light
   synthesiser that needs no server and no model. It makes the test suite and
   the evaluation layer runnable in CI, and it proves the abstraction: the
   same code paths drive any backend, narration included.
 
-A fifth used to ship — a REST client for a desktop application on a fixed
+Another used to ship — a REST client for a desktop application on a fixed
 port. It was removed once the default ran in-process: an engine you have to
 install, launch and keep alive, to do what a 300 MB file does here, is not a
 second option but a second way to fail.
@@ -272,6 +276,16 @@ def _kyutai_factory(settings: Settings) -> TTSEngine:
 
 
 register_backend("kyutai", _kyutai_factory)
+
+
+def _audio8_factory(settings: Settings) -> TTSEngine:
+    """Lazily build the Audio8 cloning backend (MLX)."""
+    from speaker_helper.backends.audio8 import Audio8Engine
+
+    return Audio8Engine(settings)
+
+
+register_backend("audio8", _audio8_factory)
 
 
 # ---------------------------------------------------------------------------

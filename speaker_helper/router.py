@@ -109,6 +109,7 @@ ENGINE_BACKENDS: dict[str, str] = {
     "chatterbox": "chatterbox",
     "kyutai": "kyutai",
     "openvoice": "openvoice",
+    "audio8": "audio8",
 }
 
 # Owner-ratified offline engine, per language. This is a DECISION, not a

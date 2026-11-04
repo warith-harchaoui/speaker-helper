@@ -40,6 +40,7 @@ TTS_QUALITY_PRIORS: dict[str, float] = {
     "chatterbox_turbo": 0.82,
     "chatterbox": 0.90,
     "kyutai": 0.88,
+    "audio8": 0.86,
     "qwen3_tts": 0.88,
     "qwen_customvoice": 0.90,
     "f5": 0.86,
@@ -69,6 +70,13 @@ _DEFAULT_PRIOR = 0.80
 # pairwise-listening scores (quality_source="measured_human") are the only
 # measurement meant to supersede these values.
 #
+# * **audio8** (added 2026-11-04) is a candidate awaiting the owner's ear, not
+#   a pick: its own paper reports CV3 WER fr 7.94% / en 2.91%, and on our
+#   bench its French clone of the bundled reference measured a TitaNet
+#   similarity of 0.72 (chatterbox: 0.66). Its prior sits deliberately below
+#   chatterbox's in every language, so adding the backend changes no routing
+#   decision until a listening says otherwise.
+#
 # The ``"*"`` key is a per-engine floor for every *other* language: kyutai
 # only speaks French and English, and would read Spanish with a
 # French/English tongue — so outside fr/en it must lose to chatterbox's
@@ -76,6 +84,7 @@ _DEFAULT_PRIOR = 0.80
 TTS_QUALITY_PRIORS_BY_LANG: dict[str, dict[str, float]] = {
     "kyutai": {"fr": 0.92, "en": 0.85, "*": 0.30},
     "chatterbox": {"fr": 0.78, "en": 0.90},
+    "audio8": {"fr": 0.77, "en": 0.86},
 }
 
 # Public arena Elo — the quality criterion the owner ratified for the
@@ -95,6 +104,9 @@ PUBLIC_ELO: dict[str, float | None] = {
     "kokoro": 1466.0,  # ±24, statistically tied with chatterbox
     "kyutai": None,  # not listed on any public arena (checked 2026-10-26)
     "openvoice": None,
+    # A LinkedIn announcement says "#1 on the Hugging Face TTS Arena"; no arena
+    # page, model card, repository or the paper shows it (checked 2026-11-04).
+    "audio8": None,
 }
 
 #: As-of date of the PUBLIC_ELO pull — Elo moves with every vote, so the date

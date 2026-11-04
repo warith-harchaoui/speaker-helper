@@ -10,6 +10,8 @@ also *skips* — never fails — when its prerequisite is absent, so
 * kokoro: needs the ~340 MB ONNX weights already installed.
 * kyutai: needs the ~3.4 GB model already in the Hugging Face cache (no test
   is allowed to download it).
+* audio8: needs mlx-audio >= 0.6.4 on a Mac and the ~1.7 GB 4-bit MLX model
+  already in the Hugging Face cache.
 * the lexicon LLM tier: needs a running Ollama with the model
   ``best-engine-ai-helper`` resolves.
 
@@ -55,6 +57,15 @@ def _chatterbox_cached() -> bool:
     if importlib.util.find_spec("chatterbox") is None:
         return False
     return (_HF_HUB / "models--ResembleAI--chatterbox").exists()
+
+
+def _audio8_cached() -> bool:
+    """Whether audio8 can run here without downloading anything."""
+    from speaker_helper.backends.audio8 import check_install
+
+    if check_install() != 0:
+        return False
+    return (_HF_HUB / "models--nativ-community--Audio8-TTS-Realistic-0.6b-4bit").exists()
 
 
 def _ollama_up() -> bool:
@@ -160,3 +171,28 @@ def test_chatterbox_short_text_fails_with_a_diagnosis_not_a_torch_error() -> Non
         asyncio.run(engine.synthesize("Un.", language="fr"))
     # And the neighbouring length still works, so the guard is not over-broad.
     assert asyncio.run(engine.synthesize("Oui.", language="fr")).duration_s > 0.0
+
+
+@pytest.mark.slow
+@pytest.mark.skipif(not _audio8_cached(), reason="audio8 runtime or weights not available")
+def test_audio8_speaks_french_in_the_bundled_female_voice() -> None:
+    """A real French take, cloned from the bundled reference, at 24 kHz."""
+    import io
+
+    import numpy as np
+    import soundfile as sf
+
+    from speaker_helper.backends.audio8 import Audio8Engine
+
+    engine = Audio8Engine(
+        Settings.from_mapping(
+            {"backend": "audio8", "language": "fr", "lexicon": {"enabled": False}}
+        )
+    )
+    result = asyncio.run(engine.synthesize("Bonjour, ceci est un essai.", language="fr"))
+    assert result.sample_rate == 24_000
+    assert result.duration_s > 0.8
+    assert result.voice_id == "ref-fr-female"
+    samples, rate = sf.read(io.BytesIO(result.wav_bytes))
+    assert rate == 24_000 and np.max(np.abs(samples)) > 0.05
+    asyncio.run(engine.aclose())

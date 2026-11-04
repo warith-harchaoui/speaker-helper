@@ -35,10 +35,11 @@ minimal web GUI — runnable locally (conda + pip) or as a Docker server.
   23-language Multilingual model elsewhere — and **streaming goes to
   `kokoro`**, which synthesises faster than real time on CPU (RTF well below
   1.0, no GPU). Name a backend explicitly and it is honoured as-is.
-- **Backend-agnostic, and nothing to launch.** The engine is an implementation detail behind a `TTSEngine` protocol, and every backend runs **in this process**. Five ship:
+- **Backend-agnostic, and nothing to launch.** The engine is an implementation detail behind a `TTSEngine` protocol, and every backend runs **in this process**. Six ship:
   - `kokoro` — ONNX Runtime, 54 voices; the streaming default;
   - `openvoice` and `chatterbox` — cloning from a recording. The chatterbox backend auto-picks its Turbo model for English and its 23-language Multilingual model elsewhere;
   - `kyutai` — native French and English from Kyutai's 1.6B model, voices from a published embedding bank;
+  - `audio8` — Edge0's realism-tuned 0.6B cloner (Apache-2.0, 23 languages) through `mlx-audio` on Apple Silicon, always conditioned on a reference recording and its transcript — the bundled female one by default;
   - `mock` — deterministic, for tests and CI.
 
   A new backend is one `register_backend` call.
@@ -91,8 +92,8 @@ flowchart LR
         router["router<br/>condition → engine + mode"]:::core
         eval["evaluation<br/>RTF · anomalies · WER/chrF"]:::eval
         subgraph BE["backends, selected by settings.backend"]
-            kokoro["kokoro — default<br/>ONNX Runtime · 54 voices"]:::engine
-            clone["openvoice · chatterbox<br/>cloning · turbo/multilingual"]:::engine
+            kokoro["kokoro — streaming default<br/>ONNX Runtime · 54 voices"]:::engine
+            clone["openvoice · chatterbox · audio8<br/>cloning · chatterbox = offline default"]:::engine
             kyutai["kyutai<br/>native FR+EN · voice bank"]:::engine
             mock["mock<br/>deterministic · no model"]:::engine
         end

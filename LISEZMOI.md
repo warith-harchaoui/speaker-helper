@@ -39,10 +39,11 @@ Python typée, une CLI, une API REST et une GUI web minimale. En local
   `kokoro`**, qui synthétise plus vite que le temps réel sur CPU (RTF nettement
   sous 1.0, sans GPU). Nommez un backend explicitement et il est respecté tel
   quel.
-- **Agnostique du moteur, puis rien à lancer.** Le moteur est un détail d'implémentation derrière le protocole `TTSEngine`, puis chaque backend tourne **dans ce processus**. Cinq sont livrés :
+- **Agnostique du moteur, puis rien à lancer.** Le moteur est un détail d'implémentation derrière le protocole `TTSEngine`, puis chaque backend tourne **dans ce processus**. Six sont livrés :
   - `kokoro` — ONNX Runtime, 54 voix ; le défaut du streaming ;
   - `openvoice` puis `chatterbox` — clonage depuis un enregistrement. Le backend chatterbox choisit tout seul son modèle Turbo pour l'anglais, son modèle Multilingual — 23 langues — ailleurs ;
   - `kyutai` — français puis anglais natifs du modèle 1.6B de Kyutai, voix tirées d'une banque d'embeddings publiée ;
+  - `audio8` — le cloneur 0.6B d'Edge0 entraîné au réalisme (Apache-2.0, 23 langues), via `mlx-audio` sur Apple Silicon, toujours conditionné par un enregistrement de référence et sa transcription — la référence féminine fournie par défaut ;
   - `mock` — déterministe, pour les tests puis la CI.
 
   Ajouter un backend, c'est un seul appel à `register_backend`.
@@ -95,8 +96,8 @@ flowchart LR
         router["routeur<br/>condition → moteur + mode"]:::core
         eval["évaluation<br/>RTF · anomalies · WER/chrF"]:::eval
         subgraph BE["backends, choisis par settings.backend"]
-            kokoro["kokoro — défaut<br/>ONNX Runtime · 54 voix"]:::engine
-            clone["openvoice · chatterbox<br/>clonage · turbo/multilingue"]:::engine
+            kokoro["kokoro — défaut du streaming<br/>ONNX Runtime · 54 voix"]:::engine
+            clone["openvoice · chatterbox · audio8<br/>clonage · chatterbox = défaut offline"]:::engine
             kyutai["kyutai<br/>FR+EN natifs · banque de voix"]:::engine
             mock["mock<br/>déterministe · sans modèle"]:::engine
         end

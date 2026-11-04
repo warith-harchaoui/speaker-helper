@@ -603,7 +603,10 @@ def _run(ctx: click.Context, command: str, **fields: object) -> None:
 @click.option(
     "--backend",
     default=None,
-    help="TTS backend: kokoro (default), openvoice, chatterbox or mock.",
+    help=(
+        "TTS backend: auto (default: chatterbox offline, kokoro streaming), "
+        "kokoro, chatterbox, kyutai, audio8, openvoice or mock."
+    ),
 )
 @click.option("--voice-sample", default=None, help="Reference recording to clone.")
 @click.option("--engine", default=None, help="Engine/model id (e.g. kokoro).")
