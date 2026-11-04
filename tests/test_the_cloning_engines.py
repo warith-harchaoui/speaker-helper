@@ -20,7 +20,7 @@ import asyncio
 
 import pytest
 
-from speaker_helper.backends.audio8 import Audio8Engine, resample
+from speaker_helper.backends.audio8 import Audio8Engine, Qwen3TTSEngine, resample
 from speaker_helper.backends.chatterbox import (
     EMOTION_EXAGGERATION_BASE,
     PACE_CFG_WEIGHT,
@@ -86,7 +86,9 @@ def test_the_neutral_emotion_maps_to_the_default_style() -> None:
 # ── Both: cloning needs a reference, and says so ───────────────────────────
 
 
-@pytest.mark.parametrize("engine_class", [ChatterboxEngine, OpenVoiceEngine, Audio8Engine])
+@pytest.mark.parametrize(
+    "engine_class", [ChatterboxEngine, OpenVoiceEngine, Audio8Engine, Qwen3TTSEngine]
+)
 def test_cloning_with_no_sample_is_refused(engine_class: type) -> None:
     """An empty clone would silently fall back to the default speaker.
 
@@ -98,7 +100,9 @@ def test_cloning_with_no_sample_is_refused(engine_class: type) -> None:
         asyncio.run(engine.clone_voice("someone", []))
 
 
-@pytest.mark.parametrize("engine_class", [ChatterboxEngine, OpenVoiceEngine, Audio8Engine])
+@pytest.mark.parametrize(
+    "engine_class", [ChatterboxEngine, OpenVoiceEngine, Audio8Engine, Qwen3TTSEngine]
+)
 def test_health_names_what_is_missing_without_loading_a_model(engine_class: type) -> None:
     """A probe that pays for torch is not a probe."""
     report = asyncio.run(engine_class(Settings()).health())
@@ -217,3 +221,22 @@ def test_audio8_resampling_keeps_duration_and_pitch() -> None:
     peak_hz = np.argmax(np.abs(np.fft.rfft(out))) * 24_000 / out.size
     assert peak_hz == pytest.approx(440.0, abs=1.0)
     assert np.max(np.abs(out)) == pytest.approx(1.0, abs=0.01)
+
+
+def test_qwen3tts_shares_the_contract_under_its_own_name() -> None:
+    """Same female default and transcript rule, its own name and knobs."""
+    engine = Qwen3TTSEngine(Settings.from_mapping({"backend": "qwen3tts", "language": "fr"}))
+    listing = asyncio.run(engine.list_voices())
+    assert listing.engine == "qwen3tts"
+    assert [(v.voice_id, v.gender) for v in listing.voices] == [(DEFAULT_CLONE_NAME, "female")]
+    assert asyncio.run(engine.health())["engine"] == "qwen3tts"
+
+
+def test_qwen3tts_names_the_language_and_sends_only_the_knobs_set() -> None:
+    """Qwen3 wants "french", not "fr"; unset sampling knobs stay the model's."""
+    engine = Qwen3TTSEngine(
+        Settings.from_mapping({"backend": "qwen3tts", "qwen3tts": {"temperature": 0.5}})
+    )
+    assert engine._language_kwargs("fr") == {"lang_code": "french"}
+    assert engine._language_kwargs("xx") == {"lang_code": "auto"}
+    assert engine._sampling == {"temperature": 0.5, "seed": 0}

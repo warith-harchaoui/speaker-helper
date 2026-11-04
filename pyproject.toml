@@ -110,6 +110,10 @@ audio8 = [
     "mlx-audio>=0.6.4; sys_platform == 'darwin'",
     "numpy>=1.24.0",
 ]
+# Qwen3-TTS through the same runtime and the same cloning contract.
+qwen3tts = [
+    "speaker-helper[audio8]",
+]
 # The pronunciation lexicon's LLM tier: derive missing respellings once with
 # the local model resolved through best-engine-ai-helper (served by Ollama).
 # Optional — hand-written `ipa:`/`respelling:` entries need none of this.

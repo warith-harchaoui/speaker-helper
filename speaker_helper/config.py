@@ -160,6 +160,8 @@ class Settings:
     # top_p, top_k, seed, max_tokens). Ignored by other backends; see
     # :class:`speaker_helper.backends.audio8.Audio8Engine`.
     audio8: dict[str, Any] = field(default_factory=dict)
+    # Same knobs for the ``qwen3tts`` engine (Qwen3-TTS through mlx-audio).
+    qwen3tts: dict[str, Any] = field(default_factory=dict)
     # Backend-specific knobs for the ``elevenlabs`` cloud engine (model,
     # voice_by_lang, stability, similarity_boost, style, seed, base_url,
     # timeout_s; api_key only as a fallback to ELEVENLABS_API_KEY). See

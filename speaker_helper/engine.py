@@ -10,7 +10,7 @@ the CLI, the evaluation layer — talks only to the :class:`TTSEngine` protocol
 defined here. Swapping or adding a backend is therefore a local change: write a
 class with four coroutines and register it.
 
-Seven backends ship in-tree. None is "the default" on its own: ``backend="auto"``
+Eight backends ship in-tree. None is "the default" on its own: ``backend="auto"``
 resolves from the operating mode (offline → chatterbox, Turbo for English;
 streaming → kokoro — see :func:`resolve_auto`).
 
@@ -20,6 +20,8 @@ streaming → kokoro — see :func:`resolve_auto`).
   picked from a published embedding bank rather than cloned.
 * ``audio8`` — Edge0's realism-tuned 0.6B cloner (MLX, Apple Silicon),
   always conditioned on a reference — the bundled female one by default.
+* ``qwen3tts`` — Qwen3-TTS 0.6B through the same MLX cloning contract; the
+  closest clone measured here, at the edge of real time.
 * ``elevenlabs`` — the paid cloud cells (``eleven_v4`` offline,
   ``eleven_v4_turbo`` streaming). The only backend that sends text off the
   machine, so ``auto`` never picks it.
@@ -289,6 +291,16 @@ def _audio8_factory(settings: Settings) -> TTSEngine:
 
 
 register_backend("audio8", _audio8_factory)
+
+
+def _qwen3tts_factory(settings: Settings) -> TTSEngine:
+    """Lazily build the Qwen3-TTS cloning backend (MLX)."""
+    from speaker_helper.backends.audio8 import Qwen3TTSEngine
+
+    return Qwen3TTSEngine(settings)
+
+
+register_backend("qwen3tts", _qwen3tts_factory)
 
 
 def _elevenlabs_factory(settings: Settings) -> TTSEngine:
