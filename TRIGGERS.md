@@ -9,7 +9,8 @@ inverse of `vocal-helper`: text in, audio out. It runs locally, with no
 server, and picks its engine from the **mode** (`backend: auto`, the default):
 offline → Chatterbox (Turbo for English, Multilingual for every other
 language), streaming → Kokoro. Other engines are one `--backend` away: Kyutai
-(native French), Audio8 (realism-tuned cloner, Apple Silicon), OpenVoice, and
+(native French), Audio8 (realism-tuned cloner, Apple Silicon), Qwen3-TTS (the
+closest clone, Apple Silicon), OpenVoice, and
 ElevenLabs for the paid cloud cells (named explicitly, never by default). It
 clones a voice from a reference sample, speaks with a **female voice** in every
 language unless told otherwise, applies the **pronunciation lexicon** on every

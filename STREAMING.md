@@ -57,6 +57,19 @@ Kokoro 1066, Chatterbox 1027. Les deux arènes racontent la même chose :
 **en local ouvert, chatterbox et kokoro sont le haut du panier, au coude à
 coude.**
 
+### Relevé du 2026-11-04
+
+Même source (`/api/leaderboard`), même ordre en tête des moteurs locaux :
+**Chatterbox 1468 ± 21**, **Kokoro v1.0 1465 ± 24** (désormais
+`active: false`, sorti de la rotation : sa note est figée). Le 1726 d'Audio8
+relevé ci-dessus a été **retiré par l'arène** : l'entrée affiche 1663 ± 51 sur
+222 votes, `suspended: true`, motif **« vote manipulation »** (suspendu le
+2026-10-30). C'est ce chiffre que reprend le « #1 du HF TTS Arena » de son post
+de lancement ; `PUBLIC_ELO` lui donne `None`. Côté Artificial Analysis
+(échelle ancrée à 1000 sur Zonos, non comparable) : Fish Drama 3 1272,
+Breeze TTS 2 1226, Ming-3.0-tts 1189, Voxtral TTS 1089, Kokoro 1061,
+Chatterbox 1022. Toujours aucune arène française.
+
 ## 3. Le paysage des moteurs *streamables* (littérature)
 
 Ce que l'architecture promet, avant mesure :
@@ -136,6 +149,15 @@ Inscription (version 0.11.0, branche `research`) :
   **La case streaming n'est pas touchée** par cette révision : son critère
   est l'Elo public croisé au RTF, et kokoro y reste le seul moteur à la fois
   classé en arène et sous le plafond anti-underrun de 0,8.
+
+### Nouveaux candidats mesurés (2026-11-04)
+
+Qwen3-TTS 0.6B (Apache-2.0, MLX 8 bits) : RTF streaming 0,90, premier son
+0,87 s, clone le plus fidèle du dépôt (similarité 0,82) ; 4 bits : 0,77.
+Ming-3.0-tts 0.5B (MIT) : 1,19, premier son 6,1 s. Ni l'un ni l'autre n'est
+nettement sous le plafond de 0,8, et aucun n'a d'Elo public au-dessus de
+kokoro : **le verdict tient**. Qwen3-TTS est disponible comme backend
+`qwen3tts` pour l'écoute (STUDY.md §8 quinquies).
 
 ## 6. Ce qui ferait bouger le verdict
 

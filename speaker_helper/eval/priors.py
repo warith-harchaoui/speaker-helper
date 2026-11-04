@@ -90,28 +90,37 @@ TTS_QUALITY_PRIORS_BY_LANG: dict[str, dict[str, float]] = {
 # Public arena Elo — the quality criterion the owner ratified for the
 # STREAMING (online) condition: human pairwise votes, aggregated as Elo, from
 # the community TTS Arena V2 (https://huggingface.co/spaces/TTS-AGI/TTS-Arena-V2,
-# pulled live 2026-10-26). Two honesty notes travel with the numbers:
+# its /api/leaderboard JSON, pulled 2026-11-04; previous pull 2026-10-26 gave
+# 1469 / 1466 — the order has not moved). Three honesty notes travel with the
+# numbers:
 #
 # * the arena is English-centric — no public arena ranks open engines in
-#   French as of 2026-10-26 (Artificial Analysis' French arena lists closed
-#   models only), so for French this axis is an English-quality proxy;
+#   French (rechecked 2026-11-04: neither TTS Arena V2 nor Artificial
+#   Analysis has a French board), so for French this axis is an
+#   English-quality proxy;
 # * an engine absent from every public arena has **no evidence under this
 #   criterion** (``None``) — a documented data gap, not a zero and not a
 #   licence to fall back on a flattering prior. The router ranks unranked
-#   engines below every ranked one in the online condition.
+#   engines below every ranked one in the online condition;
+# * a rating the arena itself has struck is not evidence either: Audio8 shows
+#   1663 ±51 on 222 votes, ``suspended: true``, reason "vote manipulation"
+#   (suspended 2026-10-30). Its launch post's "#1 on the Hugging Face TTS
+#   Arena" is that struck rating.
+#
+# Two readings of the JSON to know about: the arena flags Chatterbox
+# ``open: false`` (its weights are MIT on GitHub and Hugging Face all the same),
+# and Kokoro ``active: false`` — out of rotation, so its rating is now frozen.
 PUBLIC_ELO: dict[str, float | None] = {
-    "chatterbox": 1469.0,  # ±20, the arena's top open-weights entry
-    "kokoro": 1466.0,  # ±24, statistically tied with chatterbox
-    "kyutai": None,  # not listed on any public arena (checked 2026-10-26)
+    "chatterbox": 1468.0,  # ±21, 1,810 votes
+    "kokoro": 1465.0,  # ±24, 1,033 votes, statistically tied with chatterbox
+    "kyutai": None,  # not listed on any public arena (checked 2026-11-04)
     "openvoice": None,
-    # A LinkedIn announcement says "#1 on the Hugging Face TTS Arena"; no arena
-    # page, model card, repository or the paper shows it (checked 2026-11-04).
-    "audio8": None,
+    "audio8": None,  # struck by the arena for vote manipulation (see above)
 }
 
 #: As-of date of the PUBLIC_ELO pull — Elo moves with every vote, so the date
 #: is part of the claim (same rule as LANDSCAPE.md's licence table).
-PUBLIC_ELO_AS_OF: str = "2026-10-26"
+PUBLIC_ELO_AS_OF: str = "2026-11-04"
 
 
 def elo_to_unit(elo: float) -> float:
@@ -134,8 +143,8 @@ def elo_to_unit(elo: float) -> float:
 
     Examples
     --------
-    >>> elo_to_unit(1466.0)
-    0.466
+    >>> elo_to_unit(1465.0)
+    0.465
     >>> elo_to_unit(2200.0)
     1.0
     """

@@ -28,6 +28,7 @@ lecture des fiches de modèle publiées.
 | Kokoro | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐ | ⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
 | Chatterbox | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐ | ⭐⭐ | ⭐⭐⭐⭐⭐ |
 | Kyutai TTS | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐ | ⭐⭐ | ⭐ | ⭐⭐⭐ | ⭐⭐ | ⭐ | ⭐⭐ | ⭐⭐⭐⭐ |
+| Audio8-TTS-Realistic | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐ | ⭐⭐⭐ | ⭐⭐ | ⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
 | CosyVoice 2/3 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐ | ⭐ | ⭐⭐⭐⭐⭐ |
 | F5-TTS | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐ | ⭐⭐⭐ | ⭐⭐ | ⭐ | ⭐⭐ | ⭐ |
 | OpenVoice | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐ | ⭐⭐⭐ | ⭐⭐ | ⭐ | ⭐⭐ | ⭐⭐⭐⭐⭐ |
@@ -85,7 +86,10 @@ La carte est un résumé en 2D des 10 critères : à lire comme une forme, pas
 comme un classement. « speaker-helper » se situe dans le coin en haut à
 droite. Les axes se lisent **Horizontal : Authenticité ↔ Efficacité** (~34 %
 de la variance) et **Vertical : Simplicité ↔ Polyvalence** (~25 %) — soit
-~60 % du tableau à eux deux.
+~59 % du tableau à eux deux. Audio8-TTS-Realistic, ajouté le 2026-11-04, se
+place dans le groupe des cloneurs, près de Bark et de F5-TTS : fort sur le
+clonage, la licence et le hors-ligne, retenu par une sortie en bloc seulement
+et l'absence d'entrée phonétique.
 
 L'axe horizontal distingue principalement les solutions qui misent sur une production rapide et efficace de la parole, comme speaker-helper, Piper et Kokoro, de celles qui privilégient une reproduction plus authentique, même au prix d'un processus plus lent. L'installation facile, la maîtrise de la prononciation et l'ergonomie des pipelines d'IA sont des facteurs clés qui orientent les options vers l'efficacité, tandis que le clonage de voix et la maîtrise de l'expressivité, au contraire, les rapprochent de l'authenticité. On observe que speaker-helper, bien qu'étant le leader, n'est pas le plus authentique, mais excelle dans sa capacité à produire de la parole rapidement et efficacement.
 
@@ -98,9 +102,10 @@ Enfin, on remarque que plusieurs solutions se positionnent dans le coin supérie
 
 `speaker-helper` n'est pas un énième modèle de TTS : c'est la **boîte à outils
 autour** des modèles. Il n'atteint un moteur concret qu'à travers le protocole
-`TTSEngine`, si bien que Kokoro, Chatterbox, OpenVoice et un `mock` déterministe
-se trouvent tous derrière le même `Speaker` typé — et tournent tous dans le
-processus appelant : `settings.backend` en choisit un dans un registre et il n'y
+`TTSEngine`, si bien que Kokoro, Chatterbox, Kyutai, Audio8, OpenVoice et un
+`mock` déterministe se trouvent tous derrière le même `Speaker` typé — et
+tournent tous dans le processus appelant (ElevenLabs, seul backend cloud,
+uniquement quand on le nomme) : `settings.backend` en choisit un dans un registre et il n'y
 a aucun serveur à lancer. Sur ce cœur neutre, il ajoute ce qu'un checkpoint de recherche
 ou un simple script d'inférence ne livrent jamais : un **routeur** qui transforme
 une *condition* de fonctionnement (temps réel en ligne ou hors-ligne) en
@@ -208,6 +213,12 @@ d'un seul fichier.
   (delayed-streams, ~220 ms annoncés) plutôt qu'après. Acceptez le marché : une
   banque de voix publiée au lieu du clonage de votre propre référence, et
   l'attribution CC-BY dans votre produit.
+- **Audio8-TTS-Realistic** — vous voulez le clone hors ligne le plus vivant
+  qu'un modèle de 0,6 B puisse donner, entraîné contre un critique de réalisme,
+  code et poids en Apache-2.0, le français parmi ses 23 langues. Acceptez qu'il
+  produise en bloc seulement, exige la transcription exacte de sa référence et
+  n'ait pas d'entrée phonétique ; sur Mac, speaker-helper le fait tourner via
+  `mlx-audio` comme backend `audio8`.
 - **CosyVoice 2/3** — clonage zero-shot à partir de trois secondes environ,
   streaming de la classe ~150 ms, consignes de style en langue naturelle et
   licence Apache-2.0 : le jeu de fonctionnalités le plus large parmi les
@@ -273,6 +284,8 @@ quelqu'un : la date fait partie de l'affirmation.
 - [9 best open source text-to-speech models in 2026](https://www.bland.ai/blog/best-open-source-text-to-speech-model) — Bland
 - [Open-sourcing TADA](https://www.hume.ai/blog/opensource-tada) — Hume AI
 - [Faster IndexTTS-2: accelerating and streaming autoregressive zero-shot TTS](https://arxiv.org/html/2607.21042v1) — arXiv
+- [Training a Compact, Strong, and Realistic Text-to-Speech Model](https://arxiv.org/abs/2610.14776) — Edge0 (Audio8, ligne ajoutée et vérifiée le **2026-11-04** ; le « #1 du HF TTS Arena » de son post de lancement ne figure sur aucune page d'arène, carte de modèle, dépôt ni dans le papier)
+- [Modèles ElevenLabs](https://elevenlabs.io/docs/models) — lu le 2026-11-04 pour le backend `elevenlabs`
 - [Deploying open-source TTS on GPU cloud](https://www.spheron.network/blog/deploy-open-source-tts-gpu-cloud-2026/) — Spheron
 
 ## Idées à reprendre

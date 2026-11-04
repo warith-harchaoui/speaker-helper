@@ -47,8 +47,26 @@ to [Semantic Versioning](https://semver.org/).
   ear: fix one per language with `elevenlabs.voice_by_lang`. Tested against a
   fake service; never run against the real one (no key yet).
 
+- **A `qwen3tts` backend: Qwen3-TTS 0.6B (Apache-2.0) through the same MLX
+  cloning contract as `audio8`** (bundled female reference, transcript
+  required, 24 kHz native). Measured on an M2 Max: the closest clone in the
+  repository (TitaNet similarity 0.82 to the reference; Audio8 0.72,
+  chatterbox 0.66), streaming RTF 0.77–0.90, first audio ~0.7–0.9 s. That is
+  *on* the 0.8 real-time ceiling, not under it, and its public Elo is below
+  kokoro's, so the streaming route stays kokoro; the backend is there so the
+  owner's ear can decide. `pip install 'speaker-helper[qwen3tts]'`. Ming-3.0
+  (RTF 1.19) was measured and not added.
+
 ### Changed
 
+- **`PUBLIC_ELO` re-pulled on 2026-11-04** from TTS Arena V2's own JSON:
+  Chatterbox 1468 ± 21, Kokoro 1465 ± 24 — same order, so no streaming route
+  moves. Audio8 stays `None`: the arena shows it at 1663 ± 51 but
+  **suspended for "vote manipulation"** since 2026-10-30, which is where its
+  launch post's "#1 on the HF TTS Arena" comes from. STREAMING.md §2 and
+  STUDY.md §8 quinquies carry the dated readings.
+- **LANDSCAPE / PAYSAGE**: an Audio8-TTS-Realistic row, scored on the same
+  rubric; positioning maps regenerated with `standpoint`.
 - `TRIGGERS.md`, the skill and the CLI's `--backend` help no longer say
   "Kokoro by default": the default is `backend: auto`, resolved from the mode
   (offline → chatterbox, streaming → kokoro), and they now name `kyutai`,

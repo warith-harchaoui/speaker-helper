@@ -101,6 +101,8 @@ block landed.
 - `kyutai`
 - `audio8`
 - `Audio8-TTS-Realistic`
+- `qwen3tts`
+- `Qwen3-TTS`
 - `openvoice`
 - `elevenlabs`
 - `ElevenLabs`

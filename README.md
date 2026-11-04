@@ -35,11 +35,12 @@ minimal web GUI — runnable locally (conda + pip) or as a Docker server.
   23-language Multilingual model elsewhere — and **streaming goes to
   `kokoro`**, which synthesises faster than real time on CPU (RTF well below
   1.0, no GPU). Name a backend explicitly and it is honoured as-is.
-- **Backend-agnostic, and nothing to launch.** The engine is an implementation detail behind a `TTSEngine` protocol, and every local backend runs **in this process**. Seven ship:
+- **Backend-agnostic, and nothing to launch.** The engine is an implementation detail behind a `TTSEngine` protocol, and every local backend runs **in this process**. Eight ship:
   - `kokoro` — ONNX Runtime, 54 voices; the streaming default;
   - `openvoice` and `chatterbox` — cloning from a recording. The chatterbox backend auto-picks its Turbo model for English and its 23-language Multilingual model elsewhere;
   - `kyutai` — native French and English from Kyutai's 1.6B model, voices from a published embedding bank;
   - `audio8` — Edge0's realism-tuned 0.6B cloner (Apache-2.0, 23 languages) through `mlx-audio` on Apple Silicon, always conditioned on a reference recording and its transcript — the bundled female one by default;
+  - `qwen3tts` — Qwen3-TTS 0.6B (Apache-2.0) through the same MLX cloning contract; the closest clone measured here, at the edge of real time;
   - `elevenlabs` — the paid cloud cells: `eleven_v4` offline, `eleven_v4_turbo` streaming, the lexicon sent as inline IPA where v4 reads it. The only backend that sends text off the machine, so `auto` never picks it; it needs `ELEVENLABS_API_KEY`;
   - `mock` — deterministic, for tests and CI.
 

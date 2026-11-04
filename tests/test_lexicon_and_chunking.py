@@ -480,7 +480,7 @@ def test_online_routing_ranks_quality_by_public_elo() -> None:
     assert pts["kokoro"].quality_source == "public_elo"
     assert pts["kokoro"].quality == elo_to_unit(PUBLIC_ELO["kokoro"])
     assert pts["chatterbox"].quality_source == "public_elo"
-    # kyutai is on no public arena (as of 2026-10-26): documented gap, not a prior.
+    # kyutai is on no public arena (rechecked 2026-11-04): documented gap, not a prior.
     assert pts["kyutai"].quality_source == "no_public_elo"
     assert pts["kyutai"].quality == 0.0
     # The offline catalogue is untouched by the Elo criterion.

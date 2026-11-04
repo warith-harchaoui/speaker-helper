@@ -27,6 +27,7 @@ model cards.
 | Kokoro | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐ | ⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
 | Chatterbox | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐ | ⭐⭐ | ⭐⭐⭐⭐⭐ |
 | Kyutai TTS | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐ | ⭐⭐ | ⭐ | ⭐⭐⭐ | ⭐⭐ | ⭐ | ⭐⭐ | ⭐⭐⭐⭐ |
+| Audio8-TTS-Realistic | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐ | ⭐⭐⭐ | ⭐⭐ | ⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
 | CosyVoice 2/3 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐ | ⭐ | ⭐⭐⭐⭐⭐ |
 | F5-TTS | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐ | ⭐⭐⭐ | ⭐⭐ | ⭐ | ⭐⭐ | ⭐ |
 | OpenVoice | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐ | ⭐⭐⭐ | ⭐⭐ | ⭐ | ⭐⭐ | ⭐⭐⭐⭐⭐ |
@@ -80,7 +81,10 @@ cells honestly, and a fabricated row would be worse than a missing one.
 The map is a 2-D summary of the ten criteria, so read it as a shape, not a
 scoreboard. `speaker-helper` is at the top-right corner. The axes read
 **Horizontal: Resourceful ↔ Adaptable** (~34% of the variance) and
-**Vertical: Practical ↔ Articulate** (~25%) — together ~60% of the table.
+**Vertical: Practical ↔ Articulate** (~25%) — together ~59% of the table.
+Audio8-TTS-Realistic, added on 2026-11-04, lands inside the cloning group next
+to Bark and F5-TTS: strong on cloning, licence and offline use, held back by
+batch-only output and no phoneme input.
 
 The map reveals a clear distinction between options that prioritize ease of use and those that emphasize flexibility. The horizontal axis separates those that excel at readily available features – like straightforward installation or built-in multilingual support – from those that offer a greater degree of customization and adaptability to varied conditions. Several options, including Tortoise-TTS, F5-TTS, IndexTTS 2.5, Fish Speech, Chatterbox, OpenVoice, Hume TADA, CosyVoice 2/3, Bark, Coqui XTTS, Kyutai TTS, and pyttsx3, cluster on the left, demonstrating a focus on resourceful capabilities. Conversely, speaker-helper, Piper, Kokoro, gTTS, and ElevenLabs (cloud) are positioned on the right, highlighting their adaptability.
 
@@ -93,9 +97,10 @@ Notably, speaker-helper leads in adaptability and articulation, occupying the to
 
 `speaker-helper` is not another TTS model — it is the **toolbox around** the
 models. It reaches a concrete engine only through a `TTSEngine` protocol, so
-Kokoro, Chatterbox, OpenVoice and a deterministic `mock` all sit behind the same
-typed `Speaker`, and all of them run in the calling process: `settings.backend`
-picks one out of a registry, and there is no server to start. On top of that
+Kokoro, Chatterbox, Kyutai, Audio8, OpenVoice and a deterministic `mock` all sit
+behind the same typed `Speaker`, and all of them run in the calling process
+(ElevenLabs, the one cloud backend, only when named): `settings.backend` picks
+one out of a registry, and there is no server to start. On top of that
 neutral core it adds the things a research checkpoint or a bare inference script
 never ship: a **router** that turns an operating *condition* (online real-time
 vs. offline) into a concrete engine + mode from measured quality↔speed evidence,
@@ -191,6 +196,11 @@ neural engines rather than a one-file OS shim.
   ~220 ms announced) rather than after. Accept the trade: a published voice
   bank instead of cloning your own reference, and CC-BY attribution in your
   product.
+- **Audio8-TTS-Realistic** — you want the most lifelike offline clone a 0.6B
+  model can give, trained against a realism critic, with Apache-2.0 code and
+  weights and French among its 23 languages. Accept that it is batch-only, needs
+  the exact transcript of its reference, and has no phoneme input; on a Mac
+  speaker-helper runs it through `mlx-audio` as the `audio8` backend.
 - **CosyVoice 2/3** — zero-shot cloning from about three seconds, streaming in
   the ~150 ms class, natural-language style instructions, and Apache-2.0: the
   broadest feature set of the permissive cloners, at the price of a heavy
@@ -247,6 +257,8 @@ cost a user money, so the date is part of the claim.
 - [9 best open source text-to-speech models in 2026](https://www.bland.ai/blog/best-open-source-text-to-speech-model) — Bland
 - [Open-sourcing TADA](https://www.hume.ai/blog/opensource-tada) — Hume AI
 - [Faster IndexTTS-2: accelerating and streaming autoregressive zero-shot TTS](https://arxiv.org/html/2607.21042v1) — arXiv
+- [Training a Compact, Strong, and Realistic Text-to-Speech Model](https://arxiv.org/abs/2610.14776) — Edge0 (Audio8, row added and checked **2026-11-04**; the "#1 on the HF TTS Arena" claim of its launch post appears on no arena page, model card, repository or the paper)
+- [ElevenLabs models](https://elevenlabs.io/docs/models) — read 2026-11-04 for the `elevenlabs` backend
 - [Deploying open-source TTS on GPU cloud](https://www.spheron.network/blog/deploy-open-source-tts-gpu-cloud-2026/) — Spheron
 
 ## Ideas worth stealing

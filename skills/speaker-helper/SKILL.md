@@ -110,7 +110,8 @@ quality first, speed irrelevant) → Chatterbox, Turbo for English and
 Multilingual for everything else; streaming (real time) → Kokoro.
 `speaker-helper route` prints that decision with its evidence. Name a backend
 to override it — `kyutai` (native French), `audio8` (Apple Silicon,
-`pip install 'speaker-helper[audio8]'`), `openvoice`, `kokoro`, `chatterbox`,
+`pip install 'speaker-helper[audio8]'`), `qwen3tts` (Apple Silicon, the
+closest clone, near real time), `openvoice`, `kokoro`, `chatterbox`,
 or `elevenlabs` for the paid cloud (`ELEVENLABS_API_KEY`; `eleven_v4` offline,
 `eleven_v4_turbo` streaming). `auto` never picks the paid one.
 
@@ -126,8 +127,9 @@ speaker-helper --backend chatterbox --voice-sample ref.wav \
   synth "This should sound like the reference."
 ```
 
-Chatterbox, Audio8 and OpenVoice clone; with no sample, Chatterbox and Audio8
-clone the bundled female reference (CC BY 4.0). Audio8 also needs the exact
+Chatterbox, Audio8, Qwen3-TTS and OpenVoice clone; with no sample, Chatterbox,
+Audio8 and Qwen3-TTS clone the bundled female reference (CC BY 4.0). Audio8 and
+Qwen3-TTS also need the exact
 transcript (`ref.txt` beside the file, or derived with vocal-helper). Kokoro
 and Kyutai refuse a voice sample rather than ignoring it.
 Six to sixty seconds of clean speech is plenty — the reference supplies

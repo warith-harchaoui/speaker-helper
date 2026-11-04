@@ -39,11 +39,12 @@ Python typée, une CLI, une API REST et une GUI web minimale. En local
   `kokoro`**, qui synthétise plus vite que le temps réel sur CPU (RTF nettement
   sous 1.0, sans GPU). Nommez un backend explicitement et il est respecté tel
   quel.
-- **Agnostique du moteur, puis rien à lancer.** Le moteur est un détail d'implémentation derrière le protocole `TTSEngine`, puis chaque backend local tourne **dans ce processus**. Sept sont livrés :
+- **Agnostique du moteur, puis rien à lancer.** Le moteur est un détail d'implémentation derrière le protocole `TTSEngine`, puis chaque backend local tourne **dans ce processus**. Huit sont livrés :
   - `kokoro` — ONNX Runtime, 54 voix ; le défaut du streaming ;
   - `openvoice` puis `chatterbox` — clonage depuis un enregistrement. Le backend chatterbox choisit tout seul son modèle Turbo pour l'anglais, son modèle Multilingual — 23 langues — ailleurs ;
   - `kyutai` — français puis anglais natifs du modèle 1.6B de Kyutai, voix tirées d'une banque d'embeddings publiée ;
   - `audio8` — le cloneur 0.6B d'Edge0 entraîné au réalisme (Apache-2.0, 23 langues), via `mlx-audio` sur Apple Silicon, toujours conditionné par un enregistrement de référence et sa transcription — la référence féminine fournie par défaut ;
+  - `qwen3tts` — Qwen3-TTS 0.6B (Apache-2.0) avec le même contrat de clonage MLX ; le clone le plus fidèle mesuré ici, à la limite du temps réel ;
   - `elevenlabs` — les cases cloud payantes : `eleven_v4` en offline, `eleven_v4_turbo` en streaming, le lexique envoyé en IPA inline là où v4 le lit. Seul backend qui fait sortir le texte de la machine, donc `auto` ne le choisit jamais ; il demande `ELEVENLABS_API_KEY` ;
   - `mock` — déterministe, pour les tests puis la CI.
 

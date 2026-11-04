@@ -505,6 +505,112 @@ Le coût redouté (« charger 6 Go sur un simple `synth` ») n'existe pas à la
 construction : les backends sont instanciés paresseusement et ne chargent leurs
 poids qu'à la première synthèse. La CI reste donc légère.
 
+## 8 quinquies. Audio8, les chiffres dits en mots, le cloud (2026-11-04)
+
+Point de départ : un post LinkedIn annonçant **Audio8-TTS-Realistic** d'Edge0
+(0,6 B paramètres, Apache-2.0 pour le code et les poids, 23 langues dont le
+français ; arXiv 2610.14776). Entraînement SFT → GRPO sur WER et similarité →
+GRPO sur un **critique de réalisme** qui compare chaque sortie à un humain
+disant la même phrase avec la même voix. Exactement la promesse de la case
+offline (« réaliste et vivante »), d'où l'essai.
+
+### Ce qui a été vérifié, et comment
+
+Chemin MLX (`mlx-audio` ≥ 0.6.4 ; la 0.6.1 échoue à déquantifier l'embedding
+lié du 4 bits), conversion `nativ-community/Audio8-TTS-Realistic-0.6b-4bit`,
+M2 Max. Garde-fous automatiques seulement — F0 médian (pyin), similarité
+TitaNet-large à la référence, aller-retour whisper-large-v3-turbo — **l'oreille
+du propriétaire tranche**, pas ces chiffres.
+
+| prise | F0 | sim. réf. | remarque |
+|---|---|---|---|
+| référence `ref-fr-female` | 238 Hz | 1,000 | |
+| fr **sans** référence | 139 Hz | 0,22 | voix **masculine** |
+| fr avec référence | 274 Hz | **0,72** | chatterbox fr : 0,66 |
+| en avec référence (française) | 266 Hz | 0,59 | clonage inter-langue |
+| fr, texte long (484 car., 32 s) | 262 Hz | 0,74 | complet ; une répétition « plusieurs centaines, plusieurs centaines » |
+
+Conséquences inscrites dans le backend `audio8` : la référence féminine fournie
+est **toujours** passée (sans elle la voix est masculine) ; la sortie 44,1 kHz
+est rééchantillonnée à 24 kHz ; le budget de génération passe de 512 à 2 048
+trames — à 21,5 trames/s, les 512 d'origine coupaient toute prise à ~24 s, plus
+court qu'un bloc de 500 caractères. Pas de streaming (une forme d'onde par
+appel), pas d'entrée phonétique (le lexique passe par le respelling).
+
+**Le « #1 du HF TTS Arena » est faux, et pas seulement invérifié.** L'arène
+l'affiche à 1663 ± 51 sur 222 votes, **suspendu le 2026-10-30 pour
+« vote manipulation »** (`/api/leaderboard`, relevé du 2026-11-04). Le papier,
+lui, critique les arènes publiques et s'appuie sur une étude d'écoute privée ;
+sur ses propres tableaux Audio8 n'est pas premier partout (CV3 : WER fr 7,94 %,
+en 2,91 %). Rien de cela ne disqualifie le modèle — c'est l'argument marketing
+qui tombe, pas la voix. `PUBLIC_ELO["audio8"] = None`, et son prior éditorial
+(0,86 ; fr 0,77) reste **sous chatterbox dans toutes les langues** : aucune
+décision de routage ne change avant l'écoute.
+
+### Les chiffres dits en mots
+
+Le commentaire le plus utile sous le post demandait de tester dates, montants,
+noms et corrections, pas des paragraphes polis. Testé : sur « Rendez-vous le
+14/11 à 9h30 pour un budget de 3 200 €. Correction : non pas le 14, mais le
+15. », Audio8 lit « 14/11 » comme une heure et avale « Correction : ». Remède
+le plus ancien de la synthèse vocale : donner au moteur des **mots**. Le module
+`spoken_numbers` (fr, en, déterministe, sans dépendance) réécrit dates,
+heures, montants, pourcentages, ordinaux, nombres groupés/décimaux/négatifs,
+zéros de tête et années anglaises, et laisse les identifiants (`4G`, `RN7`,
+`H2O`) intacts. Il s'applique à ce qui est **dit**, jamais à ce que la page
+**montre** : les cues d'une narration gardent les chiffres. Après réécriture,
+whisper entend « le 14 novembre à 9h30 … Correction, non pas le 14 ». Actif
+par défaut, pour **tous** les moteurs (`numbers_to_words: false` le coupe).
+
+### Les cases cloud payantes : ElevenLabs
+
+Backend `elevenlabs`, sans dépendance HTTP. Le mode choisit le modèle :
+`eleven_v4` en offline (« our most emotive, high quality »), `eleven_v4_turbo`
+en streaming (~100 ms médian) — page Models lue le 2026-11-04 ; les deux
+parlent français. L'audio revient en `pcm_24000`. Le lexique part en **IPA
+inline `/…/`** vers `eleven_v4` (seul modèle documenté comme lisant cette
+forme) et en respelling ailleurs. Ce backend n'est **pas** candidat du
+routeur : `backend: auto` n'atteint jamais un service payant. Testé contre un
+faux service seulement (pas encore de clé). La voix par défaut (« Sarah »,
+bibliothèque premade, étiquetée féminine) n'a **pas** été choisie à l'oreille :
+la figer par langue (`elevenlabs.voice_by_lang`) est une décision du
+propriétaire.
+
+### La case streaming, rouverte pour « vivante » (2026-11-04)
+
+L'exigence « une voix féminine et vivante, toujours et partout » vise aussi le
+streaming local, tenu par kokoro, le moteur le moins vivant du paysage. Banc
+M2 Max, référence féminine fournie, paragraphe français de deux phrases, une
+prise par variante (donc des RTF à ±10 % près) :
+
+| moteur (MLX) | licence | RTF bloc | RTF streaming | 1er son | F0 | sim. réf. |
+|---|---|---:|---:|---:|---:|---:|
+| **Qwen3-TTS 0.6B** 8 bits | Apache-2.0 | 0,87 | 0,90 | 0,87 s | 233 Hz | **0,82** |
+| Qwen3-TTS 0.6B 4 bits | Apache-2.0 | 1,04 | 0,77 | 0,66 s | — | — |
+| Ming-3.0-tts 0.5B 8 bits | MIT | 1,33 | 1,19 | 6,1 s | 224 Hz | 0,74 |
+| *rappel* kyutai q8 | CC-BY | — | 0,88 | — | 226 Hz | — |
+| *rappel* kokoro | Apache-2.0 | — | 0,22 | — | — | — |
+
+Écartés sans banc : Voxtral 4B (poids CC BY-NC, non commerciaux), Breeze TTS 2
+(non commercial, anglais/chinois), Fish Drama 3 (35 B), VoxCPM2 (le français
+n'est pas déclaré).
+
+Lecture : **Qwen3-TTS donne le clone le plus fidèle mesuré ici**, toutes cases
+confondues (0,82, contre 0,72 pour Audio8 et 0,66 pour chatterbox), et il
+lit juste la phrase en chiffres après normalisation. Mais il tient le temps
+réel **au plafond** (0,77–0,90) et non dessous, et son Elo public (Artificial
+Analysis 929) est sous celui de kokoro (1061). Sur les critères ratifiés,
+**la case streaming ne bouge pas** : kokoro reste le seul moteur classé et
+nettement sous 0,8. Qwen3-TTS entre comme backend `qwen3tts`, pour que
+l'oreille du propriétaire puisse trancher « vivante » contre « temps réel
+garanti » en connaissance de cause. Échantillons : `samples/fr-streaming-qwen3.wav`,
+`samples/fr-streaming-ming.wav`, `samples/fr-qwen3tts-chiffres.wav`.
+
+Piège rencontré : sur un cache Hugging Face posé sur un volume externe exFAT,
+macOS crée des fichiers AppleDouble `._model.safetensors` que le chargeur de
+mlx-audio ramasse (« Invalid json header length ») ; `dot_clean` sur le cache
+règle le problème.
+
 ## 9. Sources principales
 
 - TTS Arena V2 (API live) — <https://huggingface.co/spaces/TTS-AGI/TTS-Arena-V2>
@@ -518,6 +624,9 @@ poids qu'à la première synthèse. La CI reste donc légère.
 - CosyVoice 3 — <https://huggingface.co/FunAudioLLM/Fun-CosyVoice3-0.5B-2512>
 - Qwen3-TTS — <https://github.com/QwenLM/Qwen3-TTS>
 - mlx-audio — <https://github.com/Blaizzy/mlx-audio>
+- Audio8-TTS-Realistic (Edge0) — <https://arxiv.org/abs/2610.14776> · <https://huggingface.co/Edge0>
+- TTS Arena V2, données brutes — <https://tts-agi-tts-arena-v2.hf.space/api/leaderboard>
+- ElevenLabs, modèles et bonnes pratiques — <https://elevenlabs.io/docs/models> · <https://elevenlabs.io/docs/overview/capabilities/text-to-speech/best-practices>
 - Piper (successeur GPL) — <https://github.com/OHF-Voice/piper1-gpl>
 - IndexTTS — <https://github.com/index-tts/index-tts>
 - Magpie 357M — <https://huggingface.co/nvidia/magpie_tts_multilingual_357m>
