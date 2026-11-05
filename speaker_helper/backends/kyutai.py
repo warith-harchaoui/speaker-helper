@@ -78,7 +78,7 @@ DEFAULT_VOICE_REPO: str = "kyutai/tts-voices"
 #: (the ``.safetensors`` embedding suffix is appended by the runtime).
 #:
 #: The French default is a CML-TTS speaker (CC BY 4.0), picked by
-#: *measurement* in the ~/speak A/B study (2026-10-26): screened against
+#: *measurement* in the speak A/B study (2026-10-26): screened against
 #: four other female CML voices and unmute's ``developpeuse-3``, it scored
 #: highest on UTMOSv2 by a wide margin (≈3.4 vs ≈2.0 for developpeuse-3 on
 #: the same sentences, F0 ≈ 226 Hz — female). ``developpeuse-3``

@@ -67,7 +67,7 @@ l'architecture actuelle (`say`/`text`, phonémisation espeak en amont de Kokoro,
 - **TTSDS2** (seul benchmark distributionnel multilingue couvrant le français,
   ICLR 2026) : site et espace HF **injoignables le 2026-10-26** (DNS/erreur
   runtime) — pas de classement français par système ce jour. Alternative :
-  calculer `ttsds` (PyPI v2.1.1) localement dans ~/speak.
+  calculer `ttsds` (PyPI v2.1.1) localement dans speak.
   <https://arxiv.org/abs/2506.19441>
 - **UTMOS communautaire** (tts-bench, UTMOS-2022 — *pas* UTMOSv2, corrélation
   de rang seulement) : Chatterbox 4,42 / WER 0,061 · Qwen3-TTS-0.6B 4,27 ·
@@ -260,7 +260,7 @@ compromis), zéro nouveau backend.
 français (réutilise le backend existant ; si son CER 6–8 % s'avère acceptable
 sur notre banc, il fait l'économie d'un backend Kyutai).
 
-### Plan de validation (dans ~/speak, pas ici)
+### Plan de validation (dans speak, pas ici)
 
 Conformément au partage des rôles (toolbox ↔ expériences) :
 
@@ -294,7 +294,7 @@ Conformément au partage des rôles (toolbox ↔ expériences) :
 
 ## 8 bis. Addendum — le banc a parlé (2026-10-26, soir)
 
-Le plan de validation du §8 a été exécuté le jour même (`~/speak`,
+Le plan de validation du §8 a été exécuté le jour même (`speak`,
 `scripts/exp_ab_voices.py` : UTMOSv2 + aller-retour WER/chrF via vocal-helper
 + RTF, 10 phrases par langue — les 5 déclaratives historiques plus 5 phrases
 expressives — moteurs à leur point de fonctionnement réel sur M2 Max :
@@ -330,7 +330,7 @@ Enseignements, dans l'ordre où ils ont surpris :
 4. **Réserve épistémique, maintenue au premier plan** : UTMOSv2 est entraîné
    sur des panels MOS anglophones ; ses valeurs absolues en français sont une
    extrapolation, et il est plausible qu'il sous-cote le *caractère* des
-   moteurs LLM. Un **pack d'écoute** (`~/speak/out/ab_samples/`, les 6
+   moteurs LLM. Un **pack d'écoute** (`speak/out/ab_samples/`, les 6
    scénarios × plat/vivant + les variantes kyutai) attend l'arbitrage à
    l'oreille qui pourrait renverser ce verdict — par de nouveaux nombres,
    pas par décret.
@@ -354,7 +354,7 @@ Le RTF, de son côté, n'a rien à faire dans l'exposé d'une décision offline.
 
 Conséquence appliquée (révision du repli ci-dessus) : les tables
 `MEASURED_QUALITY`/`MEASURED_RTF` sont **retirées du routage** (les nombres
-restent consignés ici et dans `~/speak/out/ab_voices.json`) ; les défauts
+restent consignés ici et dans `speak/out/ab_voices.json`) ; les défauts
 offline redeviennent le choix éditorial du §8 — **fr → kyutai, en →
 chatterbox-Turbo** — affiché honnêtement comme prior de confiance basse.
 (Le volet français de cette paire a été révisé depuis : voir §8 ter.) Les

@@ -48,7 +48,7 @@ def test_from_youtube_wraps_helper(monkeypatch) -> None:
         @staticmethod
         def download_audio(url, output_path=None, target_sample_rate=44100):
             """Return a fixed local audio path instead of downloading."""
-            return "/tmp/audio.wav"
+            return "/path/to/audio.wav"
 
         @staticmethod
         def video_url_meta_data(url):
@@ -61,7 +61,7 @@ def test_from_youtube_wraps_helper(monkeypatch) -> None:
     src = from_youtube("https://youtu.be/abc")
     # Assert: origin, downloaded path, and title are threaded through.
     assert src.origin == "youtube"
-    assert src.path == "/tmp/audio.wav"
+    assert src.path == "/path/to/audio.wav"
     assert src.title == "A talk"
 
 

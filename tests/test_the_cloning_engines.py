@@ -164,7 +164,7 @@ def test_chatterbox_does_not_claim_a_gender_for_somebody_elses_recording() -> No
     """
     engine = ChatterboxEngine(
         Settings.from_mapping(
-            {"backend": "chatterbox", "language": "en", "voice_sample": "/tmp/somebody-else.wav"}
+            {"backend": "chatterbox", "language": "en", "voice_sample": "/path/to/somebody-else.wav"}
         )
     )
     listing = asyncio.run(engine.list_voices())

@@ -402,7 +402,7 @@ to [Semantic Versioning](https://semver.org/).
   in French (6–8% CER, per the survey). Priors are flagged
   `confidence="low"` and only speak where nothing was measured.
 - **An A/B bench ran — and its criterion was rejected** (`STUDY.md` §8 bis
-  tells the full story). The ~/speak study measured UTMOSv2 naturalness,
+  tells the full story). The speak study measured UTMOSv2 naturalness,
   WER/chrF round-trips and RTF for every (engine, language) pair
   (2026-10-26, 10 sentences per language, real operating points on the
   reference M2 Max); UTMOSv2 ranked kokoro first in both languages, the

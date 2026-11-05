@@ -88,11 +88,11 @@ Ce que l'architecture promet, avant mesure :
   **CosyVoice 2/3** (streaming 150 ms annoncé). Si l'un d'eux apparaît dans
   une arène publique, il entre dans la course par la grande porte.
 
-## 4. Les mesures (M2 Max, 2026-10-26, `~/speak/scripts/exp_streaming_voices.py`)
+## 4. Les mesures (M2 Max, 2026-10-26, `speak/scripts/exp_streaming_voices.py`)
 
 Paragraphe de 8 phrases par langue, moteurs chauds, via `Speaker.stream` ;
 « RTF soutenu » = calcul total / audio total (le critère d'anti-décrochage),
-p95 = la queue que la moyenne cache. Résultats (`~/speak/out/streaming_voices.json`) :
+p95 = la queue que la moyenne cache. Résultats (`speak/out/streaming_voices.json`) :
 
 | scénario | TTFA | RTF soutenu | p95 chunk | audio | charge modèle |
 |---|---:|---:|---:|---:|---:|
@@ -181,5 +181,5 @@ kokoro : **le verdict tient**. Qwen3-TTS est disponible comme backend
 - Kyutai delayed-streams (streaming natif, on-device) — <https://kyutai.org/tts/>
 - Hume TADA — <https://github.com/HumeAI/tada>
 - Pocket TTS — <https://github.com/kyutai-labs/pocket-tts>
-- Mesures locales — `~/speak/out/streaming_voices.json` (script
-  `~/speak/scripts/exp_streaming_voices.py`)
+- Mesures locales — `speak/out/streaming_voices.json` (script
+  `speak/scripts/exp_streaming_voices.py`)
