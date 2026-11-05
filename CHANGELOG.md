@@ -6,6 +6,16 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.15.1] - 2026-11-05
+
+### Changed
+
+- **The `[stt]` extra admits vocal-helper 5** (`vocal-helper>=2.0.0,<6`). The
+  only call, `vocal_helper.transcribe_pcm(pcm, sr, language=...)`, is unchanged
+  in 5.0.0, whose major changes the live diarization latency this extra never
+  reaches. It matters beyond compatibility: vocal-helper 4.0.0 cannot install
+  its diarization bundle on a fresh machine, and 5.0.0 repairs that.
+
 ## [0.15.0] - 2026-11-04
 
 ### Added
