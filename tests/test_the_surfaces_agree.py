@@ -354,6 +354,24 @@ def test_the_skill_points_at_files_that_exist() -> None:
     assert referenced <= present, f"dangling: {sorted(referenced - present)}"
 
 
+def test_the_trigger_catalogue_is_mirrored() -> None:
+    """``TRIGGERS.md`` and the skill's ``references/triggers.md`` say the same.
+
+    They had become two different files: phrasings on the root side, a list of
+    engine names on the skill side, each missing what the other held. Two
+    catalogues that have drifted are worse than one, because each audience
+    believes the copy it reads, so the two are compared, not merely both
+    required to exist.
+    """
+    root = ROOT / "TRIGGERS.md"
+    mirror = SKILL.parent / "references" / "triggers.md"
+    assert root.is_file(), "TRIGGERS.md missing at the repo root"
+    assert mirror.is_file(), "skills/speaker-helper/references/triggers.md missing"
+    assert root.read_text(encoding="utf-8").strip() == mirror.read_text(encoding="utf-8").strip(), (
+        "TRIGGERS.md and skills/speaker-helper/references/triggers.md have drifted apart"
+    )
+
+
 def test_the_skill_only_tells_the_reader_to_run_real_commands() -> None:
     """``--help`` advertising a command nothing installs is the classic rot."""
     body = SKILL.read_text(encoding="utf-8")

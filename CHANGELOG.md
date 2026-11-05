@@ -6,6 +6,21 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **`TRIGGERS.md` and the skill's `references/triggers.md` are one catalogue
+  again.** They had drifted into two different files: trigger phrasings on the
+  root side, a list of engine names on the skill side. Both now carry the
+  union, checked against the code. Command lines that would not parse were
+  corrected (`clone` takes its reference through `--clone-audio`, `narrate`
+  reads a JSON list of blocks rather than a Markdown file, `speak-from` takes
+  `--source` and `--url`, `route` needs `--condition`, the `eval` dataset is a
+  JSONL file), and `serve` and `speaker-helper-mcp` are listed. A test now
+  fails when the two copies differ.
+- A test runs every console script with `--help` and requires a usage line,
+  so no entry point can start serving when asked for help. Both scripts
+  already answered.
+
 ## [0.15.2] - 2026-11-05
 
 ### Fixed
