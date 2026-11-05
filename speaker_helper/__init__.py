@@ -97,7 +97,7 @@ from speaker_helper.types import (
 # Curated real presets, resolvable by language and gender.
 from speaker_helper.voices import PRESET_VOICES, voice_for, voices_for
 
-__version__ = "0.15.1"
+__version__ = "0.15.2"
 
 # Explicit, sorted public API: only these names are re-exported from the
 # package root; the sub-modules above hold the implementation.

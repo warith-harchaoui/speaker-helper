@@ -6,6 +6,15 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.15.2] - 2026-11-05
+
+### Fixed
+
+- **The published package no longer cites a machine path.** A comment in
+  `speaker_helper.backends.kyutai` named a directory on the author's machine;
+  it now names the speak study, and a test refuses any machine path or
+  hard-coded absolute path in the repository.
+
 ## [0.15.1] - 2026-11-05
 
 ### Changed
