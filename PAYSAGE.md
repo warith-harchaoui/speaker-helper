@@ -102,7 +102,7 @@ Enfin, on remarque que plusieurs solutions se positionnent dans le coin supérie
 
 `speaker-helper` n'est pas un énième modèle de TTS : c'est la **boîte à outils
 autour** des modèles. Il n'atteint un moteur concret qu'à travers le protocole
-`TTSEngine`, si bien que Kokoro, Chatterbox, Kyutai, Audio8, OpenVoice et un
+`TTSEngine`, si bien que Kokoro, Chatterbox, Kyutai, Audio8, Qwen3-TTS, OpenVoice et un
 `mock` déterministe se trouvent tous derrière le même `Speaker` typé — et
 tournent tous dans le processus appelant (ElevenLabs, seul backend cloud,
 uniquement quand on le nomme) : `settings.backend` en choisit un dans un registre et il n'y

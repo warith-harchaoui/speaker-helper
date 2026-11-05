@@ -35,9 +35,9 @@ most of using it well.
 
 | The question | The call | What comes back |
 |---|---|---|
-| "What does this sentence sound like?" | `synth` / `Speaker.say` | one WAV |
+| "What does this sentence sound like?" | `synth` / `Speaker.say` | one audio file |
 | "Start talking before I finish writing" | `synth --stream` / `Speaker.stream` | chunks, first one small |
-| "Read me this document, and let the page follow" | `narrate` / `Speaker.narrate` | one WAV **and** its cues |
+| "Read me this document, and let the page follow" | `narrate` / `Speaker.narrate` | one audio file **and** its cues |
 
 The third is the one a plain text-to-speech call cannot give you, and the one
 most people actually want for an article.

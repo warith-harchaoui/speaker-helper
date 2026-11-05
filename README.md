@@ -101,24 +101,27 @@ flowchart LR
         eval["evaluation<br/>RTF · anomalies · WER/chrF"]:::eval
         subgraph BE["backends, selected by settings.backend"]
             kokoro["kokoro — streaming default<br/>ONNX Runtime · 54 voices"]:::engine
-            clone["openvoice · chatterbox · audio8<br/>cloning · chatterbox = offline default"]:::engine
+            clone["openvoice · chatterbox · audio8 · qwen3tts<br/>cloning · chatterbox = offline default"]:::engine
             kyutai["kyutai<br/>native FR+EN · voice bank"]:::engine
+            cloud["elevenlabs<br/>cloud · paid · only when named"]:::engine
             mock["mock<br/>deterministic · no model"]:::engine
         end
     end
     weights[("weights cache<br/>~/.cache/speaker-helper")]:::store
-    audio["WAV audio"]:::output
+    audio["audio<br/>WAV · MP3 · M4A"]:::output
 
     text --> speaker
     router -.->|picks| speaker
     speaker -- "TTSEngine protocol" --> kokoro
     speaker -- "TTSEngine protocol" --> clone
     speaker -- "TTSEngine protocol" --> kyutai
+    speaker -- "TTSEngine protocol" --> cloud
     speaker -- "TTSEngine protocol" --> mock
     weights -.->|loaded once| kokoro
     kokoro --> audio
     clone --> audio
     kyutai --> audio
+    cloud --> audio
     mock --> audio
     speaker -.->|measured by| eval
     eval -.->|evidence| router
@@ -418,7 +421,7 @@ when the bar is missed, so it gates CI.
 
 ```bash
 speaker-helper --backend mock eval                 # deterministic, no model
-# backend=mock engine=kokoro cases=12
+# backend=mock engine=auto cases=12
 # mean_rtf=0.3 p95_rtf=0.3 anomaly_rate=0.0 quality=1.0 (prior)
 # PASS
 

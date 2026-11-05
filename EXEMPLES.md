@@ -258,9 +258,9 @@ curl -s -X POST localhost:8080/route \
      -H 'content-type: application/json' \
      -d '{"condition": "online_realtime", "language": "fr"}'
 # {"condition":"online_realtime","engine":"kokoro","backend":"kokoro",
-#  "mode":"streaming","quality":0.466,"mean_rtf":0.223,
+#  "mode":"streaming","quality":0.465,"mean_rtf":0.223,
 #  "quality_source":"public_elo","rtf_source":"measured",
-#  "justification":"…","candidates_considered":3,"pareto_size":1}
+#  "justification":"…","candidates_considered":4,"pareto_size":1}
 ```
 
 `POST /narrate` répond au §5 sur HTTP — en JSON plutôt qu'en `audio/wav`, parce
@@ -367,7 +367,7 @@ asyncio.run(main())
 ```bash
 # ligne de commande : code de sortie non nul quand la barre n'est pas tenue
 speaker-helper --backend mock eval
-# backend=mock engine=kokoro cases=12
+# backend=mock engine=auto cases=12
 # mean_rtf=0.3 p95_rtf=0.3 anomaly_rate=0.0 quality=1.0 (prior)
 # PASS
 speaker-helper --engine kokoro eval --json report.json
@@ -426,7 +426,7 @@ print(d2.owner_ratified)                            # True
 print(d2.justification)
 # offline: engine fixed by the owner's ratified choice for 'fr' (as of
 # 2026-10-28) -- 'chatterbox' (quality=0.780 [prior]). This OVERRIDES the
-# quality argmax over 3 candidate(s), which was 'kyutai' (quality=0.920
+# quality argmax over 4 candidate(s), which was 'kyutai' (quality=0.920
 # [prior]): a decision, not a measurement. Pass respect_ratification=False
 # for the unarbitrated ranking. mode=offline (whole-text synthesis; speed is
 # not an objective and no RTF enters this decision).
@@ -672,7 +672,7 @@ speaker-helper --help
 #   route          Choose the best engine + mode for a condition (online...
 #   serve          Run the REST API server.
 #   speak-from     Re-voice audio from a source (youtube / podcast /...
-#   synth          Synthesise TEXT (or stdin) to a WAV file.
+#   synth          Synthesise TEXT (or stdin) to an audio file.
 #   voices         List preset voices for an engine (uses the global...
 ```
 
@@ -723,9 +723,9 @@ Routage (§10) puis garde-fou qualité (§9) :
 ```bash
 speaker-helper --language fr route --condition online_realtime
 # condition=online_realtime engine=kokoro mode=streaming
-# quality=0.466 (public_elo) mean_rtf=0.223 (measured)
+# quality=0.465 (public_elo) mean_rtf=0.223 (measured)
 # online_realtime: require mean_rtf <= 0.8 (RTF<1 is the real-time feasibility
-# boundary; margin absorbs TTFA + jitter). 1/3 candidates keep up; on the
+# boundary; margin absorbs TTFA + jitter). 1/4 candidates keep up; on the
 # 1-point Pareto front, chose 'kokoro' …
 
 speaker-helper route --condition offline --json decision.json

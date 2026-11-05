@@ -74,12 +74,17 @@ your text ──▶ Speaker (offline · streaming · clone) ──TTSEngine─�
   `VoiceList`, `VoiceSample`.
 - **Engine boundary** (`engine.py`): the `TTSEngine` protocol —
   `synthesize`, `list_voices`, `health`, `clone_voice`, `aclose` — plus a
-  backend registry. Four backends ship, all in-process: `KokoroEngine`
-  (`backends/kokoro.py`, the default), `OpenVoiceEngine` and
-  `ChatterboxEngine` (cloning), and `MockEngine` (deterministic, no model).
-- **Façade** (`speaker.py`): `Speaker` — `say`, `stream`, `clone_voice`,
-  `warmup`, `from_profile`.
-- **Interfaces**: CLI (`cli.py`), REST API (`api.py`, [@fastapi]).
+  backend registry. Eight backends ship: `KokoroEngine`
+  (`backends/kokoro.py`, the streaming default), `ChatterboxEngine` (the
+  offline default, cloning), `OpenVoiceEngine` (cloning), `KyutaiEngine`
+  (native French and English), `Audio8Engine` and `Qwen3TTSEngine` (MLX
+  cloning on Apple Silicon), `ElevenLabsEngine` (the paid cloud, only when
+  named) and `MockEngine` (deterministic, no model). Every local one runs
+  in-process.
+- **Façade** (`speaker.py`): `Speaker` — `say`, `stream`, `narrate`,
+  `clone_voice`, `warmup`, `from_profile`, `from_route`.
+- **Interfaces**: CLI (`cli.py`), REST API (`api.py`, [@fastapi]), MCP
+  (`mcp.py`).
 - **Evaluation** (`eval/`): datasets, metrics, thresholds, runner, priors,
   DeepEval binding [@deepeval], multi-language driver.
 - **Ecosystem glue**: logging via `os-helper`, audio slicing/concatenation via
@@ -113,7 +118,7 @@ resolved from the system install first, because the copy bundled in the
 Cloning it refuses outright, naming `openvoice` and `chatterbox` instead — the
 useful answer to a request it cannot serve.
 
-A fifth backend shipped until 0.8.0: a REST client for an out-of-process engine
+Another backend shipped until 0.8.0: a REST client for an out-of-process engine
 on a fixed port [@voicebox], with idempotent profile bootstrap, a sync/async
 fallback and retries with exponential backoff on transient failures. It was
 removed when the default moved in-process, and with it the HTTP dependency, the

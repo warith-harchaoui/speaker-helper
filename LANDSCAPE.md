@@ -97,7 +97,7 @@ Notably, speaker-helper leads in adaptability and articulation, occupying the to
 
 `speaker-helper` is not another TTS model — it is the **toolbox around** the
 models. It reaches a concrete engine only through a `TTSEngine` protocol, so
-Kokoro, Chatterbox, Kyutai, Audio8, OpenVoice and a deterministic `mock` all sit
+Kokoro, Chatterbox, Kyutai, Audio8, Qwen3-TTS, OpenVoice and a deterministic `mock` all sit
 behind the same typed `Speaker`, and all of them run in the calling process
 (ElevenLabs, the one cloud backend, only when named): `settings.backend` picks
 one out of a registry, and there is no server to start. On top of that

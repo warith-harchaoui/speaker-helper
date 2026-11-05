@@ -105,24 +105,27 @@ flowchart LR
         eval["évaluation<br/>RTF · anomalies · WER/chrF"]:::eval
         subgraph BE["backends, choisis par settings.backend"]
             kokoro["kokoro — défaut du streaming<br/>ONNX Runtime · 54 voix"]:::engine
-            clone["openvoice · chatterbox · audio8<br/>clonage · chatterbox = défaut offline"]:::engine
+            clone["openvoice · chatterbox · audio8 · qwen3tts<br/>clonage · chatterbox = défaut offline"]:::engine
             kyutai["kyutai<br/>FR+EN natifs · banque de voix"]:::engine
+            cloud["elevenlabs<br/>cloud · payant · seulement si nommé"]:::engine
             mock["mock<br/>déterministe · sans modèle"]:::engine
         end
     end
     weights[("cache des poids<br/>~/.cache/speaker-helper")]:::store
-    audio["audio WAV"]:::output
+    audio["audio<br/>WAV · MP3 · M4A"]:::output
 
     text --> speaker
     router -.->|choisit| speaker
     speaker -- "protocole TTSEngine" --> kokoro
     speaker -- "protocole TTSEngine" --> clone
     speaker -- "protocole TTSEngine" --> kyutai
+    speaker -- "protocole TTSEngine" --> cloud
     speaker -- "protocole TTSEngine" --> mock
     weights -.->|chargé une fois| kokoro
     kokoro --> audio
     clone --> audio
     kyutai --> audio
+    cloud --> audio
     mock --> audio
     speaker -.->|mesuré par| eval
     eval -.->|preuves| router
@@ -436,7 +439,7 @@ CI.
 
 ```bash
 speaker-helper --backend mock eval                 # déterministe, sans modèle
-# backend=mock engine=kokoro cases=12
+# backend=mock engine=auto cases=12
 # mean_rtf=0.3 p95_rtf=0.3 anomaly_rate=0.0 quality=1.0 (prior)
 # PASS
 

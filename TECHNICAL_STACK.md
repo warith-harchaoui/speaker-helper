@@ -11,8 +11,8 @@ the **AI Helpers** ecosystem.
 flowchart TB
     subgraph clients["Entry points (4 surfaces)"]
         lib["Python API<br/>Speaker · route"]:::core
-        cli["CLI (click)<br/>synth · voices · clone · eval · route · serve"]:::core
-        api["REST API<br/>/synth · /synth/stream · /clone · /voices · /route · /health"]:::core
+        cli["CLI (click)<br/>synth · narrate · voices · clone · eval · route · serve · health · install-voice · speak-from"]:::core
+        api["REST API + MCP<br/>/synth · /synth/stream · /narrate · /clone · /voices · /route · /health · /mcp"]:::core
         gui["Web GUI<br/>served at /"]:::core
     end
 
@@ -21,8 +21,10 @@ flowchart TB
     text["text splitter<br/>sentence chunks → low TTFA"]:::util
 
     subgraph engines["TTSEngine protocol — backends, all in this process"]
-        kokoro["KokoroEngine (default)<br/>ONNX Runtime · 54 voices"]:::engine
-        cloning["OpenVoiceEngine · ChatterboxEngine<br/>cloning · torch"]:::engine
+        kokoro["KokoroEngine (streaming default)<br/>ONNX Runtime · 54 voices"]:::engine
+        cloning["ChatterboxEngine (offline default) · OpenVoiceEngine<br/>Audio8Engine · Qwen3TTSEngine<br/>cloning"]:::engine
+        kyutai["KyutaiEngine<br/>native FR+EN · voice bank"]:::engine
+        cloud["ElevenLabsEngine<br/>cloud · paid · only when named"]:::engine
         mock["MockEngine<br/>deterministic · no model"]:::engine
     end
 
@@ -49,6 +51,8 @@ flowchart TB
     router -.->|picks engine + mode| speaker
     speaker -- "TTSEngine" --> kokoro
     speaker -- "TTSEngine" --> cloning
+    speaker -- "TTSEngine" --> kyutai
+    speaker -- "TTSEngine" --> cloud
     speaker -- "TTSEngine" --> mock
     weights -.->|loaded once| kokoro
     espeak -.->|phonemes| kokoro
@@ -76,14 +80,21 @@ flowchart TB
 | Types | `types.py` | `Voice`, `AudioResult` (+`rtf`), `StreamChunk`, `VoiceList`, `VoiceSample` |
 | Config | `config.py` | YAML + `${VAR}` + `SPEAKER_HELPER_*` overrides; `backend`, `clone`, `mock` |
 | Engine | `engine.py` | `TTSEngine` protocol, backend registry, `MockEngine` |
-| Backends | `backends/` | `kokoro.py` (default, ONNX in-process), `openvoice.py`, `chatterbox.py` |
+| Backends | `backends/` | `kokoro.py` (streaming default, ONNX in-process), `chatterbox.py` (offline default), `openvoice.py`, `kyutai.py`, `audio8.py` (`audio8` and `qwen3tts`, MLX), `elevenlabs.py` (cloud, paid) |
 | Install | `install.py` | fetches Kokoro's ~340 MB from a pinned release, size-checked |
 | Façade | `speaker.py` | `Speaker` — `say` / `stream` / `clone_voice` / `warmup` / `from_profile` / `from_route` |
 | Router | `router.py` | condition (`online_realtime` / `offline`) → engine + mode from measured quality↔speed evidence, minus the languages the owner has arbitrated himself (`OFFLINE_RATIFIED_ENGINE`, flagged `owner_ratified`) |
 | Profiles | `profiles.py` | per-language hyperparameters (producer/consumer) + measured RTF/quality |
 | Text | `text.py` | sentence splitting for low time-to-first-audio |
-| CLI | `cli.py` | `synth`, `voices`, `clone`, `eval`, `speak-from`, `route`, `serve` — one click group over the shared `_cmd_*` handlers |
-| API | `api.py` | FastAPI — offline, SSE streaming, cloning upload, `/route`, GUI at `/` |
+| Chunking | `chunking.py` | long texts cut at discourse boundaries, LLM-assisted |
+| Lexicon | `lexicon.py` | per-word pronunciation overrides (IPA or respelling) applied before synthesis |
+| Spoken numbers | `spoken_numbers.py` | dates, times, amounts and numbers said as words (French, English) |
+| Speech text | `speech_text.py` | notation (math) turned into the words the voice says |
+| Narration | `narration.py` | a document read aloud, with the timed cues (WebVTT) a page can follow |
+| Voices | `voices.py` | curated preset voices by language and gender |
+| CLI | `cli.py` | `synth`, `narrate`, `voices`, `clone`, `eval`, `speak-from`, `route`, `serve`, `health`, `install-voice` — one click group over the shared `_cmd_*` handlers |
+| API | `api.py` | FastAPI — offline, SSE streaming, `/narrate`, cloning upload, `/route`, GUI at `/` |
+| MCP | `mcp.py` | `speaker-helper-mcp`: the same routes as agent tools, mounted at `/mcp` |
 | GUI | `gui/` | minimal vanilla-JS + Tailwind single page (synth / stream / voices / clone / route) |
 | Cloning | `cloning.py` | clone defaults (ref-fr-female), trim + transcript preparation |
 | Transcription | `transcription.py` | `vocal-helper` adapter (clone transcript + eval round-trip) |
@@ -96,10 +107,12 @@ flowchart TB
 
 - **Backend-agnostic core, and no second process.** Everything talks to the
   `TTSEngine` protocol, never to a concrete engine: `create_engine(settings)`
-  looks `settings.backend` up in a module-level registry. Four backends are
-  registered — `kokoro` (the default), `openvoice`, `chatterbox`, `mock` — and
-  every one of them synthesises in the calling process. The package shipped a
-  fifth once, a REST client for a desktop application on a fixed port; it was
+  looks `settings.backend` up in a module-level registry. Eight backends are
+  registered — `kokoro` (the streaming default), `chatterbox` (the offline
+  default), `openvoice`, `kyutai`, `audio8`, `qwen3tts`, `elevenlabs` and
+  `mock` — and every local one synthesises in the calling process;
+  `elevenlabs`, the paid cloud, runs only when named. The package shipped
+  another once, a REST client for a desktop application on a fixed port; it was
   removed when the default moved in-process, because an engine you have to
   install, launch and keep alive is not a second option but a second way to
   fail. `register_backend` adds your own with one call.
@@ -117,12 +130,12 @@ flowchart TB
   `offline` (quality only) — maps to a concrete engine + mode, with provenance
   (`quality_source`, `rtf_source`) and a number-citing justification — no
   derived confidence grade.
-- **Nothing fetched at synthesis time.** The default engine's weights come from
-  a pinned `kokoro-onnx` GitHub release and then live in
+- **Nothing fetched at synthesis time.** The streaming default's weights come
+  from a pinned `kokoro-onnx` GitHub release and then live in
   `~/.cache/speaker-helper/kokoro`; `install.py` checks the exact byte sizes so
   a truncated download is repaired rather than mistaken for an install. Copy
-  that directory and the engine runs air-gapped. Only the cloning backends
-  still fetch their own checkpoints.
+  that directory and the engine runs air-gapped. The other local backends,
+  chatterbox the offline default among them, still fetch their own checkpoints.
 - **Cloning made trivial.** Supply a recording; the transcript is derived with
   `vocal-helper` and over-long audio is trimmed with `audio-helper`, so a custom
   voice works from the library, CLI, and REST API alike.

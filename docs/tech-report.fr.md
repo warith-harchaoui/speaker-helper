@@ -80,12 +80,17 @@ votre texte ──▶ Speaker (hors-ligne · streaming · clone) ──TTSEngine
   `VoiceList`, `VoiceSample`.
 - **Frontière moteur** (`engine.py`) : le protocole `TTSEngine` —
   `synthesize`, `list_voices`, `health`, `clone_voice`, `aclose` — plus un
-  registre de backends. Quatre backends sont livrés, tous dans le processus :
-  `KokoroEngine` (`backends/kokoro.py`, le défaut), `OpenVoiceEngine` et
-  `ChatterboxEngine` (clonage) et `MockEngine` (déterministe, sans modèle).
-- **Façade** (`speaker.py`) : `Speaker` — `say`, `stream`, `clone_voice`,
-  `warmup`, `from_profile`.
-- **Interfaces** : CLI (`cli.py`), API REST (`api.py`, [@fastapi]).
+  registre de backends. Huit backends sont livrés : `KokoroEngine`
+  (`backends/kokoro.py`, le défaut en diffusion continue), `ChatterboxEngine`
+  (le défaut hors ligne, clonage), `OpenVoiceEngine` (clonage), `KyutaiEngine`
+  (français et anglais natifs), `Audio8Engine` et `Qwen3TTSEngine` (clonage MLX
+  sur Apple Silicon), `ElevenLabsEngine` (le cloud payant, seulement quand on le
+  nomme) et `MockEngine` (déterministe, sans modèle). Chaque backend local
+  tourne dans le processus.
+- **Façade** (`speaker.py`) : `Speaker` — `say`, `stream`, `narrate`,
+  `clone_voice`, `warmup`, `from_profile`, `from_route`.
+- **Interfaces** : CLI (`cli.py`), API REST (`api.py`, [@fastapi]), MCP
+  (`mcp.py`).
 - **Évaluation** (`eval/`) : jeux de données, métriques, seuils, runner, priors,
   pont DeepEval [@deepeval], pilote multilingue.
 - **Colle écosystème** : journalisation via `os-helper`, découpe et concaténation
@@ -121,7 +126,7 @@ l'installation système d'abord, parce que la copie embarquée dans la roue
 données. Le clonage, il le refuse franchement en nommant `openvoice` et
 `chatterbox` — la réponse utile à une demande qu'il ne peut pas servir.
 
-Un cinquième backend était livré jusqu'à 0.8.0 : un client REST vers un moteur
+Un autre backend était livré jusqu'à 0.8.0 : un client REST vers un moteur
 hors processus sur un port fixe [@voicebox], avec bootstrap idempotent de
 profil, repli sync/async et retries à backoff exponentiel sur les échecs
 transitoires. Il a été retiré quand le défaut est passé dans le processus, et
