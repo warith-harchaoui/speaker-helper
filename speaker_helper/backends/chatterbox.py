@@ -81,6 +81,66 @@ EMOTION_EXAGGERATION_BASE: dict[str, float] = {
 #: variation without sounding careless.
 PACE_CFG_WEIGHT: dict[str, float] = {"slow": 0.7, "normal": 0.5, "fast": 0.3}
 
+#: The trailing-artifact guard (see :func:`trailing_artifact_start`) reads the
+#: take in 20 ms frames. A frame is *voiced* when it is louder than -45 dBFS
+#: and its autocorrelation peaks at 0.6 or more between 70 and 400 Hz, the
+#: range of a speaking voice's fundamental. A *gap* is 100 ms below -55 dBFS.
+TAIL_FRAME_S: float = 0.020
+TAIL_VOICED_DB: float = -45.0
+TAIL_VOICED_PERIODICITY: float = 0.6
+TAIL_GAP_DB: float = -55.0
+TAIL_GAP_S: float = 0.100
+
+
+def _periodicity(frame: Any, sample_rate_hz: int) -> float:
+    """Highest normalised autocorrelation at a voice's pitch lag, 0 to 1."""
+    import numpy as np
+
+    centred = frame - frame.mean()
+    energy = float((centred * centred).sum())
+    if energy < 1e-12:
+        return 0.0
+    ac = np.correlate(centred, centred, "full")[len(centred) - 1 :] / energy
+    return float(ac[int(sample_rate_hz / 400) : int(sample_rate_hz / 70)].max())
+
+
+def trailing_artifact_start(samples: Any, sample_rate_hz: int) -> int | None:
+    """Where the noise the model appends after the last word begins, if any.
+
+    The multilingual model, which serves French, sometimes keeps generating
+    after the sentence is said: the voice stops, a true silence follows, then
+    a second or so of clicks or a rising breath with no voice in it. Measured
+    2026-11-06 on a French launch film: three takes out of eleven, tails of
+    0.31, 1.08 and 1.19 s; none of the eleven English (Turbo) takes.
+
+    The rule keys on the voice, not the level, because the noise is as loud as
+    speech (-24 dBFS). After the last voiced frame, the first 100 ms gap that
+    is followed by anything audible marks the cut, placed at the end of the
+    gap so the word keeps its natural release. A take with no such gap, or
+    whose gap is followed only by silence, is returned untouched (``None``).
+    A final unvoiced consonant is safe: it is joined to its vowel, never
+    separated from it by 100 ms of silence.
+    """
+    import numpy as np
+
+    n = int(sample_rate_hz * TAIL_FRAME_S)
+    frames = [samples[i * n : (i + 1) * n] for i in range(len(samples) // n)]
+    db = [20 * np.log10(np.sqrt(float((f * f).mean())) + 1e-9) for f in frames]
+    voiced = [
+        d > TAIL_VOICED_DB and _periodicity(f, sample_rate_hz) >= TAIL_VOICED_PERIODICITY
+        for f, d in zip(frames, db, strict=True)
+    ]
+    if not any(voiced):
+        return None
+    last = max(i for i, v in enumerate(voiced) if v)
+    need = int(round(TAIL_GAP_S / TAIL_FRAME_S))
+    run = 0
+    for i in range(last + 1, len(frames)):
+        run = run + 1 if db[i] < TAIL_GAP_DB else 0
+        if run >= need:
+            return (i + 1) * n if any(d >= TAIL_GAP_DB for d in db[i + 1 :]) else None
+    return None
+
 
 def check_install() -> int:
     """Return 0 when ``chatterbox`` is importable, 1 otherwise.
@@ -350,6 +410,10 @@ class ChatterboxEngine:
         compute_s = time.perf_counter() - started
 
         samples = np.clip(wav.squeeze().detach().cpu().numpy(), -1.0, 1.0)
+        # Noise the model appended after the last word: cut, never spoken.
+        cut = trailing_artifact_start(samples, SAMPLE_RATE_HZ)
+        if cut is not None:
+            samples = samples[:cut]
         pcm = (samples * 32_767).astype(np.int16)
 
         from speaker_helper.backends.kokoro import pcm_to_wav_bytes
