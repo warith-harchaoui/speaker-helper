@@ -46,6 +46,7 @@ from __future__ import annotations
 
 import asyncio
 import importlib
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -139,6 +140,60 @@ def trailing_artifact_start(samples: Any, sample_rate_hz: int) -> int | None:
         run = run + 1 if db[i] < TAIL_GAP_DB else 0
         if run >= need:
             return (i + 1) * n if any(d >= TAIL_GAP_DB for d in db[i + 1 :]) else None
+    return None
+
+
+#: Frames kept after the one where the model's attention reaches the end of the
+#: text. One speech token is 40 ms; the last word has stopped 150 to 200 ms
+#: before that frame (measured 2026-11-06), so one more frame is pure margin.
+END_OF_TEXT_MARGIN_FRAMES: int = 1
+
+_analyzers = threading.local()
+
+
+def _spy_on_alignment() -> None:
+    """Keep a handle on each multilingual alignment analyzer, per thread.
+
+    ``T3.inference`` builds a fresh ``AlignmentStreamAnalyzer`` on every call
+    and drops it afterwards, with the whole alignment matrix inside. Wrapping
+    its constructor, once, is the only way to read that matrix without
+    patching the package. The handle is thread-local because ``synthesize``
+    runs ``generate`` in a worker thread.
+    """
+    try:
+        from chatterbox.models.t3.inference import alignment_stream_analyzer as asa
+    except ImportError:
+        return
+    cls = asa.AlignmentStreamAnalyzer
+    if getattr(cls, "_speaker_helper_spy", False):
+        return
+    init = cls.__init__
+
+    def __init__(self: Any, *args: Any, **kwargs: Any) -> None:
+        init(self, *args, **kwargs)
+        _analyzers.current = self
+
+    cls.__init__ = __init__
+    cls._speaker_helper_spy = True
+
+
+def end_of_text_frame(alignment: Any, completed_at: int | None) -> int | None:
+    """The speech frame at which the model has finished saying the text.
+
+    The multilingual model never stops by itself in French: on 2026-11-06 all
+    eleven lines of a launch film ended on upstream's forced stop
+    (``long_tail``), and everything generated between the end of the text and
+    that stop stays in the audio — silence, a breath, or a sung "aaah" as loud
+    as the voice. Upstream's own alignment says where the text ends: the text
+    is framed by a start and an end token, and the frame whose attention first
+    settles on the end token (two frames in a row, the map is noisy) is the
+    one after the last word. Returns ``None`` when it never settles there.
+    """
+    positions = alignment.argmax(dim=1).tolist()
+    last = alignment.shape[1] - 1
+    for t in range(completed_at or 0, len(positions)):
+        if positions[t] == last and (t + 1 == len(positions) or positions[t + 1] == last):
+            return t
     return None
 
 
@@ -383,9 +438,15 @@ class ChatterboxEngine:
             kwargs["exaggeration"] = exaggeration
             kwargs["cfg_weight"] = PACE_CFG_WEIGHT.get(pace, 0.5)
 
+        _spy_on_alignment()
+
+        def generate() -> tuple[Any, Any]:
+            _analyzers.current = None
+            return model.generate(**kwargs), _analyzers.current
+
         started = time.perf_counter()
         try:
-            wav = await asyncio.to_thread(model.generate, **kwargs)
+            wav, analyzer = await asyncio.to_thread(generate)
         except IndexError as exc:
             # Upstream bug, and one that lands squarely on this suite: the
             # alignment watchdog (`AlignmentStreamAnalyzer`) is instantiated
@@ -410,7 +471,15 @@ class ChatterboxEngine:
         compute_s = time.perf_counter() - started
 
         samples = np.clip(wav.squeeze().detach().cpu().numpy(), -1.0, 1.0)
-        # Noise the model appended after the last word: cut, never spoken.
+        # What the model generated after the text was said: cut, never spoken.
+        # The alignment says where the text ends; the take's own frames are
+        # spread evenly over its samples.
+        if analyzer is not None and analyzer.alignment.shape[0]:
+            frame = end_of_text_frame(analyzer.alignment, analyzer.completed_at)
+            if frame is not None:
+                kept = (frame + 1 + END_OF_TEXT_MARGIN_FRAMES) / analyzer.alignment.shape[0]
+                samples = samples[: int(len(samples) * min(1.0, kept))]
+        # Noise left before that point, after a true silence: cut as well.
         cut = trailing_artifact_start(samples, SAMPLE_RATE_HZ)
         if cut is not None:
             samples = samples[:cut]

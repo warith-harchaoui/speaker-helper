@@ -14,8 +14,13 @@ Warith HARCHAOUI — https://linkedin.com/in/warith-harchaoui/
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
-from speaker_helper.backends.chatterbox import SAMPLE_RATE_HZ, trailing_artifact_start
+from speaker_helper.backends.chatterbox import (
+    SAMPLE_RATE_HZ,
+    end_of_text_frame,
+    trailing_artifact_start,
+)
 
 SR = SAMPLE_RATE_HZ
 
@@ -53,3 +58,29 @@ def test_a_final_consonant_joined_to_its_vowel_is_kept() -> None:
 def test_a_clean_take_and_a_silent_one_are_untouched() -> None:
     assert trailing_artifact_start(np.concatenate([voice(1.0), silence(0.5)]), SR) is None
     assert trailing_artifact_start(silence(1.0), SR) is None
+
+
+# ── The alignment says where the text ends ─────────────────────────────────
+
+
+def alignment(positions: list[int], width: int):  # type: ignore[no-untyped-def]
+    torch = pytest.importorskip("torch")
+    a = torch.zeros(len(positions), width)
+    for t, p in enumerate(positions):
+        a[t, p] = 1.0
+    return a
+
+
+def test_the_take_ends_where_attention_settles_on_the_end_token() -> None:
+    a = alignment([1, 2, 3, 4, 5, 5, 6, 6, 6, 6, 6, 6], width=7)
+    assert end_of_text_frame(a, completed_at=4) == 6
+
+
+def test_a_single_noisy_frame_on_the_end_token_is_not_the_end() -> None:
+    a = alignment([1, 2, 6, 3, 4, 5, 6, 6, 6], width=7)
+    assert end_of_text_frame(a, completed_at=None) == 6
+
+
+def test_attention_that_never_reaches_the_end_token_cuts_nothing() -> None:
+    a = alignment([1, 2, 3, 4, 5, 5, 5], width=7)
+    assert end_of_text_frame(a, completed_at=3) is None
