@@ -6,8 +6,19 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.15.3] - 2026-11-12
+
 ### Fixed
 
+- **Chatterbox in French no longer ends a take on noise.** The multilingual
+  model sometimes kept generating after the last word: a true silence, then a
+  second or so of clicks or a rising breath with no voice in it (three takes
+  out of eleven on a French launch film). Two guards now cut it. The take
+  stops one frame after the model's alignment reaches the end of the text, so
+  nothing produced before the forced `long_tail` stop is rendered. And after
+  the last voiced frame, a 100 ms gap followed by anything audible marks the
+  cut; the rule reads voicing, not level, because the noise is as loud as
+  speech. A take with no such tail is returned untouched.
 - **`TRIGGERS.md` and the skill's `references/triggers.md` are one catalogue
   again.** They had drifted into two different files: trigger phrasings on the
   root side, a list of engine names on the skill side. Both now carry the
