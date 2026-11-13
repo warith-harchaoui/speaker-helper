@@ -239,3 +239,23 @@ def test_prose_without_notation_gains_no_override() -> None:
     """An identical `say` would make every block look like it carries one."""
     segs = resolve_spoken_math([Segment(text="Just words here.")], "en")
     assert segs[0].say == ""
+
+
+async def test_emotion_reaches_a_backend_that_has_the_dial() -> None:
+    """A cheerful page must sound cheerful wherever the engine can do it."""
+    heard: list[tuple[str, str]] = []
+    async with _speaker() as spk:
+        mock = spk.engine
+
+        class WithDial:
+            async def synthesize(self, text, *, language=None, emotion="neutral", intensity=""):
+                heard.append((emotion, intensity))
+                return await mock.synthesize(text, language=language)
+
+            async def aclose(self):
+                await mock.aclose()
+
+        spk.engine = WithDial()
+        result = await spk.narrate([Segment(text="Bonjour.", emotion="cheerful", intensity="high")])
+    assert heard == [("cheerful", "high")]
+    assert result.ignored_hints == []

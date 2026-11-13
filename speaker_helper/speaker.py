@@ -587,10 +587,10 @@ class Speaker:
             if not seg.text.strip():
                 # Nothing on the page either: no cue, no silence, no trace.
                 continue
-            if seg.emotion and seg.emotion != "neutral":
+            if seg.emotion and seg.emotion != "neutral" and not self._honours("emotion"):
                 ignored.add("emotion")
-                if seg.intensity:
-                    ignored.add("intensity")
+            if seg.intensity and not self._honours("intensity"):
+                ignored.add("intensity")
 
             # Skipped on the first piece: a "pause before" with nothing before
             # it is dead air at the head of the file.
@@ -715,7 +715,18 @@ class Speaker:
             extra["voice"] = voice
         if "speed" in signature:
             extra["speed"] = PACE_SPEED.get(seg.pace, 1.0)
+        # The emotion dial (chatterbox, openvoice): a document that asks for a
+        # cheerful reading gets one wherever the engine has the dial.
+        if "emotion" in signature and seg.emotion:
+            extra["emotion"] = seg.emotion
+            if "intensity" in signature and seg.intensity:
+                extra["intensity"] = seg.intensity
         return extra
+
+    def _honours(self, hint: str) -> bool:
+        """Whether the engine's ``synthesize`` takes ``hint`` as a keyword."""
+        signature = getattr(type(self.engine).synthesize, "__kwdefaults__", None) or {}
+        return hint in signature
 
     # ----- blocking convenience ------------------------------------------
 
