@@ -2,7 +2,7 @@
 
 [🇫🇷](LISEZMOI.md) · [🇬🇧](README.md)
 
-[![CI](https://github.com/warith-harchaoui/speaker-helper/actions/workflows/ci.yml/badge.svg)](https://github.com/warith-harchaoui/speaker-helper/actions/workflows/ci.yml) [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](LICENSE) [![Python](https://img.shields.io/badge/python-3.10%E2%80%933.13-blue.svg)](#)
+[![CI](https://github.com/warith-harchaoui/speaker-helper/actions/workflows/ci.yml/badge.svg)](https://github.com/warith-harchaoui/speaker-helper/actions/workflows/ci.yml) [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](LICENSE) [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](#)
 
 `Speaker Helper` fait partie d'une collection de bibliothèques appelée `AI Helpers`, développée pour construire de l'Intelligence Artificielle.
 
@@ -154,7 +154,7 @@ d'**évaluation** produit ces preuves.
 
 ## Installation
 
-**Prérequis** — **Python 3.10–3.13** et **git**, **libsndfile**, **ffmpeg**, multiplateforme. `soundfile` nécessite la bibliothèque native `libsndfile` et `audio-helper` (découpe/concaténation pour le clonage) utilise `ffmpeg` :
+**Prérequis** — **Python 3.10 ou plus récent** et **git**, **libsndfile**, **ffmpeg**, multiplateforme. `soundfile` nécessite la bibliothèque native `libsndfile` et `audio-helper` (découpe/concaténation pour le clonage) utilise `ffmpeg` :
 
 - 🍎 **macOS** ([Homebrew](https://brew.sh)) : `brew install python git libsndfile ffmpeg`
 - 🐧 **Ubuntu/Debian** : `sudo apt update && sudo apt install -y python3 python3-pip git libsndfile1 ffmpeg`
@@ -491,7 +491,7 @@ speaker-helper --backend mock eval    # exécute la passerelle d'évaluation en 
 ```
 
 La CI exécute ruff (lint + format) et la suite rapide avec couverture verrouillée
-(`--cov-fail-under=70`) sur Python 3.10–3.13 ; un test qui échoue bloque les
+(`--cov-fail-under=70`) sur Python 3.10 ou plus récent ; un test qui échoue bloque les
 fusions. La suite rapide pilote le backend `mock` déterministe : elle ne nécessite
 aucun moteur.
 

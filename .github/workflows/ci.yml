@@ -41,9 +41,9 @@ jobs:
     timeout-minutes: 20
     strategy:
       fail-fast: false
-      # The two ends of `requires-python = ">=3.10,<3.14"`, not every version in
-      # between. Both ends carry information -- 3.10 is the floor a `pip install`
-      # will accept, 3.13 the ceiling -- while 3.11 and 3.12 can only fail in
+      # Two ends, not every version in between: 3.10 is the floor a
+      # `pip install` will accept (`requires-python = ">=3.10"`), 3.13 the newest
+      # one tested here -- while 3.11 and 3.12 can only fail in
       # ways one of the ends already fails. Four jobs for two bits of signal is
       # the ambition this suite trades away to stay fast.
       #

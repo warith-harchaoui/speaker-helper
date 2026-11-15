@@ -6,6 +6,14 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.15.5] - 2026-11-15
+
+### Changed
+
+- **No upper bound on Python any more.** `requires-python` was capped at
+  `>=3.10,<3.14` with no recorded reason, which refused every newer Python at install
+  time; it is now `>=3.10`. Badges and prerequisites say "Python 3.10 or later".
+
 ## [0.15.4] - 2026-11-15
 
 ### Fixed
@@ -205,7 +213,6 @@ to [Semantic Versioning](https://semver.org/).
 - `audio-helper` floor raised to **2.6.0**, the release where
   `sound_converter` gained a `bitrate` argument. Below it a 64 kb/s narration
   cannot be asked for at all.
-
 
 ### Fixed
 - **The chatterbox catalogue now names a female voice.** `list_voices` answered
