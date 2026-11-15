@@ -6,6 +6,20 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.15.4] - 2026-11-15
+
+### Fixed
+
+- **`narrate` passes each segment's emotion and intensity to an engine that
+  has the dial** (chatterbox, openvoice), instead of reporting them as
+  ignored. Only an engine whose `synthesize` takes no such keyword still
+  reports them.
+
+### Changed
+
+- The author's address in the package metadata is now
+  `warithmetics@deraison.ai`.
+
 ## [0.15.3] - 2026-11-12
 
 ### Fixed
