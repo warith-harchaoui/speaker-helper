@@ -17,6 +17,11 @@ for running as a Docker service. It exposes:
 * ``POST /clone`` — multipart upload of reference audio (plus optional
   transcripts) to clone a voice; missing transcripts come from ``vocal-helper``.
   The clone becomes the server's active voice for subsequent ``/synth`` calls.
+* ``POST /eardrum`` — start the Ralph Eardrum Loop on a text and/or words; it
+  answers ``202`` at once with a ``job_id``. ``GET /eardrum/{job_id}`` reads
+  the job (``running``, ``done`` with one entry per word, or ``failed`` with
+  the error); ``GET /eardrum/{job_id}/report`` serves the HTML report. A job,
+  not a request held open: the loop takes minutes.
 
 This module imports FastAPI/pydantic/uvicorn at import time, so it is only ever
 imported behind the ``server`` extra (the CLI imports it lazily, and the core
@@ -117,6 +122,46 @@ class RouteRequestBody(BaseModel):
     rtf_ceiling: float = Field(0.8, description="Online RTF ceiling (must keep up).")
     rtf_budget: float | None = Field(None, description="Offline RTF patience cap.")
     quality_floor: float | None = Field(None, description="Minimum quality to accept.")
+
+
+class EardrumRequest(BaseModel):
+    """Request body for ``POST /eardrum`` (the Ralph Eardrum Loop).
+
+    Parameters
+    ----------
+    text : str or None
+        A document: its lexicon words and the words at risk it holds (proper
+        nouns, acronyms, foreign words) are checked.
+    words : list of str
+        Explicit words to check.
+    language : str or None
+        Override the configured language.
+    include_lexicon : bool
+        Also check the lexicon's entries (all of them when no ``text``).
+    listen_all : bool
+        Say the whole ``text`` first and add every word heard wrong.
+    max_iter : int
+        Most respellings the LLM proposes per word.
+    threshold : float
+        Phonetic distance at or below which a word counts as said right.
+    web : bool
+        Look targets up on Wiktionary / Wikipedia.
+    llm : bool
+        Let the local LLM propose respellings.
+    dry_run : bool
+        Report, but save nothing to the verified sidecar.
+    """
+
+    text: str | None = Field(None, description="A document to check.")
+    words: list[str] = Field(default_factory=list, description="Explicit words to check.")
+    language: str | None = Field(None, description="Override target language.")
+    include_lexicon: bool = Field(True, description="Also check lexicon entries.")
+    listen_all: bool = Field(False, description="Say the whole text; add words heard wrong.")
+    max_iter: int = Field(4, ge=0, le=12, description="Most LLM respellings per word.")
+    threshold: float = Field(0.25, gt=0, le=1, description="Distance counted as right.")
+    web: bool = Field(True, description="Look targets up on Wiktionary / Wikipedia.")
+    llm: bool = Field(True, description="Let the local LLM propose respellings.")
+    dry_run: bool = Field(False, description="Report only; save nothing.")
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -360,6 +405,87 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
         return {"voice_id": voice_id}
 
+    # The Ralph Eardrum Loop says every word several times through the real
+    # engine: minutes, not a request to hold open. So it runs as a job — POST
+    # starts it and answers at once with an id, GET reads its state and, when
+    # done, the results; the HTML report with the takes is served beside them.
+    # One job at a time: the loop already saturates the engine, and two of
+    # them would only halve each other's speed. It gets its own Speaker,
+    # because it swaps the lexicon in and out word by word and must not do
+    # that under a /synth request.
+    eardrum_jobs: dict[str, dict] = {}
+
+    @app.post("/eardrum", operation_id="eardrum_start", status_code=202)
+    async def eardrum_start(req: EardrumRequest) -> dict:
+        """Start the Ralph Eardrum Loop; answer with a job id to poll."""
+        import asyncio
+        import dataclasses
+        import uuid
+
+        if not req.text and not req.words and not req.include_lexicon:
+            raise HTTPException(status_code=400, detail="nothing to check: give text or words")
+        if req.listen_all and not req.text:
+            raise HTTPException(status_code=400, detail="listen_all needs a text")
+        if any(job["status"] == "running" for job in eardrum_jobs.values()):
+            raise HTTPException(status_code=409, detail="an eardrum job is already running")
+        job_settings = dataclasses.replace(settings)
+        if req.language:
+            job_settings.language = req.language
+        job_id = uuid.uuid4().hex[:12]
+        job: dict = {"id": job_id, "status": "running", "words": [], "report": None}
+        eardrum_jobs[job_id] = job
+
+        async def run() -> None:
+            """Run the loop, then store its summary (or its error) on the job."""
+            from speaker_helper.eardrum import run_eardrum_async
+
+            try:
+                report = await run_eardrum_async(
+                    job_settings,
+                    text=req.text,
+                    words=req.words or None,
+                    include_lexicon=req.include_lexicon,
+                    listen_everything=req.listen_all,
+                    max_iter=req.max_iter,
+                    threshold=req.threshold,
+                    web=req.web,
+                    llm=req.llm,
+                    dry_run=req.dry_run,
+                )
+            except Exception as exc:  # noqa: BLE001 - reported on the job, not raised
+                job.update(status="failed", error=f"{type(exc).__name__}: {exc}")
+                return
+            job.update(
+                status="done",
+                report=str(report.html) if report.html else None,
+                verified_path=str(report.verified_path) if report.verified_path else None,
+                meta=report.meta,
+                words=[_eardrum_summary(r) for r in report.results],
+            )
+
+        # Keep a reference so the task is not garbage-collected mid-run.
+        job["_task"] = asyncio.create_task(run())
+        return {"job_id": job_id, "status": "running"}
+
+    @app.get("/eardrum/{job_id}", operation_id="eardrum_status")
+    async def eardrum_status(job_id: str) -> dict:
+        """State of an eardrum job: running, done (with each word), or failed."""
+        job = eardrum_jobs.get(job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail=f"no eardrum job {job_id!r}")
+        return {k: v for k, v in job.items() if not k.startswith("_")}
+
+    @app.get("/eardrum/{job_id}/report", operation_id="eardrum_report")
+    async def eardrum_report(job_id: str) -> Response:
+        """The job's HTML report (every attempt, its score, what was heard)."""
+        from pathlib import Path
+
+        job = eardrum_jobs.get(job_id)
+        if job is None or not job.get("report"):
+            raise HTTPException(status_code=404, detail=f"no report for job {job_id!r} yet")
+        page = Path(job["report"]).read_text(encoding="utf-8")
+        return Response(content=page, media_type="text/html")
+
     # Republish the routes above as agent tools. Before the GUI, because the
     # GUI mounts a catch-all at ``/``.
     _mount_mcp(app)
@@ -369,6 +495,37 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     _mount_gui(app)
 
     return app
+
+
+def _eardrum_summary(result: object) -> dict:
+    """One word's eardrum result, as the job status reports it.
+
+    Parameters
+    ----------
+    result : WordResult
+        The loop's result for one word.
+
+    Returns
+    -------
+    dict
+        Word, verdict, best spelling and score, what was heard, target,
+        whether it was saved, and the note for the human.
+    """
+    attempts = getattr(result, "attempts", [])
+    best_index = getattr(result, "best", -1)
+    best = attempts[best_index] if attempts and best_index >= 0 else None
+    target = getattr(result, "target", None) or {}
+    return {
+        "word": getattr(result, "word", ""),
+        "verdict": getattr(result, "verdict", ""),
+        "best": best.candidate if best else None,
+        "score": best.score if best else None,
+        "heard": best.takes[0].heard if best and best.takes else None,
+        "target": target.get("variants"),
+        "target_source": target.get("source"),
+        "saved": getattr(result, "saved", False),
+        "note": getattr(result, "note", ""),
+    }
 
 
 def _mount_mcp(app: FastAPI) -> None:
@@ -396,8 +553,9 @@ def _mount_mcp(app: FastAPI) -> None:
             name="speaker-helper",
             description=(
                 "Speech synthesis as agent tools: say a sentence, list the "
-                "voices, clone one from a recording, and narrate a document "
-                "with the cues that say where each block is spoken."
+                "voices, clone one from a recording, narrate a document "
+                "with the cues that say where each block is spoken, and run "
+                "the Ralph Eardrum Loop that checks pronunciation by ear."
             ),
         )
         # Newer releases split mount() into transport-specific mount_http()

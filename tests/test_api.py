@@ -160,3 +160,83 @@ def test_every_os_helper_reference_resolves() -> None:
         if not hasattr(osh, name)
     }
     assert not missing, f"these os_helper names do not exist: {sorted(missing)}"
+
+
+def test_the_eardrum_loop_runs_as_a_job_and_reports_each_word(monkeypatch, tmp_path) -> None:
+    """POST starts it and answers 202 at once; GET reads the words when done."""
+    from speaker_helper.eardrum import EardrumReport
+    from speaker_helper.eardrum.loop import Attempt, Take, WordResult
+
+    seen: dict = {}
+
+    async def fake_run(settings, **kwargs):  # type: ignore[no-untyped-def]
+        """Record the call, return one fixed word."""
+        seen.update(kwargs, language=settings.language)
+        page = tmp_path / "index.html"
+        page.write_text("<h1>Ralph Eardrum Loop</h1>", encoding="utf-8")
+        word = WordResult(
+            "Feynman",
+            "fr",
+            "mock",
+            target={"variants": ["fajnman"], "source": "wikipedia"},
+            attempts=[
+                Attempt("Faïnemane", "respelling", "llm", 0.06, [Take("", 0.06, "f a j n", "")])
+            ],
+            best=0,
+            verdict="fixed",
+            saved=True,
+        )
+        return EardrumReport(results=[word], html=page, meta={"engine": "mock"})
+
+    monkeypatch.setattr("speaker_helper.eardrum.run_eardrum_async", fake_run)
+    with _client() as client:
+        started = client.post("/eardrum", json={"words": ["Feynman"], "language": "fr"})
+        assert started.status_code == 202
+        job_id = started.json()["job_id"]
+        status = client.get(f"/eardrum/{job_id}").json()
+        for _ in range(50):
+            if status["status"] != "running":
+                break
+            status = client.get(f"/eardrum/{job_id}").json()
+        assert status["status"] == "done"
+        assert status["words"][0] == {
+            "word": "Feynman",
+            "verdict": "fixed",
+            "best": "Faïnemane",
+            "score": 0.06,
+            "heard": "f a j n",
+            "target": ["fajnman"],
+            "target_source": "wikipedia",
+            "saved": True,
+            "note": "",
+        }
+        assert "Ralph Eardrum Loop" in client.get(f"/eardrum/{job_id}/report").text
+    assert seen["words"] == ["Feynman"] and seen["language"] == "fr"
+
+
+def test_the_eardrum_route_refuses_what_it_cannot_do() -> None:
+    """Nothing to check, listen_all without text, an unknown job: all said plainly."""
+    with _client() as client:
+        nothing = {"include_lexicon": False}
+        assert client.post("/eardrum", json=nothing).status_code == 400
+        assert client.post("/eardrum", json={"listen_all": True}).status_code == 400
+        assert client.get("/eardrum/nope").status_code == 404
+        assert client.get("/eardrum/nope/report").status_code == 404
+
+
+def test_a_failing_eardrum_job_says_why(monkeypatch) -> None:
+    """An error inside the loop lands on the job, not in a 500."""
+
+    async def boom(settings, **kwargs):  # type: ignore[no-untyped-def]
+        """Fail like a missing extra would."""
+        raise ImportError("pip install 'speaker-helper[eardrum]'")
+
+    monkeypatch.setattr("speaker_helper.eardrum.run_eardrum_async", boom)
+    with _client() as client:
+        job_id = client.post("/eardrum", json={"words": ["x"]}).json()["job_id"]
+        status = client.get(f"/eardrum/{job_id}").json()
+        for _ in range(50):
+            if status["status"] != "running":
+                break
+            status = client.get(f"/eardrum/{job_id}").json()
+        assert status["status"] == "failed" and "eardrum" in status["error"]

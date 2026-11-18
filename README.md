@@ -497,6 +497,17 @@ your ear decides. `--dry-run` reports without saving, `--offline` skips the
 web, `--no-llm` only measures. The command exits `1` while a word is still
 wrong, so it can gate a narration in CI.
 
+Over HTTP (and as MCP tools `eardrum_start`, `eardrum_status`,
+`eardrum_report`), it runs as a job, because it takes minutes:
+
+```bash
+curl -s -X POST localhost:8080/eardrum -H 'content-type: application/json' \
+     -d '{"text": "Hier, Feynman citait Nietzsche.", "language": "fr"}'
+# {"job_id": "3f9c2a1b7d4e", "status": "running"}
+curl -s localhost:8080/eardrum/3f9c2a1b7d4e          # running → done, one entry per word
+curl -s localhost:8080/eardrum/3f9c2a1b7d4e/report   # the HTML report
+```
+
 From Python:
 
 ```python

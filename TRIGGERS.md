@@ -54,7 +54,7 @@ before the sub-command.
 | Pick the engine + mode for a situation | `speaker-helper route --condition offline` | `route(...)`, `RouteRequest` | `POST /route` |
 | Check the backend can actually run | `speaker-helper health` | `available_backends()` | `GET /health` |
 | Fetch the weights an engine needs | `speaker-helper install-voice --engine kokoro` | — | — |
-| Check pronunciation by ear and fix respellings (Ralph Eardrum Loop) | `speaker-helper eardrum [doc.md] [--words A,B] [--listen-all]` | `speaker_helper.eardrum.run_eardrum(...)` | — |
+| Check pronunciation by ear and fix respellings (Ralph Eardrum Loop) | `speaker-helper eardrum [doc.md] [--words A,B] [--listen-all]` | `speaker_helper.eardrum.run_eardrum(...)` | `POST /eardrum` → `GET /eardrum/{job_id}` (MCP: `eardrum_start`, `eardrum_status`, `eardrum_report`) |
 | Fetch the eardrum loop's phoneme recogniser | `speaker-helper install-voice --engine eardrum` | — | — |
 | Re-voice audio from a source | `speaker-helper speak-from --source youtube --url URL` | — | — |
 | Score the engine against a dataset | `speaker-helper eval --dataset cases.jsonl` | — | — |

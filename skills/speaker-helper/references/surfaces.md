@@ -52,9 +52,9 @@ speaker-helper route --condition online_realtime   # which engine, in numbers
 speaker-helper --language fr eardrum doc.md         # pronunciation, checked by ear
 ```
 
-`eardrum` is command-line and library only (`speaker_helper.eardrum`): a run
-says every word several times through the real engine and can last minutes,
-which is not a request an HTTP route should hold open.
+`eardrum` is also a library call (`speaker_helper.eardrum.run_eardrum`) and,
+over HTTP and MCP, a job (below): a run says every word several times through
+the real engine and lasts minutes.
 
 ## 3. HTTP API
 
@@ -71,11 +71,19 @@ speaker-helper serve --bind-host 0.0.0.0 --bind-port 8080
 | `POST /narrate` | blocks in; audio **and cues** out, as JSON |
 | `POST /clone` | a reference recording in, a voice id out |
 | `POST /route` | the engine choice, with the numbers behind it |
+| `POST /eardrum` | start the Ralph Eardrum Loop on a text and/or words; `202` and a `job_id` at once |
+| `GET /eardrum/{job_id}` | the job: `running`, `done` (each word's verdict, best spelling, score, what was heard) or `failed` |
+| `GET /eardrum/{job_id}/report` | the HTML report with every take to listen to |
 | `GET /` | a dependency-free single-page GUI over all of the above |
 
 `/narrate` answers JSON where `/synth` answers audio, and the asymmetry is
 deliberate: the cues are the reason that route exists, and a caller who only
 wanted sound already has `/synth`.
+
+`/eardrum` is a job rather than a request held open, because the loop says
+each word several times through the real engine. One job runs at a time (a
+second `POST` answers `409`), on its own engine instance, so the lexicon it
+swaps word by word never leaks into a concurrent `/synth`.
 
 ## 4. MCP
 
@@ -85,7 +93,8 @@ speaker-helper-mcp --host 127.0.0.1 --port 8080
 
 No second implementation: `fastapi-mcp` republishes the routes above from
 their own descriptions, so an agent calling `narrate` and a shell calling
-`POST /narrate` reach the same function.
+`POST /narrate` reach the same function. The eardrum loop arrives the same way
+as three tools: `eardrum_start`, `eardrum_status`, `eardrum_report`.
 
 This surface was removed in 0.7.5 and brought back. `fastapi-mcp` 0.4.0 called
 the `mcp` SDK with an argument count it no longer accepted, and the mount was

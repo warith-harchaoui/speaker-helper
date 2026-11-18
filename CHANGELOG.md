@@ -28,6 +28,11 @@ to [Semantic Versioning](https://semver.org/).
     A hand-written respelling is never replaced; the report proposes.
   - **Report**: `.private/eardrum-loop/<date-time>/index.html` with every
     attempt, its score, what was heard and the audio (sentence and word).
+  - **Every surface**: CLI (`speaker-helper eardrum`), library
+    (`run_eardrum`), REST as a job (`POST /eardrum` → `202` + `job_id`,
+    `GET /eardrum/{job_id}`, `GET /eardrum/{job_id}/report`; one job at a
+    time, on its own engine instance), MCP (`eardrum_start`,
+    `eardrum_status`, `eardrum_report`), and the skill.
   - `speaker-helper install-voice --engine eardrum` fetches the recogniser at a
     pinned revision with exact sizes; the `eardrum` extra brings torch,
     transformers and phonemizer.

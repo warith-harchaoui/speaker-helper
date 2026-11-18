@@ -515,6 +515,18 @@ orientent ; votre oreille tranche. `--dry-run` rapporte sans enregistrer,
 `--offline` se passe du web, `--no-llm` ne fait que mesurer. La commande sort
 en `1` tant qu'un mot reste faux, elle peut donc garder une narration en CI.
 
+En HTTP (et comme outils MCP `eardrum_start`, `eardrum_status`,
+`eardrum_report`), elle tourne en tâche de fond, parce qu'elle prend des
+minutes :
+
+```bash
+curl -s -X POST localhost:8080/eardrum -H 'content-type: application/json' \
+     -d '{"text": "Hier, Feynman citait Nietzsche.", "language": "fr"}'
+# {"job_id": "3f9c2a1b7d4e", "status": "running"}
+curl -s localhost:8080/eardrum/3f9c2a1b7d4e          # running → done, un résultat par mot
+curl -s localhost:8080/eardrum/3f9c2a1b7d4e/report   # le rapport HTML
+```
+
 Depuis Python :
 
 ```python

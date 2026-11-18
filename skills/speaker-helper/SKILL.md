@@ -128,7 +128,10 @@ the respelling until it passes. Winners go to `lexicon.yaml.eardrum.yaml`,
 per engine; hand-written respellings are never replaced. Needs
 `pip install 'speaker-helper[eardrum]'` and, once,
 `speaker-helper install-voice --engine eardrum`. The report with every take is
-`.private/eardrum-loop/<date-time>/index.html`. Dates, times,
+`.private/eardrum-loop/<date-time>/index.html`. Over HTTP / MCP it is a job:
+`POST /eardrum` (tool `eardrum_start`) returns a `job_id`, then
+`GET /eardrum/{job_id}` (`eardrum_status`) until `done`, and
+`GET /eardrum/{job_id}/report` (`eardrum_report`) for the HTML. Dates, times,
 amounts and numbers are spelled out first (French, English), so `14/11` is
 read as a date and not guessed at; the cues keep the digits.
 
