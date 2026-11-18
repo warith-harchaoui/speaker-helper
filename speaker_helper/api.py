@@ -90,12 +90,18 @@ class NarrateRequest(BaseModel):
     read_math : str or None
         Language in which to speak any notation the blocks contain. The cues
         keep the page's own text either way — that is the point of the pair.
+    select : int
+        Draw each block up to this many times and keep the take whose
+        intonation and emotion agree with the text (``0``: one draw).
     """
 
     segments: list = Field(..., min_length=1, description="The document's blocks.")
     language: str | None = Field(None, description="Override target language.")
     voice: str | None = Field(None, description="Override the voice.")
     read_math: str | None = Field(None, description="Speak notation as words in this language.")
+    select: int = Field(
+        0, ge=0, le=8, description="Draw each block up to N times; keep the take that agrees."
+    )
 
 
 class RouteRequestBody(BaseModel):
@@ -312,7 +318,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             segments = coerce_segments(req.segments)
             if req.read_math:
                 segments = resolve_spoken_math(segments, req.read_math)
-            result = await speaker.narrate(segments, language=req.language, voice=req.voice)
+            chooser = None
+            if req.select:
+                from speaker_helper.eardrum.expressive import TakeSelector
+
+                chooser = TakeSelector(req.select)
+            result = await speaker.narrate(
+                segments, language=req.language, voice=req.voice, choose=chooser
+            )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except Exception as exc:  # noqa: BLE001 - surface engine failures as 502
@@ -327,6 +340,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "language": result.language,
             "language_fallback": result.language_fallback,
             "ignored_hints": result.ignored_hints,
+            "selection": result.selection,
             "cues": [
                 {
                     "index": cue.index,

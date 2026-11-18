@@ -569,7 +569,7 @@ parole de synthèse (*arXiv 2603.16483*).
 ```bash
 speaker-helper --language fr eardrum --prosody chapitre.md --measure-only  # texte et voix s'accordent-ils ?
 speaker-helper --language fr eardrum --prosody segments.json               # et corriger là où non
-speaker-helper --language fr narrate .private/eardrum-loop/prosody-*/segments.tuned.json -o chapitre.wav
+speaker-helper --language fr narrate segments.json --select 4 -o chapitre.wav  # choisir chaque prise à l'oreille
 ```
 
 Quand une phrase est en désaccord, la boucle essaie des leviers dans un
@@ -591,7 +591,19 @@ prise :
 La référence neutre est la moyenne de deux prises neutres, et une prise doit
 déplacer l'activation de 1,0 pour compter comme activée ou calmée : des
 prises neutres répétées d'une même phrase diffèrent déjà jusqu'à 1,4, et tout
-écart plus petit relève du hasard. Le rapport montre, phrase par phrase, l'attendu, ce
+écart plus petit relève du hasard.
+
+Comme la correction la plus efficace sur un moteur qui échantillonne est un
+nouveau *tirage*, elle ne peut pas s'écrire dans un fichier : la narration
+suivante tire à nouveau. Le choix se fait donc là où l'audio se fabrique.
+`narrate --select N` (et `"select": N` sur `POST /narrate`) tire chaque bloc
+jusqu'à N fois et garde la première prise dont la fin de phrase et
+l'activation s'accordent avec le texte, sinon la plus proche. Il ne dépense
+de tirages que là où quelque chose peut rater : un bloc dont la forme admet
+toute fin et qui ne porte pas d'émotion coûte un tirage ; l'activation n'est
+jugée que pour les blocs marqués calmes ou activés, face à deux tirages
+neutres. Les changements de réglage trouvés par la boucle (`?!`, débit,
+émotion) vont toujours dans `segments.tuned.json`. Le rapport montre, phrase par phrase, l'attendu, ce
 qu'a fait chaque prise, et l'audio ; les réglages gagnants sont écrits en
 segments que `narrate` relit.
 

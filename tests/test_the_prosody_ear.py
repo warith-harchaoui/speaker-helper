@@ -424,3 +424,134 @@ def test_the_levers_only_act_where_they_apply() -> None:
     assert marked_question(dials, rise, "neutral")["say"] == "Tu viens ?!"
     assert marked_question({**dials, "say": "Tu viens ?!"}, rise, "neutral") is None
     assert marked_question(dials, either, "neutral") is None
+
+
+# ── 5. Choosing the take during the narration ───────────────────────────────
+
+
+class _Draws:
+    """A sampling engine: each draw of a segment returns the next scripted take."""
+
+    def __init__(self, script: dict[str, list[ProsodyFeatures]]) -> None:
+        """``script`` maps "say|emotion" to the features of successive draws."""
+        self.script = {k: list(v) for k, v in script.items()}
+        self.calls: list[str] = []
+
+    async def draw(self, segment):  # type: ignore[no-untyped-def]
+        """Pop the next take for this segment's (say, emotion)."""
+        from types import SimpleNamespace
+
+        key = f"{segment.spoken}|{segment.emotion or 'neutral'}"
+        self.calls.append(key)
+        features = self.script[key].pop(0)
+        return SimpleNamespace(wav_bytes=repr(len(self.calls)).encode(), features=features)
+
+
+def _selector_run(script, segment, max_draws=4):  # type: ignore[no-untyped-def]
+    """Run a TakeSelector on one segment; return (kept take, selector, engine)."""
+    import asyncio
+
+    from speaker_helper.eardrum.expressive import TakeSelector
+
+    engine = _Draws(script)
+    issued: list[ProsodyFeatures] = []
+
+    async def draw(seg):  # type: ignore[no-untyped-def]
+        """Draw, remembering what each serial number sounded like."""
+        take = await engine.draw(seg)
+        issued.append(take.features)
+        return take
+
+    selector = TakeSelector(max_draws, measure=lambda wav: issued[int(wav.decode()) - 1])
+    kept = asyncio.run(selector(segment, draw, index=3, language="fr"))
+    return kept, selector, engine
+
+
+def test_the_selector_keeps_the_first_draw_that_rises() -> None:
+    """Chatterbox, measured: identical dials, contours rise / level / rise."""
+    from speaker_helper.narration import Segment
+
+    q = "Tu viens ce soir ?"
+    script = {
+        f"{q}|neutral": [_features(280, "level"), _features(281, "rise"), _features(280, "rise")]
+    }
+    kept, selector, engine = _selector_run(script, Segment(text=q))
+    assert kept.features.final.shape == "rise"
+    assert len(engine.calls) == 2  # stopped at the first agreeing draw
+    assert selector.records == [
+        {
+            "index": 3,
+            "text": q,
+            "draws": 2,
+            "agrees": True,
+            "contour": {"expected": "rise", "heard": "rise"},
+            "arousal": {"expected": None, "shift": None},
+        }
+    ]
+
+
+def test_the_selector_judges_arousal_against_a_neutral_reference() -> None:
+    """A sad block: two neutral draws make the reference, then sad draws until calm."""
+    from speaker_helper.narration import Segment
+
+    s = "Il est mort hier soir à l'hôpital."
+    neutral = ProsodyFeatures(230.0, 7.0, Contour(0, 0, 3, "fall"), -30.0, 10.0, 0.6, 2.0)
+    excited = ProsodyFeatures(260.0, 9.0, Contour(0, 0, 3, "fall"), -27.0, 12.0, 0.6, 2.0)
+    calm = ProsodyFeatures(205.0, 5.0, Contour(0, 0, 3, "fall"), -33.0, 8.0, 0.6, 2.2)
+    script = {f"{s}|neutral": [neutral, neutral], f"{s}|sad": [excited, calm]}
+    kept, selector, engine = _selector_run(script, Segment(text=s, emotion="sad"))
+    assert kept.features is calm
+    assert engine.calls == [f"{s}|neutral", f"{s}|neutral", f"{s}|sad", f"{s}|sad"]
+    assert selector.records[0]["agrees"] is True and selector.records[0]["arousal"]["shift"] < -1
+
+
+def test_with_nothing_to_judge_a_block_costs_one_draw() -> None:
+    """ "Est-ce que tu viens ?" may rise or fall, and carries no emotion: one draw."""
+    from speaker_helper.narration import Segment
+
+    q = "Est-ce que tu viens ?"
+    kept, selector, engine = _selector_run(
+        {f"{q}|neutral": [_features(250, "fall")]}, Segment(text=q)
+    )
+    assert len(engine.calls) == 1 and selector.records[0]["agrees"] is None
+
+
+def test_when_no_draw_agrees_the_closest_is_kept_and_said() -> None:
+    """Out of draws: the least wrong take wins, and the record says it did not agree."""
+    from speaker_helper.narration import Segment
+
+    q = "Tu viens ce soir ?"
+    script = {f"{q}|neutral": [_features(280, "fall"), _features(280, "level")]}
+    kept, selector, engine = _selector_run(script, Segment(text=q), max_draws=2)
+    assert len(engine.calls) == 2 and selector.records[0]["agrees"] is False
+
+
+def test_narrate_hands_each_block_to_the_chooser_and_reports_its_records() -> None:
+    """The hook in Speaker.narrate: the chooser draws, its records reach the result."""
+    import asyncio
+
+    from speaker_helper import Settings
+    from speaker_helper.speaker import Speaker
+
+    class Chooser:
+        """Draws twice per block, keeps the second, records it."""
+
+        def __init__(self) -> None:
+            """No record yet."""
+            self.records: list[dict] = []
+
+        async def __call__(self, segment, draw, *, index=0, language=""):  # type: ignore[no-untyped-def]
+            """Two draws; the second is kept."""
+            await draw(segment)
+            kept = await draw(segment)
+            self.records.append({"index": index, "text": segment.text, "draws": 2, "agrees": True})
+            return kept
+
+    async def run():  # type: ignore[no-untyped-def]
+        """Narrate two blocks on the mock backend with the chooser."""
+        async with Speaker(Settings.from_mapping({"backend": "mock"})) as spk:
+            return await spk.narrate(["Un.", "Deux."], choose=Chooser())
+
+    result = asyncio.run(run())
+    assert [r["index"] for r in result.selection] == [0, 1]
+    assert len(result.cues) == 2

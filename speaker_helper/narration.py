@@ -275,6 +275,10 @@ class NarrationResult:
         Dials the segments asked for and this backend does not have. Empty on
         a plain narration; non-empty means the caller should know which engine
         does have them.
+    selection : list of dict
+        When takes were chosen by ear (``narrate(choose=...)``), one record
+        per spoken segment: how many draws, whether the kept one agrees with
+        the text, and why. Empty otherwise.
     """
 
     wav_bytes: bytes
@@ -287,6 +291,7 @@ class NarrationResult:
     detected_language: str = ""
     language_fallback: bool = False
     ignored_hints: list[str] = field(default_factory=list)
+    selection: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def rtf(self) -> float:

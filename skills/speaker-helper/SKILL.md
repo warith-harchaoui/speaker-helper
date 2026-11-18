@@ -133,7 +133,10 @@ rises, "Où vas-tu ?" falls) and its arousal match the emotion of the text?
 Measured from the pitch and energy, against a neutral take of the same
 sentence; valence is never judged from audio. `--measure-only` reports the
 text/voice agreement; otherwise the engine's dials are tuned and written as
-`segments.tuned.json` for `narrate`. Over HTTP/MCP: `"prosody": true`. Dates, times,
+`segments.tuned.json` for `narrate`. Over HTTP/MCP: `"prosody": true`.
+On a sampling engine (chatterbox) the best fix is often a new draw, which no
+file can replay: `narrate --select N` draws each block up to N times and keeps
+the take that agrees with the text (`"select": N` on `POST /narrate`). Dates, times,
 amounts and numbers are spelled out first (French, English), so `14/11` is
 read as a date and not guessed at; the cues keep the digits.
 

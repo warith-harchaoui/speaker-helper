@@ -547,7 +547,7 @@ a verdict, because they collapse on synthetic speech (*arXiv 2603.16483*).
 ```bash
 speaker-helper --language fr eardrum --prosody chapitre.md --measure-only  # how often do text and voice agree?
 speaker-helper --language fr eardrum --prosody segments.json               # and tune where they do not
-speaker-helper --language fr narrate .private/eardrum-loop/prosody-*/segments.tuned.json -o chapitre.wav
+speaker-helper --language fr narrate segments.json --select 4 -o chapitre.wav  # choose each take by ear
 ```
 
 When a sentence disagrees, the loop tries levers in an order **measured**
@@ -564,7 +564,17 @@ on chatterbox (French, 2026-11-18), and keeps the best take:
 
 The neutral reference is the mean of two neutral takes, and a take must move
 arousal by 1.0 to count as activated or calmed: repeated neutral takes of one
-sentence already differ by up to 1.4, so anything smaller is the dice. The report shows,
+sentence already differ by up to 1.4, so anything smaller is the dice.
+
+Because the most effective fix on a sampling engine is a new *draw*, it
+cannot be written into a file: the next narration draws again. So the choice
+is made where the audio is made. `narrate --select N` (and `"select": N` on
+`POST /narrate`) draws each block up to N times and keeps the first take
+whose final contour and arousal agree with the text, else the closest. It
+only spends draws where something can go wrong: a block whose form accepts
+any contour and carries no emotion costs one draw; arousal is judged only for
+blocks tagged calm or activated, against two neutral draws. The dial changes
+the loop finds (`?!`, pace, emotion) still go to `segments.tuned.json`. The report shows,
 per sentence, what was expected, what each take did, and the audio; the
 winning settings are written as segments `narrate` reads.
 

@@ -8,6 +8,16 @@ to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **`narrate --select N`: each take chosen by ear, while narrating**
+  (`Speaker.narrate(..., choose=TakeSelector(N))`, `"select": N` on
+  `POST /narrate`). On a sampling engine the prosody loop's best fix is a new
+  draw, which a segments file cannot replay; the chooser draws each block up
+  to N times and keeps the first take whose final contour and arousal agree
+  with the text, else the closest, and reports per block in
+  `NarrationResult.selection`. Draws are spent only where something can go
+  wrong: a block with nothing to judge costs one; arousal is judged only for
+  blocks tagged calm or activated, against two neutral draws.
+
 - **`eardrum --prosody`: intonation and emotion, text against voice**
   (`speaker_helper.eardrum.expressive`, `.prosody`, `.intonation`). Per
   sentence, the text side gives the final contour its form calls for (French

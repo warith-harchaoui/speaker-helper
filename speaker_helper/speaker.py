@@ -509,6 +509,7 @@ class Speaker:
         *,
         language: str | None = None,
         voice: str | None = None,
+        choose: Any = None,
     ) -> NarrationResult:
         """Read a document aloud and say where every block landed in the audio.
 
@@ -526,6 +527,15 @@ class Speaker:
             :func:`~speaker_helper.narration.coerce_segments`.
         language, voice : str or None
             Override the configured ones for this reading.
+        choose : callable or None
+            Picks each block's take by ear: ``async choose(segment, draw) ->
+            AudioResult``, where ``async draw(segment)`` synthesises a segment
+            (the block itself, or a variant such as its neutral reading). A
+            sampling engine (chatterbox) says the same block differently on
+            every draw; the chooser keeps the draw that agrees with the text —
+            see :class:`speaker_helper.eardrum.expressive.TakeSelector`. Its
+            ``records`` (when it has them) land in
+            :attr:`NarrationResult.selection`. ``None``: one draw per block.
 
         Returns
         -------
@@ -557,18 +567,24 @@ class Speaker:
         sem = asyncio.Semaphore(self.stream_concurrency)
         started = time.perf_counter()
 
-        async def _synth(seg: Segment) -> AudioResult:
-            async with sem:
-                return await self.engine.synthesize(
-                    # The lexicon applies to what is *spoken* (text or its
-                    # `say` override), never to the page's own text — cues
-                    # keep showing the document's words.
-                    self._spoken(seg.spoken, language),
-                    language=language,
-                    **self._voice_and_speed(voice, seg),
-                )
+        async def _draw(seg: Segment) -> AudioResult:
+            """One synthesis of ``seg`` — one draw, on a sampling engine."""
+            return await self.engine.synthesize(
+                # The lexicon applies to what is *spoken* (text or its
+                # `say` override), never to the page's own text — cues
+                # keep showing the document's words.
+                self._spoken(seg.spoken, language),
+                language=language,
+                **self._voice_and_speed(voice, seg),
+            )
 
-        tasks = {index: asyncio.create_task(_synth(seg)) for index, seg in speakable}
+        async def _synth(index: int, seg: Segment) -> AudioResult:
+            async with sem:
+                if choose is None:
+                    return await _draw(seg)
+                return await choose(seg, _draw, index=index, language=language or "")
+
+        tasks = {index: asyncio.create_task(_synth(index, seg)) for index, seg in speakable}
         try:
             rendered = {index: await task for index, task in tasks.items()}
         finally:
@@ -638,6 +654,7 @@ class Speaker:
             voice_id=first.voice_id,
             language=first.language,
             ignored_hints=sorted(ignored),
+            selection=sorted(getattr(choose, "records", []), key=lambda r: r.get("index", 0)),
         )
 
     def _spoken(self, text: str, language: str | None) -> str:

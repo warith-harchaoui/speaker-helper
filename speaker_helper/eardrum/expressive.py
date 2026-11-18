@@ -844,3 +844,136 @@ def run_prosody(settings: Any, segments: list[dict[str, str]], **kwargs: Any) ->
     import asyncio
 
     return asyncio.run(run_prosody_async(settings, segments, **kwargs))
+
+
+# ---------------------------------------------------------------------------
+# Choosing the take during the narration itself
+# ---------------------------------------------------------------------------
+
+
+class TakeSelector:
+    """Pick, for each narrated block, a draw that agrees with the text.
+
+    On a sampling engine the fix the prosody loop found is often a *draw*, not
+    a dial: chatterbox said "Il est mort hier soir à l'hôpital." too activated
+    on its first take and calm on its third, with the same settings. Such a
+    fix cannot be written into a segments file — the next narration draws
+    again — so this chooser does it where the audio is made: passed as
+    ``Speaker.narrate(..., choose=TakeSelector(4))``, it draws a block up to
+    ``max_draws`` times and keeps the first take that agrees, else the
+    closest.
+
+    What is judged, and what it costs:
+
+    * the final contour, whenever the sentence's form asks for one (a ``.``,
+      a yes/no question…) — free, no reference needed;
+    * the arousal, only for a block whose ``emotion`` tag asks for calm or
+      activation — it needs a neutral reference, :data:`REFERENCE_TAKES`
+      extra draws for that block.
+
+    A block with nothing to judge (a question that may rise or fall, no
+    emotion) costs one draw, as without a chooser.
+
+    Parameters
+    ----------
+    max_draws : int
+        Most draws per block (at least 1).
+    measure : callable or None
+        ``wav_bytes -> ProsodyFeatures``; :func:`~.prosody.measure` by default.
+    reference_takes : int
+        Neutral draws averaged into the arousal reference.
+
+    Attributes
+    ----------
+    records : list of dict
+        One per block: ``index``, ``text``, ``draws``, ``agrees``,
+        ``contour`` (expected, heard), ``arousal`` (expected, shift).
+    """
+
+    def __init__(
+        self,
+        max_draws: int = 4,
+        *,
+        measure: Callable[[bytes], ProsodyFeatures] | None = None,
+        reference_takes: int = REFERENCE_TAKES,
+    ) -> None:
+        """Remember the budget; nothing is drawn yet.
+
+        Parameters
+        ----------
+        max_draws, measure, reference_takes
+            See the class docstring.
+        """
+        self.max_draws = max(1, int(max_draws))
+        self.reference_takes = max(1, int(reference_takes))
+        if measure is None:
+            from speaker_helper.eardrum.prosody import measure as measure_take
+
+            measure = measure_take
+        self.measure = measure
+        self.records: list[dict[str, Any]] = []
+
+    async def __call__(self, segment: Any, draw: Any, *, index: int = 0, language: str = "") -> Any:
+        """Draw ``segment`` until a take agrees with its text; return that take.
+
+        Parameters
+        ----------
+        segment : Segment
+            The block.
+        draw : callable
+            ``async draw(segment) -> AudioResult``.
+        index : int
+            The block's position (for the record).
+        language : str
+            Its language.
+
+        Returns
+        -------
+        AudioResult
+            The take kept.
+        """
+        import dataclasses
+
+        expected = expected_contour(segment.spoken, language or "fr")
+        arousal = expected_arousal_from_tag(segment.emotion) if segment.emotion else None
+        judge_arousal = arousal in ("high", "low")
+        if expected.shape == "either" and not judge_arousal:
+            # Nothing the voice can get wrong here: one draw, no cost.
+            take = await draw(segment)
+            self.records.append({"index": index, "text": segment.text, "draws": 1, "agrees": None})
+            return take
+        reference = None
+        if judge_arousal:
+            neutral = dataclasses.replace(segment, emotion="neutral", intensity="")
+            reference = average_features(
+                [self.measure((await draw(neutral)).wav_bytes) for _ in range(self.reference_takes)]
+            )
+        best, best_miss, best_info = None, float("inf"), {}
+        draws = 0
+        while draws < self.max_draws:
+            draws += 1
+            take = await draw(segment)
+            features = self.measure(take.wav_bytes)
+            heard = features.final.shape if features.final else None
+            contour_ok = contour_agrees(expected, heard)
+            shift = arousal_shift(features, reference) if reference else None
+            arousal_ok = arousal_agrees(arousal, shift) if shift is not None else True
+            miss = (1.0 if contour_ok is False else 0.0) + (0.0 if arousal_ok else 1.0)
+            if shift is not None and not arousal_ok:
+                miss += abs(shift) / AROUSAL_STEP / 10.0
+            if miss < best_miss:
+                best, best_miss = take, miss
+                best_info = {"heard": heard, "shift": shift}
+            if contour_ok is not False and arousal_ok:
+                break
+        self.records.append(
+            {
+                "index": index,
+                "text": segment.text,
+                "draws": draws,
+                "agrees": best_miss == 0.0,
+                "contour": {"expected": expected.shape, "heard": best_info.get("heard")},
+                "arousal": {"expected": arousal, "shift": best_info.get("shift")},
+            }
+        )
+        return best

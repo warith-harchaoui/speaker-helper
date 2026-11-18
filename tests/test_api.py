@@ -288,3 +288,16 @@ def test_the_prosody_check_runs_as_the_same_kind_of_job(monkeypatch, tmp_path) -
         assert status["status"] == "done", status
         assert status["segments"][0]["verdict"] == "fixed"
         assert status["tuned_segments"][0]["say"] == "Tu viens ?!"
+
+
+def test_narrate_can_choose_its_takes_by_ear() -> None:
+    """select > 0: each block's choice comes back in the response."""
+    import pytest
+
+    pytest.importorskip("librosa")
+    with _client() as client:
+        answer = client.post("/narrate", json={"segments": ["Un.", "Deux."], "select": 2})
+        assert answer.status_code == 200, answer.text
+        selection = answer.json()["selection"]
+        assert [r["index"] for r in selection] == [0, 1]
+        assert all(1 <= r["draws"] <= 2 for r in selection)

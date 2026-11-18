@@ -49,6 +49,7 @@ before the sub-command.
 | Say a sentence to a WAV | `speaker-helper synth "…" -o out.wav` | `Speaker.say(...)`, `create_engine().synthesize(...)` | `POST /synth` |
 | Stream a reply as it is written | `speaker-helper synth --stream "…"` | `Speaker.stream(...)`, `chunk_for_streaming(...)` | `POST /synth/stream` |
 | Narrate a document + timed track | `speaker-helper narrate segments.json -o post.wav` | `Speaker.narrate(...)`, `NarrationResult`, `cues_to_vtt` | `POST /narrate` |
+| Narrate, choosing each take by ear (intonation and emotion agree with the text) | `speaker-helper narrate segments.json --select 4 -o post.wav` | `Speaker.narrate(..., choose=TakeSelector(4))` | `POST /narrate` with `"select": 4` |
 | Clone a voice from a sample | `speaker-helper --clone-audio ref.wav clone` | `Speaker.clone_voice()`, `VoiceSample` | `POST /clone` |
 | List the voices an engine offers | `speaker-helper voices` | `voices_for(...)`, `PRESET_VOICES` | `GET /voices` |
 | Pick the engine + mode for a situation | `speaker-helper route --condition offline` | `route(...)`, `RouteRequest` | `POST /route` |

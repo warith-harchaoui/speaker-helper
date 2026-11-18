@@ -200,9 +200,17 @@ def _cmd_narrate(args: SimpleNamespace, settings: Settings) -> int:
     if args.read_math:
         segments = resolve_spoken_math(segments, args.read_math)
 
+    chooser = None
+    if getattr(args, "select", 0):
+        # Draw each block up to N times and keep the take whose melody and
+        # energy agree with the text (see eardrum.expressive.TakeSelector).
+        from speaker_helper.eardrum.expressive import TakeSelector
+
+        chooser = TakeSelector(args.select)
+
     async def run() -> int:
         async with Speaker(settings) as spk:
-            result = await spk.narrate(segments)
+            result = await spk.narrate(segments, choose=chooser)
         result.write_audio(args.out, bitrate=getattr(args, "bitrate", DEFAULT_SPEECH_BITRATE))
         cues_path = args.out.with_suffix(".vtt")
         cues_path.write_text(result.to_vtt(), encoding="utf-8")
@@ -210,6 +218,19 @@ def _cmd_narrate(args: SimpleNamespace, settings: Settings) -> int:
             f"{args.out}\t{result.duration_s:.2f}s\t{len(result.cues)} cues\t"
             f"rtf {result.rtf:.2f}\n{cues_path}\n"
         )
+        if result.selection:
+            judged = [r for r in result.selection if r.get("agrees") is not None]
+            agreeing = sum(1 for r in judged if r["agrees"])
+            draws = sum(r["draws"] for r in result.selection)
+            sys.stdout.write(
+                f"selection: {agreeing}/{len(judged)} judged blocks agree with their text, "
+                f"{draws} draws for {len(result.selection)} blocks\n"
+            )
+            for record in judged:
+                if not record["agrees"]:
+                    sys.stderr.write(
+                        f"note: no draw of block {record['index']} agreed: {record['text'][:60]}\n"
+                    )
         if result.ignored_hints:
             # Not a failure, and not silent either: the document asked for
             # something this engine has no dial for.
@@ -818,6 +839,15 @@ def route(
     help="Output audio; the cues are written beside it as .vtt.",
 )
 @click.option(
+    "--select",
+    type=int,
+    default=0,
+    show_default=True,
+    metavar="N",
+    help="Draw each block up to N times; keep the take whose intonation and "
+    "emotion agree with the text (sampling engines such as chatterbox).",
+)
+@click.option(
     "--read-math",
     metavar="LANG",
     default=None,
@@ -831,7 +861,12 @@ def route(
 )
 @click.pass_context
 def narrate(
-    ctx: click.Context, segments: Path, out: Path, read_math: str | None, bitrate: str
+    ctx: click.Context,
+    segments: Path,
+    out: Path,
+    select: int,
+    read_math: str | None,
+    bitrate: str,
 ) -> None:
     """Read a document aloud, and write the timed track that follows it.
 
@@ -839,7 +874,15 @@ def narrate(
     `pause_before_ms`, `pause_after_ms`, `pace` and `emotion`. A list of plain
     strings works too.
     """
-    _run(ctx, "narrate", segments=segments, out=out, read_math=read_math, bitrate=bitrate)
+    _run(
+        ctx,
+        "narrate",
+        segments=segments,
+        out=out,
+        select=select,
+        read_math=read_math,
+        bitrate=bitrate,
+    )
 
 
 @cli.command(name="eardrum")

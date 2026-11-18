@@ -68,7 +68,7 @@ speaker-helper serve --bind-host 0.0.0.0 --bind-port 8080
 | `GET /voices` | the catalogue |
 | `POST /synth` | text in, `audio/wav` out, duration and RTF in headers |
 | `POST /synth/stream` | Server-Sent Events, one per sentence-sized chunk |
-| `POST /narrate` | blocks in; audio **and cues** out, as JSON |
+| `POST /narrate` | blocks in; audio **and cues** out, as JSON; `"select": N` chooses each block's take by ear |
 | `POST /clone` | a reference recording in, a voice id out |
 | `POST /route` | the engine choice, with the numbers behind it |
 | `POST /eardrum` | start the Ralph Eardrum Loop on a text and/or words (or, with `"prosody": true`, on sentences or narration segments); `202` and a `job_id` at once |
