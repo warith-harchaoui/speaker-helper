@@ -248,7 +248,8 @@ def test_the_tag_sets_the_expected_arousal_and_the_neutral_take_is_the_reference
         "source": "tag",
     }
     assert result.takes[0].arousal_ok and result.verdict == "ok"
-    assert engine.asked == [(s, "neutral", ""), (s, "angry", "")]
+    # Two neutral takes make the reference, then the angry one.
+    assert engine.asked == [(s, "neutral", ""), (s, "neutral", ""), (s, "angry", "")]
 
 
 def test_a_lever_that_helps_is_kept_and_the_loop_stops_there() -> None:
@@ -376,6 +377,28 @@ def test_a_document_run_reports_agreement_and_writes_tuned_segments(tmp_path) ->
     page = report.html.read_text(encoding="utf-8")
     assert "prosodie" in page and "50 %" in page
     assert (tmp_path / "audio" / "s000" / "take1.wav").is_file()
+
+
+def test_a_retake_is_a_new_draw_with_the_same_dials() -> None:
+    """Measured on chatterbox: identical dials, different contours — so ask again."""
+    from speaker_helper.eardrum.expressive import retake
+
+    dials = {"say": "Tu viens ?", "emotion": "neutral", "intensity": "", "pace": "normal"}
+    once = retake(dials, ExpectedContour("rise", ""), "neutral")
+    assert once == {**dials, "retake": "1"}
+    assert retake(once, ExpectedContour("rise", ""), "neutral")["retake"] == "2"
+
+
+def test_the_reference_averages_several_neutral_takes() -> None:
+    """One neutral take is a roll of the dice; the reference is their mean."""
+    from speaker_helper.eardrum.prosody import average_features
+
+    a = ProsodyFeatures(200.0, 6.0, None, -20.0, 10.0, 0.6, 2.0)
+    b = ProsodyFeatures(242.0, 8.0, None, -22.0, 12.0, 0.6, 2.2)
+    mean = average_features([a, b])
+    assert 200 < mean.f0_median_hz < 242 and mean.f0_range_st == 7.0 and mean.final is None
+    with pytest.raises(ValueError):
+        average_features([])
 
 
 def test_the_levers_only_act_where_they_apply() -> None:

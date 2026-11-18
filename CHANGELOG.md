@@ -17,9 +17,13 @@ to [Semantic Versioning](https://semver.org/).
   removed, Theil-Sen slope; rise ≥ +3 st, fall ≤ −2 st) and the arousal shift
   against a neutral take of the same sentence. Valence is reported from the
   text, never judged from audio. `--measure-only` reports the text/voice
-  agreement; otherwise the levers are tried in order (emotion dial to the end
-  of its range, slower pace = more text guidance, `?!` in what is said) and
-  the winning dials are written as `segments.tuned.json` for `narrate`. Also
+  agreement; otherwise levers are tried in a measured order (new draws with
+  the same dials first — chatterbox samples, and identical takes of one
+  question ended rise, level, rise — then `?!` in what is said, a slower pace,
+  and last the emotion dial, measured inert on chatterbox Multilingual as
+  upstream issue #355 reports). The neutral reference averages two takes; an
+  arousal change must reach 1.0, above the measured take-to-take noise. The
+  winning dials are written as `segments.tuned.json` for `narrate`. Also
   over HTTP/MCP (`"prosody": true`). `librosa` joins the `eardrum` extra.
 
 - **The Ralph Eardrum Loop** (`speaker-helper eardrum`,

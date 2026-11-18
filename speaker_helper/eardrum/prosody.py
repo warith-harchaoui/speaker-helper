@@ -371,3 +371,47 @@ def arousal_shift(take: ProsodyFeatures, neutral: ProsodyFeatures) -> float:
         parts.append(take.f0_range_st - neutral.f0_range_st)
     parts.append((take.loudness_db - neutral.loudness_db) / 3.0)
     return round(sum(parts) / len(parts), 3)
+
+
+def average_features(takes: list[ProsodyFeatures]) -> ProsodyFeatures:
+    """One reference out of several takes of the same reading.
+
+    Measured on chatterbox (French): three takes of the same sentence with the
+    same dials differ by up to 1.4 in :func:`arousal_shift` — as much as a
+    real change of emotion. A single neutral take is therefore a noisy
+    reference; averaging several makes it steadier. Pitch is averaged in the
+    log domain (a geometric mean), the rest arithmetically; the final contour
+    is not averaged (it is judged per take).
+
+    Parameters
+    ----------
+    takes : list of ProsodyFeatures
+        At least one.
+
+    Returns
+    -------
+    ProsodyFeatures
+        The averaged reference (``final`` is ``None``).
+
+    Examples
+    --------
+    >>> a = ProsodyFeatures(200.0, 6.0, None, -20.0, 10.0, 0.6, 2.0)
+    >>> b = ProsodyFeatures(800.0, 8.0, None, -24.0, 12.0, 0.4, 3.0)
+    >>> average_features([a, b]).f0_median_hz
+    400.0
+    """
+    import numpy as np
+
+    if not takes:
+        raise ValueError("average_features needs at least one take")
+    pitches = [t.f0_median_hz for t in takes if t.f0_median_hz]
+    ranges = [t.f0_range_st for t in takes if t.f0_range_st is not None]
+    return ProsodyFeatures(
+        f0_median_hz=round(float(np.exp(np.mean(np.log(pitches)))), 2) if pitches else None,
+        f0_range_st=round(float(np.mean(ranges)), 3) if ranges else None,
+        final=None,
+        loudness_db=round(float(np.mean([t.loudness_db for t in takes])), 3),
+        loudness_spread_db=round(float(np.mean([t.loudness_spread_db for t in takes])), 3),
+        voiced_share=round(float(np.mean([t.voiced_share for t in takes])), 4),
+        duration_s=round(float(np.mean([t.duration_s for t in takes])), 3),
+    )

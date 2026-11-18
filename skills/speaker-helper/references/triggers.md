@@ -207,8 +207,9 @@ block landed.
   contour (from the pitch track) and the arousal against a neutral take of
   the same sentence. Valence is read from the text and reported, never judged
   from the audio. On kokoro, French questions do not rise at all (measured);
-  on chatterbox, "Tu viens ?" is raised as a whole rather than rising at the
-  end.
+  on chatterbox, the same question rises on some takes and not others, and
+  `exaggeration` is inert in French (measured; upstream issue #355), so the
+  loop's first lever is a new draw.
 - **Nothing is uploaded** unless you name `--backend elevenlabs`: every other
   engine runs on this machine, and only the first use downloads weights.
   ElevenLabs needs `ELEVENLABS_API_KEY`; `health` says so without spending a

@@ -572,11 +572,26 @@ speaker-helper --language fr eardrum --prosody segments.json               # et 
 speaker-helper --language fr narrate .private/eardrum-loop/prosody-*/segments.tuned.json -o chapitre.wav
 ```
 
-Quand une phrase est en désaccord, la boucle essaie les leviers du moteur
-dans l'ordre (le cadran d'émotion poussé au bout, un débit plus lent, donc
-plus de guidage par le texte chez chatterbox, une question marquée plus fort
-dans ce qui est *dit* avec `?!`, jamais dans ce que la page montre) et garde
-la meilleure prise. Le rapport montre, phrase par phrase, l'attendu, ce
+Quand une phrase est en désaccord, la boucle essaie des leviers dans un
+ordre **mesuré** sur chatterbox (français, 2026-11-18), et garde la meilleure
+prise :
+
+1. **un nouveau tirage avec les mêmes réglages** : chatterbox échantillonne,
+   et trois prises de « Tu viens ce soir ? » aux réglages identiques ont fini
+   montante, plate, montante ;
+2. une question marquée plus fort dans ce qui est *dit* (`?!`), jamais dans
+   ce que la page montre ; puis un débit plus lent (plus de guidage par le
+   texte chez chatterbox) ;
+3. le cadran d'émotion poussé au bout : **mesuré inerte sur chatterbox
+   Multilingual** (`exaggeration` de 0,25 à 2,0 bouge l'activation moins que
+   le bruit d'une prise à l'autre, comme le signale l'issue #355 de
+   resemble-ai/chatterbox), donc gardé en dernier, pour les moteurs où il
+   agit.
+
+La référence neutre est la moyenne de deux prises neutres, et une prise doit
+déplacer l'activation de 1,0 pour compter comme activée ou calmée : des
+prises neutres répétées d'une même phrase diffèrent déjà jusqu'à 1,4, et tout
+écart plus petit relève du hasard. Le rapport montre, phrase par phrase, l'attendu, ce
 qu'a fait chaque prise, et l'audio ; les réglages gagnants sont écrits en
 segments que `narrate` relit.
 

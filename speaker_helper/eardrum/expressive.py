@@ -48,7 +48,7 @@ from typing import Any
 import os_helper as osh
 
 from speaker_helper.eardrum.intonation import ExpectedContour, contour_agrees, expected_contour
-from speaker_helper.eardrum.prosody import ProsodyFeatures, arousal_shift
+from speaker_helper.eardrum.prosody import ProsodyFeatures, arousal_shift, average_features
 
 #: The narration's emotion tags (the chatterbox vocabulary) → the arousal
 #: each one means. Valence is deliberately absent: the voice does not carry it
@@ -70,9 +70,16 @@ TAG_AROUSAL: dict[str, str] = {
 
 #: Arousal shift (in roughly semitone-sized units, see
 #: :func:`~.prosody.arousal_shift`) a take must reach against its neutral
-#: reading to count as activated (``high``) or calmed (``low``). Set above the
-#: take-to-take noise measured on repeated neutral takes.
+#: reference to count as activated (``high``) or calmed (``low``). Measured on
+#: chatterbox (French, 2026-11-18): repeated neutral takes of one sentence
+#: differ by 0.15 to 1.4 from each other, a mean of about 0.6 — so a step of
+#: 1.0 against a reference averaged over :data:`REFERENCE_TAKES` takes is the
+#: smallest change that is not just another roll of the dice.
 AROUSAL_STEP = 1.0
+
+#: Neutral takes averaged into the reference (see
+#: :func:`~.prosody.average_features`).
+REFERENCE_TAKES = 2
 
 
 def expected_arousal_from_tag(emotion: str) -> str | None:
@@ -150,8 +157,18 @@ def infer_expression(sentence: str, language: str) -> TextExpression | None:
         "Answer with JSON only, no prose: "
         '{"arousal": "low|neutral|high", "valence": "negative|neutral|positive", '
         f'"emotion": "one of: {tags}"}}\n'
-        "arousal is the energy the delivery needs (calm, ordinary, activated). "
-        "Most sentences of an ordinary text are neutral; do not over-read."
+        "arousal is the energy the delivery needs (calm, ordinary, activated).\n"
+        "Examples:\n"
+        '"La réunion est reportée à jeudi." -> '
+        '{"arousal": "neutral", "valence": "neutral", "emotion": "neutral"}\n'
+        '"Il nous a quittés ce matin, paisiblement." -> '
+        '{"arousal": "low", "valence": "negative", "emotion": "sad"}\n'
+        '"Tu as encore cassé la voiture !" -> '
+        '{"arousal": "high", "valence": "negative", "emotion": "angry"}\n'
+        '"On a gagné, c\'est incroyable !" -> '
+        '{"arousal": "high", "valence": "positive", "emotion": "enthusiastic"}\n'
+        "Factual sentences are neutral; a sentence about loss, illness or death is "
+        "low and negative even when it is written plainly."
     )
     try:
         reply = ollama.chat(
@@ -353,6 +370,7 @@ async def check_expression(
     infer: Callable[[str, str], TextExpression | None] | None = infer_expression,
     levers: list[Lever] | None = None,
     save: Callable[[str, bytes], str] | None = None,
+    reference_takes: int = REFERENCE_TAKES,
 ) -> ExpressionResult:
     """Judge (and, with ``levers``, tune) how one sentence is said.
 
@@ -375,6 +393,8 @@ async def check_expression(
         measures.
     save : callable or None
         ``(name, wav_bytes) -> relative path`` to keep each take.
+    reference_takes : int
+        Neutral takes averaged into the reference.
 
     Returns
     -------
@@ -405,8 +425,13 @@ async def check_expression(
         "intensity": "",
         "pace": segment.get("pace", "") or "normal",
     }
+    # The neutral reference: the same words, the same voice, no emotion,
+    # averaged over several takes because one take is a roll of the dice.
     neutral_wav = await say(neutral_dials)
-    neutral = measure(neutral_wav)
+    neutral_takes = [measure(neutral_wav)]
+    for _ in range(max(0, reference_takes - 1)):
+        neutral_takes.append(measure(await say({**neutral_dials, "retake": "reference"})))
+    neutral = average_features(neutral_takes)
     result.neutral = asdict(neutral)
     if save:
         save("neutral", neutral_wav)
@@ -425,7 +450,8 @@ async def check_expression(
     async def take(name: str, dials: dict[str, str], number: int) -> ExpressionTake:
         """Say the sentence with ``dials``, measure it, judge it."""
         if dials == neutral_dials:
-            wav, features = neutral_wav, neutral
+            # The first neutral take is a take like any other: reuse it.
+            wav, features = neutral_wav, neutral_takes[0]
         else:
             wav = await say(dials)
             features = measure(wav)
@@ -476,10 +502,43 @@ async def check_expression(
 _STRONGEST = {"high": "enthusiastic", "low": "calm"}
 
 
+def retake(dials: dict[str, str], contour: ExpectedContour, arousal: str) -> dict[str, str]:
+    """Say it again with the same dials: a new roll of a stochastic engine.
+
+    The most effective lever measured on chatterbox (French): three takes of
+    "Tu viens ce soir ?" with identical dials ended rise, level, rise. When
+    the engine samples, asking again and keeping the take that agrees is a
+    correction, not a trick — the dials did not change, only the draw.
+
+    Parameters
+    ----------
+    dials : dict
+        The current take's dials.
+    contour : ExpectedContour
+        The expected contour (unused).
+    arousal : str
+        The expected arousal (unused).
+
+    Returns
+    -------
+    dict
+        The same dials, marked as a new draw (the mark never reaches the
+        engine).
+    """
+    previous = dials.get("retake", "")
+    draws = int(previous) if previous.isdigit() else 0
+    return {**dials, "retake": str(draws + 1)}
+
+
 def stronger_emotion(
     dials: dict[str, str], contour: ExpectedContour, arousal: str
 ) -> dict[str, str] | None:
     """Push the emotion dial to the end of its range, towards the expected arousal.
+
+    Measured inert on chatterbox Multilingual (French, 2026-11-18):
+    ``exaggeration`` from 0.25 to 2.0 moved arousal by less than the
+    take-to-take noise, as resemble-ai/chatterbox issue #355 reports; Turbo
+    ignores the dial altogether. Kept, last, for the engines where it acts.
 
     Parameters
     ----------
@@ -565,9 +624,18 @@ def marked_question(
     return {**dials, "say": said + "!"}
 
 
-#: The order the loop tries them in. Arousal first (the dial made for it),
-#: then the two contour levers, gentlest first.
-DEFAULT_LEVERS: list[Lever] = [stronger_emotion, closer_to_the_text, marked_question]
+#: The order the loop tries them in, measured rather than assumed: new draws
+#: first (on a sampling engine the cheapest and most effective change), then
+#: the contour levers, then the emotion dial (inert on chatterbox French, see
+#: :func:`stronger_emotion`), then one last draw with whatever dials stand.
+DEFAULT_LEVERS: list[Lever] = [
+    retake,
+    retake,
+    marked_question,
+    closer_to_the_text,
+    stronger_emotion,
+    retake,
+]
 
 
 # ---------------------------------------------------------------------------

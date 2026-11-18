@@ -550,10 +550,21 @@ speaker-helper --language fr eardrum --prosody segments.json               # and
 speaker-helper --language fr narrate .private/eardrum-loop/prosody-*/segments.tuned.json -o chapitre.wav
 ```
 
-When a sentence disagrees, the loop tries the engine's levers in order —
-the emotion dial pushed to the end of its range, a slower pace (more text
-guidance on chatterbox), a question marked harder in what is *said* (`?!`),
-never in what the page shows — and keeps the best take. The report shows,
+When a sentence disagrees, the loop tries levers in an order **measured**
+on chatterbox (French, 2026-11-18), and keeps the best take:
+
+1. **a new draw with the same dials** — chatterbox samples: three takes of
+   "Tu viens ce soir ?" with identical settings ended rise, level, rise;
+2. a question marked harder in what is *said* (`?!`), never in what the page
+   shows; then a slower pace (more text guidance on chatterbox);
+3. the emotion dial pushed to the end of its range — **measured inert on
+   chatterbox Multilingual**: `exaggeration` from 0.25 to 2.0 moved arousal by
+   less than the take-to-take noise (as resemble-ai/chatterbox issue #355
+   reports), so it is kept last, for the engines where it acts.
+
+The neutral reference is the mean of two neutral takes, and a take must move
+arousal by 1.0 to count as activated or calmed: repeated neutral takes of one
+sentence already differ by up to 1.4, so anything smaller is the dice. The report shows,
 per sentence, what was expected, what each take did, and the audio; the
 winning settings are written as segments `narrate` reads.
 
