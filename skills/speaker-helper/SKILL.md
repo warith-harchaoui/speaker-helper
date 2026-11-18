@@ -1,25 +1,19 @@
 ---
 name: speaker-helper
 description: >-
-  Turn text into speech, locally and in-process — one sentence, a streamed
-  reply, or a whole document read aloud with a WebVTT track saying where each
-  block is spoken so a page can follow along. The engine follows the mode:
-  offline → Chatterbox (Turbo for English, Multilingual elsewhere), streaming →
-  Kokoro (82M ONNX, faster than real time on CPU); Kyutai (native French),
-  Audio8 (realism-tuned cloner, Apple Silicon) and OpenVoice are one
-  `--backend` away, and ElevenLabs serves the paid cloud cells when named. A
-  female voice in every language by default, the
-  pronunciation lexicon applied on every call, LaTeX spoken as words, and the
-  dials a backend does not have reported instead of pretended. Use when the user says "read
-  this aloud", "text to speech", "TTS", "narrate this post / article /
-  document", "make a voiceover", "say this out loud", "which voice", "clone
-  this voice", "sound like this recording", "audiobook", "low-latency speech",
-  "offline or streaming", "a lifelike female voice", "pronunciation lexicon",
-  "Ralph Eardrum Loop", "is this name said right",
-  or names `speaker-helper`, `speaker-helper-mcp`, `import speaker_helper`. Do
-  NOT use for speech → text, captions of a recording, or "who spoke when" —
-  that is the inverse toolbox, `vocal-helper`. The exhaustive trigger
-  catalogue is in `references/triggers.md`.
+  Turn text into speech, locally and in-process: one sentence, a streamed
+  reply, or a whole document read aloud with a WebVTT track a page can follow.
+  Offline → Chatterbox, streaming → Kokoro; Kyutai, Audio8, Qwen3-TTS and
+  OpenVoice are one `--backend` away, ElevenLabs when named. A female voice by
+  default, a pronunciation lexicon on every call, checked by ear with the Ralph
+  Eardrum Loop. Use when the user says "read this aloud", "text to speech",
+  "TTS", "narrate this document", "make a voiceover", "which voice", "clone
+  this voice", "audiobook", "low-latency speech", "offline or streaming",
+  "pronunciation lexicon", "is this name said right", "Ralph Eardrum Loop", or
+  names `speaker-helper`, `speaker-helper-mcp`, `import speaker_helper`. Do NOT
+  use for speech → text, captions of a recording, or "who spoke when": that is
+  `vocal-helper`. The exhaustive trigger catalogue is in
+  `references/triggers.md`.
 license: BSD-3-Clause
 metadata:
   author: Warith HARCHAOUI

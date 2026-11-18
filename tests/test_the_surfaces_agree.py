@@ -345,6 +345,18 @@ def test_narration_is_reachable_over_http() -> None:
 # ── 5. The skill ───────────────────────────────────────────────────────────
 
 
+def test_the_skill_description_fits_what_a_host_reads() -> None:
+    """A host model sees at most 1024 characters of ``description:``.
+
+    It had grown to about 1280: everything past the cap was text no host
+    ever read, and the triggers listed last were the ones cut.
+    """
+    import yaml
+
+    front = SKILL.read_text(encoding="utf-8").split("---")[1]
+    assert len(yaml.safe_load(front)["description"]) <= 1024
+
+
 def test_the_skill_ships_where_the_suite_puts_it() -> None:
     """One skill per package, at skills/<package>/SKILL.md."""
     assert SKILL.is_file()

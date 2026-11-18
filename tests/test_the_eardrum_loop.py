@@ -15,7 +15,9 @@ Warith HARCHAOUI — https://linkedin.com/in/warith-harchaoui
 from __future__ import annotations
 
 import asyncio
+import importlib.util
 import io
+import shutil
 import urllib.error
 from pathlib import Path
 from types import SimpleNamespace
@@ -728,3 +730,258 @@ def test_the_ear_can_be_installed_with_pinned_sizes() -> None:
 
     assert "eardrum" in INSTALLABLE
     assert dict(EARDRUM_FILES)["pytorch_model.bin"] == 1_263_535_127
+
+
+# ── 9. The whole run, end to end, with every model stubbed ──────────────────
+
+
+class _FakeEngine:
+    """A respelling-tier engine (no phoneme input)."""
+
+    LEXICON_TIER = "respelling"
+
+
+class _FakeSpeaker:
+    """Says the respelled text as one second of silence; records each sentence."""
+
+    def __init__(self) -> None:
+        """Start with no lexicon, like a fresh Speaker before the loop sets one."""
+        self.engine = _FakeEngine()
+        self.lexicon: Lexicon | None = None
+        self.said: list[str] = []
+        self.closed = False
+
+    def _respelled(self, text: str, language: str | None) -> str:
+        """Apply the lexicon the way the real Speaker does."""
+        return self.lexicon.respell(text, language or "fr") if self.lexicon else text
+
+    async def say(self, text, language=None):  # type: ignore[no-untyped-def]
+        """Record what the engine is handed; return silence."""
+        import numpy as np
+        import soundfile as sf
+
+        self.said.append(self._respelled(text, language))
+        buffer = io.BytesIO()
+        sf.write(buffer, np.zeros(1600, dtype="float32"), 16000, format="WAV")
+        return SimpleNamespace(wav_bytes=buffer.getvalue())
+
+    async def aclose(self) -> None:
+        """Remember the speaker was closed."""
+        self.closed = True
+
+
+class _LetterEar:
+    """Hears the last sentence the fake speaker said, one phone per letter."""
+
+    def __init__(self, speaker: _FakeSpeaker) -> None:
+        """Listen to this speaker."""
+        self.speaker = speaker
+
+    def hear(self, wav_bytes):  # type: ignore[no-untyped-def]
+        """Letters of the last sentence, lowercased, as phones."""
+        letters = [c for c in self.speaker.said[-1].lower() if c.isalpha()]
+        return [HeardPhone(c, i * 0.05, i * 0.05 + 0.05) for i, c in enumerate(letters)]
+
+
+@pytest.fixture
+def letters_as_phones(monkeypatch):  # type: ignore[no-untyped-def]
+    """espeak replaced by "each letter is a phone", foreign detection off."""
+    import speaker_helper.eardrum.espeak as espeak
+
+    monkeypatch.setattr(
+        espeak,
+        "espeak_ipa",
+        lambda text, language: " ".join(c for c in text.lower() if c.isalpha()),
+    )
+    monkeypatch.setattr(espeak, "foreign_words", lambda words, language: set())
+
+
+def test_a_whole_run_checks_fixes_saves_and_reports(
+    tmp_path, letters_as_phones, monkeypatch
+) -> None:
+    """Discovery → target → takes → LLM fix → sidecar → HTML, in one call."""
+    import speaker_helper.eardrum as eardrum
+    from speaker_helper import Settings
+
+    settings = Settings.from_mapping(
+        {
+            "backend": "mock",
+            "language": "fr",
+            "lexicon": {"path": str(tmp_path / "lexicon.yaml"), "builtin": False},
+        }
+    )
+    speaker = _FakeSpeaker()
+    cache = tmp_path / "targets.yaml"
+    cache.write_text(yaml.safe_dump({"fr:zorg": [["blis", "fr", "wiktionary", "https://x"]]}))
+    proposals = iter(["Bliss"])
+    tune_word = eardrum.tune_word
+
+    async def tune(*args, **kwargs):  # type: ignore[no-untyped-def]
+        """tune_word with a scripted proposer in place of the local LLM."""
+        kwargs["proposer"] = lambda *a: next(proposals, "")
+        return await tune_word(*args, **kwargs)
+
+    monkeypatch.setattr(eardrum, "tune_word", tune)
+    report = asyncio.run(
+        eardrum.run_eardrum_async(
+            settings,
+            text="Hier, Zorg est venu.",
+            out_dir=tmp_path / "report",
+            ear=_LetterEar(speaker),
+            speaker=speaker,
+            resolver=TargetResolver(cache, client=_NoNetwork()),
+        )
+    )
+    assert [(r.word, r.verdict) for r in report.results] == [("Zorg", "fixed")]
+    assert report.results[0].attempts[report.results[0].best].candidate == "Bliss"
+    assert "Je vous parle de Bliss aujourd'hui." in speaker.said
+    sidecar = yaml.safe_load(report.verified_path.read_text(encoding="utf-8"))
+    assert sidecar["mock:fr:zorg"]["respelling"] == "Bliss"
+    assert report.html is not None and "Zorg" in report.html.read_text(encoding="utf-8")
+    assert (tmp_path / "report" / "report.json").is_file()
+    # An injected speaker belongs to the caller: the run does not close it.
+    assert not speaker.closed
+
+
+def test_listen_all_flags_the_word_heard_far_from_its_reading(letters_as_phones) -> None:
+    """The engine mangles one word: only that word is flagged, worst first."""
+    from speaker_helper.eardrum import listen_all
+
+    speaker = _FakeSpeaker()
+
+    class MangledEar:
+        """Hears "Bonjour Zorglub" as if Zorglub came out as "xyxyxyx"."""
+
+        def hear(self, wav_bytes):  # type: ignore[no-untyped-def]
+            """Right letters for the first word, garbage for the second."""
+            return [HeardPhone(c, 0, 0) for c in "bonjour" + "xqxqxqx"]
+
+    flagged = asyncio.run(listen_all(speaker, MangledEar(), "Bonjour Zorglub.", "fr"))
+    assert [word for word, _, _ in flagged] == ["Zorglub"]
+    assert speaker.said == ["Bonjour Zorglub."]
+
+
+def test_sentences_are_cut_where_a_reader_pauses() -> None:
+    """The listen-all pass says one sentence at a time."""
+    from speaker_helper.eardrum import _sentences
+
+    assert _sentences("Un. Deux ?\n\nTrois… Quatre") == ["Un.", "Deux ?", "Trois…", "Quatre"]
+
+
+def test_todays_spelling_is_read_without_asking_the_llm() -> None:
+    """What the engine is handed today: verified, else the entry's own, else nothing."""
+    from speaker_helper.eardrum import _current_respelling
+
+    lexicon = Lexicon(
+        [
+            LexiconEntry("Eschyle", "fr", respelling="Esskil", source="builtin"),
+            LexiconEntry("Sutton", "fr", respelling="Seutone", source="user"),
+        ]
+    )
+    lexicon.verified["chatterbox:fr:eschyle"] = {"respelling": "Ès-kile"}
+    lexicon.verified["chatterbox:fr:sutton"] = {"respelling": "Seuttone"}
+    assert _current_respelling(lexicon, "Eschyle", "fr", "chatterbox") == "Ès-kile"
+    assert _current_respelling(lexicon, "Eschyle", "fr", "kyutai") == "Esskil"
+    assert _current_respelling(lexicon, "Sutton", "fr", "chatterbox") == "Seutone"
+    assert _current_respelling(lexicon, "Inconnu", "fr", "chatterbox") == ""
+    assert _current_respelling(None, "Eschyle", "fr", "chatterbox") == ""
+
+
+# ── 10. The ear and espeak, without their models ───────────────────────────
+
+
+def test_the_ear_looks_where_it_was_told_first(tmp_path, monkeypatch) -> None:
+    """Explicit path, then the self-hosted bundle, then the install cache, then the hub id."""
+    from speaker_helper.eardrum import ear
+
+    monkeypatch.setenv("SPEAKER_HELPER_PHONEME_MODEL", str(tmp_path / "mine"))
+    assert ear.model_dir() == str(tmp_path / "mine")
+    monkeypatch.delenv("SPEAKER_HELPER_PHONEME_MODEL")
+    bundle = tmp_path / "engines" / "metrics" / "phonemes" / ear.PHONEME_CACHE.name
+    bundle.mkdir(parents=True)
+    (bundle / "config.json").write_text("{}")
+    monkeypatch.setenv("SPEAKER_ENGINES_DIR", str(tmp_path / "engines"))
+    assert ear.model_dir() == str(bundle)
+    monkeypatch.delenv("SPEAKER_ENGINES_DIR")
+    monkeypatch.setattr(ear, "PHONEME_CACHE", tmp_path / "nowhere")
+    assert ear.model_dir() == ear.PHONEME_MODEL
+
+
+def test_the_ear_decodes_frames_into_timed_phones() -> None:
+    """Greedy CTC over a scripted model: tokens split into phones, blanks dropped."""
+    torch = pytest.importorskip("torch")
+    pytest.importorskip("torchaudio")
+    import numpy as np
+    import soundfile as sf
+
+    from speaker_helper.eardrum.ear import FRAME_S, PhonemeEar
+
+    vocab = ["<pad>", "f", "aɪ", "n", "<unk>"]
+
+    class Tokenizer:
+        """The four calls the ear makes on a tokenizer."""
+
+        pad_token_id, pad_token, unk_token = 0, "<pad>", "<unk>"
+
+        def convert_ids_to_tokens(self, i):  # type: ignore[no-untyped-def]
+            """Vocabulary lookup."""
+            return vocab[i]
+
+    class Processor:
+        """Hands the waveform through untouched."""
+
+        tokenizer = Tokenizer()
+
+        def __call__(self, audio, sampling_rate, return_tensors):  # type: ignore[no-untyped-def]
+            """Wrap the samples the way a feature extractor would."""
+            return SimpleNamespace(input_values=torch.tensor(audio)[None])
+
+    class Model:
+        """Frames: f f · aɪ aɪ · <unk> n."""
+
+        def __call__(self, values):  # type: ignore[no-untyped-def]
+            """One-hot logits for the scripted frame sequence."""
+            ids = [1, 1, 0, 2, 2, 0, 4, 3]
+            return SimpleNamespace(
+                logits=torch.nn.functional.one_hot(torch.tensor(ids), 5)[None].float()
+            )
+
+    ear = PhonemeEar(source="unused")
+    ear._processor, ear._model = Processor(), Model()
+    buffer = io.BytesIO()
+    sf.write(buffer, np.zeros((8000, 2), dtype="float32"), 8000, format="WAV")  # stereo, 8 kHz
+    heard = ear.hear(buffer.getvalue())
+    assert [h.phone for h in heard] == ["f", "a", "ɪ", "n"]
+    assert heard[0].start_s == 0 and heard[0].end_s == pytest.approx(2 * FRAME_S)
+    # "aɪ" spans frames 3-4: each half gets one frame.
+    assert heard[1].end_s == pytest.approx(4 * FRAME_S) and heard[2].start_s == heard[1].end_s
+
+
+def test_espeak_codes_and_a_missing_espeak_degrade_quietly(monkeypatch) -> None:
+    """Language codes map to espeak voices; detection without espeak finds nothing."""
+    from speaker_helper.eardrum import espeak
+
+    assert espeak.espeak_language("fr") == "fr-fr"
+    assert espeak.espeak_language("en") == "en-us"
+    assert espeak.espeak_language("en-GB") == "en-gb"
+    assert espeak.espeak_ipa("   ", "fr") == ""
+    assert espeak.foreign_words([], "fr") == set()
+
+    def broken(language, keep_flags):  # type: ignore[no-untyped-def]
+        """espeak missing on this machine."""
+        raise RuntimeError("espeak not installed")
+
+    monkeypatch.setattr(espeak, "_backend", broken)
+    assert espeak.foreign_words(["Tailwind"], "fr") == set()
+
+
+@pytest.mark.skipif(
+    importlib.util.find_spec("phonemizer") is None or shutil.which("espeak-ng") is None,
+    reason="phonemizer or espeak-ng missing",
+)
+def test_espeak_reads_french_and_spots_an_english_word() -> None:
+    """The real espeak: carrier words read, and Tailwind marked as English."""
+    from speaker_helper.eardrum.espeak import espeak_ipa, foreign_words
+
+    assert "v u" in " ".join(tokenize(espeak_ipa("Je vous parle de", "fr")))
+    assert foreign_words(["Tailwind", "maison"], "fr") == {"Tailwind"}
