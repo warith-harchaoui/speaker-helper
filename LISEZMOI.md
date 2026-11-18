@@ -56,6 +56,13 @@ Python typée, une CLI, une API REST et une GUI web minimale. En local
 - **Un lexique de prononciation, appliqué d'office.** Déclarez une fois, dans un `lexicon.yaml`, comment un mot se prononce : en IPA exact (épissé tel quel dans le flux de phonèmes de kokoro, donc déterministe) ou en ré-écriture orthographique (pour les moteurs sans accès phonémique).
 
   Une entrée sans ni l'un ni l'autre voit sa ré-écriture dérivée **une seule fois** par un LLM local (résolu via `best-engine-ai-helper`, servi par Ollama) puis mise en cache. Ensuite tout est déterministe puis hors-ligne. Voir [`lexicon.yaml.example`](https://github.com/warith-harchaoui/speaker-helper/blob/main/lexicon.yaml.example).
+- **La Ralph Eardrum Loop : la prononciation vérifiée à l'oreille.**
+  `speaker-helper eardrum` fait dire au moteur chaque mot à risque, le
+  réécoute avec un reconnaisseur de phonèmes, mesure l'écart à la bonne
+  prononciation (l'IPA du lexique, le Wiktionnaire, Wikipédia) et réécrit la
+  graphie jusqu'à ce que le mot sorte juste : pour les mots du lexique et
+  pour ceux d'un document qui n'y sont pas encore. Voir
+  [la section plus bas](#la-ralph-eardrum-loop-la-prononciation-à-loreille).
 - **Les nombres sont dits, pas devinés.** Dates, heures, montants puis nombres
   sont écrits en toutes lettres avant qu'un moteur ne les lise (français,
   anglais, déterministe, `speaker_helper.spoken_numbers`) : `14/11` devient une
@@ -425,6 +432,101 @@ speaker-helper --clone speak-from --source mic --seconds 5          -o out.wav
 
 Les sources sont des extras optionnels : `youtube` (`youtube-helper`), `podcast`
 (`podcast-helper`), `mic` (`capture-helper`).
+
+---
+
+## La Ralph Eardrum Loop (la prononciation, à l'oreille)
+
+Une graphie phonétique est un pari sur la façon dont un moteur lit.
+« Faïnemane » fait dire *Feynman* correctement à une voix française, ou pas :
+cela dépend du moteur, et la seule façon de le savoir est d'écouter. La Ralph
+Eardrum Loop écoute à votre place, comme la Ralph Eyeball Loop regarde une
+figure : **le dire, l'entendre, corriger la source, le redire**.
+
+```mermaid
+flowchart LR
+  W["mot à risque<br/>(lexique, ou trouvé dans le texte)"] --> T["IPA cible<br/>lexique · Wiktionnaire · Wikipédia"]
+  T --> S["le moteur le dit<br/>dans deux phrases porteuses"]
+  S --> E["un reconnaisseur de phonèmes<br/>le réécoute"]
+  E --> D{"distance à<br/>la cible ≤ 0,25 ?"}
+  D -- non --> L["le LLM local réécrit la graphie<br/>(il voit chaque essai et ce qui a été entendu)"]
+  L --> S
+  D -- oui --> V["enregistré pour ce moteur<br/>lexicon.yaml.eardrum.yaml"]
+```
+
+```bash
+pip install "speaker-helper[eardrum,chatterbox]"
+speaker-helper install-voice --engine eardrum        # l'oreille, une fois (~1,26 Go)
+
+speaker-helper --language fr eardrum                 # toutes les entrées du lexique
+speaker-helper --language fr eardrum chapitre.md     # + les mots d'un document
+speaker-helper --language fr eardrum chapitre.md --listen-all   # + tout mot entendu faux
+speaker-helper --language fr eardrum --words Feynman,Kasparov   # seulement ceux-là
+```
+
+Ce qu'elle fait, mot par mot :
+
+1. **Quels mots.** Sans document, toutes les entrées du lexique pour la
+   langue. Avec un document, les mots du lexique qu'il contient **et les mots
+   qui ne sont pas encore dans le lexique** mais sont à risque : noms propres
+   (majuscule en milieu de phrase), sigles, mots en forme de marque (`GitHub`,
+   `ChatGPT`), mots qu'espeak lit lui-même comme étrangers. `--listen-all` va
+   plus loin : tout le document est dit avec le lexique du jour puis réécouté,
+   et chaque mot sorti loin de sa lecture attendue rejoint la liste.
+2. **La cible.** L'`ipa:` de l'entrée quand elle existe (elle fait foi).
+   Sinon le Wiktionnaire (éditions française et anglaise, toutes les variantes
+   admises), puis l'introduction de l'article Wikipédia. Quand une graphie
+   existante désigne une variante parmi plusieurs (« Esskil » pour /ɛs.kil/
+   plutôt que /e.ʃil/), c'est celle-là qui est visée. Les requêtes sont
+   espacées (pauses aléatoires, repli exponentiel avec gigue sur 429 / 503,
+   User-Agent honnête) et mises en cache une fois pour toutes dans
+   `~/.cache/speaker-helper/eardrum/targets.yaml`. Faute de mieux, espeak
+   lisant la graphie actuelle sert de cible, signalée **faible**.
+3. **L'oreille.** Un reconnaisseur de phonèmes, pas un modèle de
+   transcription : Whisper écrirait « GitHub » pour un *GitHub* estropié, parce
+   que c'est le mot le plus probable. `wav2vec2-xlsr-53-espeak-cv-ft` écrit les
+   sons qu'il entend, dans le même alphabet IPA que les cibles.
+4. **Le score.** Le mot est retrouvé dans la phrase porteuse par alignement,
+   et seule sa région compte. La distance est phonétique, pas littérale : /e/
+   pour /ɛ/ ou un r pour un autre coûte peu, une voyelle pour une consonne
+   coûte tout. 0 est parfait ; à 0,25 ou moins le mot est juste (mesuré :
+   « Faïnemane » entendu `s a i n m a n` contre /fajnman/ donne 0,06, un
+   « fènman » fautif 0,39).
+5. **La réécriture.** Le LLM local (résolu via `best-engine-ai-helper`, servi
+   par Ollama ; `BEST_LLM_TEXT` en désigne un autre déjà installé) voit la
+   cible, une table son → graphie pour la langue, et chaque essai avec ce qui
+   a été entendu et, phonème par phonème, ce qui n'allait pas (« /ɛ/ dit à la
+   place de /ə/ », « /ʁ/ en trop à la fin »). Il propose une autre graphie, au
+   plus `--max-iter` fois. On garde le meilleur essai, pas le dernier ; une
+   graphie qui passe déjà n'est jamais remplacée par une à peine meilleure
+   (deux prises du même texte diffèrent d'autant d'elles-mêmes).
+6. **Le résultat.** Le gagnant va dans `lexicon.yaml.eardrum.yaml`, rangé par
+   moteur (ce que chatterbox lit juste, kyutai peut le lire faux) et s'applique
+   à chaque synthèse suivante de ce moteur. **Une graphie écrite à la main
+   n'est jamais remplacée** : quand elle échoue, le rapport propose la
+   meilleure et vous décidez. Pour un moteur qui prend des phonèmes (kokoro),
+   il n'y a rien à réécrire : la boucle vérifie que l'IPA cible sort juste et
+   l'enregistre.
+
+Chaque prise est gardée. `.private/eardrum-loop/<date-heure>/index.html`
+montre, pour chaque mot, la cible, chaque essai avec son score et ce qui a été
+entendu, et l'audio : la phrase entière et le mot découpé dedans. Les chiffres
+orientent ; votre oreille tranche. `--dry-run` rapporte sans enregistrer,
+`--offline` se passe du web, `--no-llm` ne fait que mesurer. La commande sort
+en `1` tant qu'un mot reste faux, elle peut donc garder une narration en CI.
+
+Depuis Python :
+
+```python
+from speaker_helper import Settings
+from speaker_helper.eardrum import run_eardrum
+
+report = run_eardrum(Settings.from_mapping({"language": "fr"}),
+                     text=open("chapitre.md").read())
+for word in report.results:
+    print(word.verdict, word.word, word.attempts[word.best].candidate)
+print(report.html)
+```
 
 ---
 

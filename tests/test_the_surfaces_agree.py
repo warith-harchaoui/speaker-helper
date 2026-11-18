@@ -108,6 +108,7 @@ def test_every_advertised_name_exists(name: str) -> None:
 # command that quietly stopped being registered in it.
 COMMANDS = {
     "clone",
+    "eardrum",
     "eval",
     "health",
     "install-voice",
@@ -236,10 +237,12 @@ def test_every_documented_command_line_is_accepted(tmp_path) -> None:
     # A floor, so an extractor that silently stops finding anything fails too.
     assert len(lines) > 60, f"only {len(lines)} documented command lines found"
 
-    # `narrate` takes an existing path, so the examples' filenames need to
-    # resolve to something; the stub never reads them.
+    # `narrate` and `eardrum` take an existing path, so the examples'
+    # filenames need to resolve to something; the stub never reads them.
     fixture = tmp_path / "doc.json"
     fixture.write_text(json.dumps([{"text": "Un."}]), encoding="utf-8")
+    document = tmp_path / "doc.md"
+    document.write_text("Un.\n", encoding="utf-8")
 
     runner = CliRunner()
     rejected = []
@@ -248,6 +251,7 @@ def test_every_documented_command_line_is_accepted(tmp_path) -> None:
             str(fixture) if arg.endswith(".json") and argv[i - 1] != "--json" else arg
             for i, arg in enumerate(argv)
         ]
+        argv = [str(document) if arg.endswith(".md") else arg for arg in argv]
         with pytest.MonkeyPatch.context() as patch:
             patch.setattr(
                 cli_module, "_HANDLERS", dict.fromkeys(cli_module._HANDLERS, lambda a, s: 0)

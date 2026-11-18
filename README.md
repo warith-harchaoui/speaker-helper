@@ -55,6 +55,13 @@ minimal web GUI — runnable locally (conda + pip) or as a Docker server.
   derived **once** by a local LLM (resolved through `best-engine-ai-helper`,
   served by Ollama) and cached; after that, everything is deterministic and
   offline. See [`lexicon.yaml.example`](https://github.com/warith-harchaoui/speaker-helper/blob/main/lexicon.yaml.example).
+- **The Ralph Eardrum Loop: pronunciation checked by ear.** `speaker-helper
+  eardrum` has the engine say every word at risk, hears it back with a
+  phoneme recogniser, measures how far it is from the right pronunciation
+  (the lexicon's IPA, Wiktionary, Wikipedia) and rewrites the respelling
+  until the word comes out right — for the lexicon's words and for the words
+  of a document that are not in the lexicon yet. See
+  [the section below](#the-ralph-eardrum-loop-pronunciation-by-ear).
 - **Numbers are said, not guessed.** Dates, times, amounts and numbers are
   spelled out as words before an engine reads them (French and English,
   deterministic, `speaker_helper.spoken_numbers`): `14/11` becomes a date,
@@ -408,6 +415,100 @@ speaker-helper --clone speak-from --source mic --seconds 5          -o out.wav
 
 Sources are optional extras: `youtube` (`youtube-helper`), `podcast`
 (`podcast-helper`), `mic` (`capture-helper`).
+
+---
+
+## The Ralph Eardrum Loop (pronunciation, by ear)
+
+A respelling is a guess about how an engine reads. "Faïnemane" makes a
+French voice say *Feynman* right — or not: it depends on the engine, and the
+only way to know is to listen. The Ralph Eardrum Loop listens for you, the way
+the Ralph Eyeball Loop looks at a figure: **say it, hear it, fix the source,
+say it again**.
+
+```mermaid
+flowchart LR
+  W["word at risk<br/>(lexicon, or found in the text)"] --> T["target IPA<br/>lexicon · Wiktionary · Wikipedia"]
+  T --> S["the engine says it<br/>in two carrier sentences"]
+  S --> E["a phoneme recogniser<br/>hears it back"]
+  E --> D{"distance to<br/>the target ≤ 0.25 ?"}
+  D -- no --> L["the local LLM rewrites the respelling<br/>(sees every attempt and what was heard)"]
+  L --> S
+  D -- yes --> V["saved for this engine<br/>lexicon.yaml.eardrum.yaml"]
+```
+
+```bash
+pip install "speaker-helper[eardrum,chatterbox]"
+speaker-helper install-voice --engine eardrum        # the ear, once (~1.26 GB)
+
+speaker-helper --language fr eardrum                 # every lexicon entry
+speaker-helper --language fr eardrum chapitre.md     # + the words of a document
+speaker-helper --language fr eardrum chapitre.md --listen-all   # + every word heard wrong
+speaker-helper --language fr eardrum --words Feynman,Kasparov   # just these
+```
+
+What it does, word by word:
+
+1. **Which words.** Without a document, every lexicon entry of the language.
+   With one, the lexicon words it contains **and the words that are not in the
+   lexicon yet** but are at risk: proper nouns (capitalised mid-sentence),
+   acronyms, brand-shaped words (`GitHub`, `ChatGPT`), words espeak itself
+   reads as foreign. `--listen-all` goes further: the whole document is said
+   with today's lexicon and heard back, and every word that came out far from
+   its expected reading joins the list.
+2. **The target.** The entry's own `ipa:` when there is one (final). Otherwise
+   Wiktionary (French and English editions, every accepted variant), then the
+   lead of the Wikipedia article. When an existing respelling encodes one of
+   several variants ("Esskil" for /ɛs.kil/ rather than /e.ʃil/), that one is
+   the target. Lookups are paced (random pauses, backoff with jitter on 429 /
+   503, an honest User-Agent) and cached for good in
+   `~/.cache/speaker-helper/eardrum/targets.yaml`. With nothing found, espeak
+   reading the current respelling is used and flagged as a **weak** target.
+3. **The ear.** A phoneme recogniser, not a speech-to-text model: Whisper
+   would write "GitHub" for a mangled *GitHub*, because that is the likeliest
+   word. `wav2vec2-xlsr-53-espeak-cv-ft` writes the sounds it hears, in the
+   same IPA alphabet as the targets.
+4. **The score.** The word is located inside the carrier sentence by
+   alignment, and only its region counts. The distance is phonetic, not
+   literal: /e/ for /ɛ/ or any r for another costs little, a vowel for a
+   consonant costs everything. 0 is perfect; at or below 0.25 the word counts
+   as right (measured: "Faïnemane" heard as `s a i n m a n` against /fajnman/
+   scores 0.06, a wrong "fènman" 0.39).
+5. **The rewrite.** The local LLM (resolved through `best-engine-ai-helper`,
+   served by Ollama; `BEST_LLM_TEXT` names another installed model) is shown
+   the target, a sound-to-spelling guide for the language, and every attempt
+   with what was heard and, phone by phone, what went wrong ("/ɛ/ said where
+   /ə/ was wanted", "extra /ʁ/ at the end"). It proposes another respelling,
+   at most `--max-iter` times. The best attempt is kept, not the last; a
+   spelling that already passes is never swapped for a marginally better one
+   (two takes of the same text differ by that much on their own).
+6. **The result.** The winner goes to `lexicon.yaml.eardrum.yaml`, keyed by
+   engine — what chatterbox reads right, kyutai may not — and is applied on
+   every later synthesis by that engine. A **hand-written respelling is never
+   replaced**: when it fails, the report proposes the better one and you
+   decide. For an engine that takes phonemes (kokoro) there is nothing to
+   respell: the loop checks the target IPA itself comes out right and records
+   it.
+
+Every take is kept. `.private/eardrum-loop/<date-time>/index.html` shows, for
+each word, the target, every attempt with its score and what was heard, and
+the audio — the whole sentence and the word cut out of it. The numbers point;
+your ear decides. `--dry-run` reports without saving, `--offline` skips the
+web, `--no-llm` only measures. The command exits `1` while a word is still
+wrong, so it can gate a narration in CI.
+
+From Python:
+
+```python
+from speaker_helper import Settings
+from speaker_helper.eardrum import run_eardrum
+
+report = run_eardrum(Settings.from_mapping({"language": "fr"}),
+                     text=open("chapitre.md").read())
+for word in report.results:
+    print(word.verdict, word.word, word.attempts[word.best].candidate)
+print(report.html)
+```
 
 ---
 

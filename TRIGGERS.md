@@ -54,6 +54,8 @@ before the sub-command.
 | Pick the engine + mode for a situation | `speaker-helper route --condition offline` | `route(...)`, `RouteRequest` | `POST /route` |
 | Check the backend can actually run | `speaker-helper health` | `available_backends()` | `GET /health` |
 | Fetch the weights an engine needs | `speaker-helper install-voice --engine kokoro` | — | — |
+| Check pronunciation by ear and fix respellings (Ralph Eardrum Loop) | `speaker-helper eardrum [doc.md] [--words A,B] [--listen-all]` | `speaker_helper.eardrum.run_eardrum(...)` | — |
+| Fetch the eardrum loop's phoneme recogniser | `speaker-helper install-voice --engine eardrum` | — | — |
 | Re-voice audio from a source | `speaker-helper speak-from --source youtube --url URL` | — | — |
 | Score the engine against a dataset | `speaker-helper eval --dataset cases.jsonl` | — | — |
 | Serve the HTTP API | `speaker-helper serve` | — | — |
@@ -106,6 +108,12 @@ before the sub-command.
 **Pronunciation**
 - "pronunciation lexicon", "pronounce this name correctly"
 - "read the dates and amounts correctly", "numbers read wrong"
+- "Ralph Eardrum Loop", "eardrum loop", "check the pronunciation by ear",
+  "listen back to every word", "is this name said right?", "the voice
+  mispronounces this name", "fix the respelling", "which words of this
+  document will be mispronounced?", "find the names missing from the lexicon"
+- "réécoute chaque mot", "vérifie la prononciation à l'oreille", "ce nom est
+  mal prononcé", "écris-le phonétiquement pour qu'il soit bien dit"
 
 **Operational**
 - "is TTS working here?", "why is there no audio?", "download the voice weights"
@@ -127,12 +135,15 @@ before the sub-command.
 | a JSON list of blocks (`text`, optionally `say`, `pause_before_ms`, `pause_after_ms`, `pace`, `emotion`), or of plain strings | what `narrate` reads, one block at a time; the page that holds the document does the splitting |
 | `.wav` reference clip (+ `<stem>.txt` transcript) | the voice to clone (`--clone-audio`, `--clone-text`, `--voice-sample`) — Audio8 needs the transcript, vocal-helper derives it when missing |
 | `lexicon.yaml` | how to pronounce names, acronyms, jargon — applied on every call (`./lexicon.yaml`, or `SPEAKER_HELPER_LEXICON`) |
+| `lexicon.yaml.eardrum.yaml` | respellings the Ralph Eardrum Loop heard to work, per engine — applied on every call by that engine, never over a hand-written one |
+| a Markdown or text document given to `eardrum` | the words to check: its lexicon words plus the names, acronyms and foreign words not in the lexicon yet |
 | a JSONL dataset | the cases `eval` scores against |
 
 | Output | Meaning |
 |--------|---------|
 | `.wav` (or `.mp3` / `.m4a`, by the `-o` extension) | the synthesised speech |
 | `.vtt` | the timed track, written beside the `narrate` audio, so a page can follow it |
+| `.private/eardrum-loop/<date-time>/index.html` (+ `report.json`, `report.md`, `audio/`) | the eardrum loop's report: every word, every attempt, its score, what was heard, the takes to listen to |
 | JSON (`Timeline`, `SpeechCue`) | the same timing, for a caller that renders its own (`POST /narrate`) |
 
 ## Do NOT invoke `speaker-helper` for
@@ -181,6 +192,13 @@ block landed.
   `numbers_to_words: false` turns it off.
 - **A missing `lexicon.yaml` is not an error**: the lexicon is on by default
   and simply inert when there is no file.
+- **The eardrum loop hears phonemes, not words.** Its ear is a phoneme
+  recogniser (wav2vec2 espeak), because a speech-to-text model writes the
+  likeliest word and would hide the very mispronunciation being looked for.
+  Targets come from the entry's `ipa:`, else Wiktionary / Wikipedia (paced,
+  cached), else espeak (flagged weak). A hand-written respelling is never
+  replaced, only challenged in the report. Prosody (emotion, intonation) is
+  not judged yet.
 - **Nothing is uploaded** unless you name `--backend elevenlabs`: every other
   engine runs on this machine, and only the first use downloads weights.
   ElevenLabs needs `ELEVENLABS_API_KEY`; `health` says so without spending a

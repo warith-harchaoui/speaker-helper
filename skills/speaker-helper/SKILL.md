@@ -15,6 +15,7 @@ description: >-
   document", "make a voiceover", "say this out loud", "which voice", "clone
   this voice", "sound like this recording", "audiobook", "low-latency speech",
   "offline or streaming", "a lifelike female voice", "pronunciation lexicon",
+  "Ralph Eardrum Loop", "is this name said right",
   or names `speaker-helper`, `speaker-helper-mcp`, `import speaker_helper`. Do
   NOT use for speech → text, captions of a recording, or "who spoke when" —
   that is the inverse toolbox, `vocal-helper`. The exhaustive trigger
@@ -116,7 +117,18 @@ or `elevenlabs` for the paid cloud (`ELEVENLABS_API_KEY`; `eleven_v4` offline,
 `eleven_v4_turbo` streaming). `auto` never picks the paid one.
 
 A `lexicon.yaml` beside you (names, acronyms, jargon) is applied on every
-call; engines without phoneme input receive its respellings. Dates, times,
+call; engines without phoneme input receive its respellings.
+
+Whether a respelling actually works is checked **by ear** with the Ralph
+Eardrum Loop: `speaker-helper eardrum [doc.md]` says each word at risk (the
+lexicon's, plus the names, acronyms and foreign words of the document that
+are not in it yet), hears it back with a phoneme recogniser, compares it with
+the right IPA (lexicon, Wiktionary, Wikipedia) and lets the local LLM rewrite
+the respelling until it passes. Winners go to `lexicon.yaml.eardrum.yaml`,
+per engine; hand-written respellings are never replaced. Needs
+`pip install 'speaker-helper[eardrum]'` and, once,
+`speaker-helper install-voice --engine eardrum`. The report with every take is
+`.private/eardrum-loop/<date-time>/index.html`. Dates, times,
 amounts and numbers are spelled out first (French, English), so `14/11` is
 read as a date and not guessed at; the cues keep the digits.
 

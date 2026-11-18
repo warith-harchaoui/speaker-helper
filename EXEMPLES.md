@@ -27,6 +27,7 @@ quel.
 - [13. Lexique de prononciation : fixer la prononciation d'un mot, une fois](#13-lexique-de-prononciation--fixer-la-prononciation-dun-mot-une-fois)
 - [14. Longs textes : découpés aux frontières du discours](#14-longs-textes--découpés-aux-frontières-du-discours)
 - [15. Les règles de langue, de bout en bout](#15-les-règles-de-langue-de-bout-en-bout)
+- [16. La Ralph Eardrum Loop : vérifier chaque mot à l'oreille](#16-la-ralph-eardrum-loop--vérifier-chaque-mot-à-loreille)
 - [Ligne de commande](#ligne-de-commande)
 - [Dépannage](#dépannage)
 
@@ -651,6 +652,50 @@ pack d'écoute pour que les défauts se re-décident à l'oreille.
 La résolution de langue suit partout une seule règle : **précisée → crue,
 non précisée → détectée** (`langdetect`, graine fixée), avec la `language`
 configurée en dernier recours.
+
+---
+
+## 16. La Ralph Eardrum Loop : vérifier chaque mot à l'oreille
+
+Une graphie du lexique est un pari sur la façon dont un moteur lit. La
+boucle vérifie le pari : le moteur dit le mot, un reconnaisseur de phonèmes
+le réécoute, et le LLM local réécrit la graphie jusqu'à ce que ce qui est
+entendu corresponde à la bonne prononciation.
+
+```bash
+pip install "speaker-helper[eardrum,chatterbox]"
+speaker-helper install-voice --engine eardrum                 # l'oreille, une fois
+
+speaker-helper --language fr eardrum                          # tout le lexique
+speaker-helper --language fr eardrum chapitre.md --dry-run    # un document, rapport seul
+```
+
+```python
+from speaker_helper import Settings
+from speaker_helper.eardrum import run_eardrum
+
+report = run_eardrum(
+    Settings.from_mapping({"language": "fr"}),
+    text="Hier, Feynman citait Nietzsche.",
+    max_iter=3,
+)
+for word in report.results:
+    best = word.attempts[word.best] if word.attempts else None
+    print(f"{word.verdict:>10}  {word.word:<12} {best.candidate if best else '—'}")
+#         ok  Feynman      Faïnemane        (0,06, chatterbox, mesuré)
+#   improved  Nietzsche    Nitché           (0,42 tel qu'écrit → 0,31)
+print(report.html)  # .private/eardrum-loop/<date-heure>/index.html — écoutez là
+```
+
+Les mots du texte absents du lexique (ici *Nietzsche*, nom propre en milieu
+de phrase) sont trouvés et vérifiés aussi. Une graphie gagnante va dans
+`lexicon.yaml.eardrum.yaml` pour ce moteur seulement et s'applique à chaque
+synthèse suivante ; un `respelling:` écrit à la main n'est jamais remplacé :
+le rapport propose, vous décidez.
+
+Le LLM local vient de `best-engine-ai-helper` ; quand le modèle qu'il désigne
+n'est pas téléchargé, le rapport le dit. `BEST_LLM_TEXT=gemma3:12b` en désigne
+un installé pour une exécution.
 
 ---
 

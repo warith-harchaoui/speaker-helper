@@ -196,3 +196,55 @@ def test_audio8_speaks_french_in_the_bundled_female_voice() -> None:
     samples, rate = sf.read(io.BytesIO(result.wav_bytes))
     assert rate == 24_000 and np.max(np.abs(samples)) > 0.05
     asyncio.run(engine.aclose())
+
+
+def _ear_ready() -> bool:
+    """True when the eardrum's phoneme recogniser can load without a download."""
+    if importlib.util.find_spec("transformers") is None:
+        return False
+    from speaker_helper.eardrum.ear import check_install
+
+    return check_install() == 0
+
+
+@pytest.mark.slow
+@pytest.mark.skipif(not (_kokoro_ready() and _ear_ready()), reason="kokoro or the ear missing")
+def test_the_ear_hears_kokoro_say_a_name_right_and_a_wrong_reading_wrong() -> None:
+    """The real loop's two halves agree: right IPA scores low, a wrong one high.
+
+    kokoro takes IPA, so both readings are forced exactly: the target
+    /fajnman/ and the French-letter misreading /fɛnman/. The ear must put the
+    first under the threshold and the second clearly above it.
+    """
+    from speaker_helper.eardrum.ear import PhonemeEar
+    from speaker_helper.eardrum.espeak import espeak_ipa
+    from speaker_helper.eardrum.loop import DEFAULT_THRESHOLD
+    from speaker_helper.eardrum.phones import word_distance
+    from speaker_helper.lexicon import Lexicon, LexiconEntry
+    from speaker_helper.speaker import Speaker
+
+    ear = PhonemeEar()
+    scores = {}
+    for ipa in ("fajnman", "fɛnmɑ̃"):
+
+        async def say(ipa: str = ipa) -> bytes:
+            """Say the carrier with ``ipa`` spliced in for the name."""
+            spk = Speaker(Settings.from_mapping({"backend": "kokoro", "language": "fr"}))
+            trial = Lexicon([LexiconEntry("Feynman", "fr", ipa=ipa)])
+            spk.lexicon = trial
+            spk.engine._lexicon = trial  # type: ignore[attr-defined]
+            try:
+                return (
+                    await spk.say("Je vous parle de Feynman aujourd'hui.", language="fr")
+                ).wav_bytes
+            finally:
+                await spk.aclose()
+
+        heard = [h.phone for h in ear.hear(asyncio.run(say()))]
+        scores[ipa] = word_distance(
+            heard,
+            espeak_ipa("Je vous parle de", "fr"),
+            ["fajnman"],
+            espeak_ipa("aujourd'hui.", "fr"),
+        ).score
+    assert scores["fajnman"] <= DEFAULT_THRESHOLD < scores["fɛnmɑ̃"]

@@ -6,6 +6,38 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **The Ralph Eardrum Loop** (`speaker-helper eardrum`,
+  `speaker_helper.eardrum`): the engine says each word at risk in two carrier
+  sentences, a phoneme recogniser (`wav2vec2-xlsr-53-espeak-cv-ft`) hears it
+  back, the word is located by alignment and scored with a phonetic distance
+  against its target, and the local LLM rewrites the respelling until it
+  passes (at most `--max-iter` times; the best attempt is kept).
+  - **Which words**: every lexicon entry of the language; or, given a
+    document, its lexicon words plus the words not in the lexicon yet —
+    proper nouns, acronyms, brand-shaped words, words espeak reads as
+    foreign; `--listen-all` also says the whole document and adds every word
+    heard far from its reading; `--words` for an explicit list.
+  - **Targets**: the entry's `ipa:`, else Wiktionary (fr, en; every variant),
+    else the Wikipedia lead, else espeak reading the current respelling
+    (flagged weak). Lookups are paced with jitter, backed off on 429 / 503,
+    and cached in `~/.cache/speaker-helper/eardrum/targets.yaml`.
+  - **Results** go to `lexicon.yaml.eardrum.yaml`, keyed by engine, and are
+    applied on every later synthesis by that engine (kokoro: verified IPA).
+    A hand-written respelling is never replaced; the report proposes.
+  - **Report**: `.private/eardrum-loop/<date-time>/index.html` with every
+    attempt, its score, what was heard and the audio (sentence and word).
+  - `speaker-helper install-voice --engine eardrum` fetches the recogniser at a
+    pinned revision with exact sizes; the `eardrum` extra brings torch,
+    transformers and phonemizer.
+
+### Changed
+
+- `Lexicon.respell(..., engine=)` and `phonemise_with_lexicon(..., engine=)`
+  take the speaking backend, to apply the respellings (or IPA) the eardrum
+  loop verified on it. `Speaker` and the kokoro backend pass it.
+
 ## [0.15.5] - 2026-11-15
 
 ### Changed

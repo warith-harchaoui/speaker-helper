@@ -68,6 +68,12 @@ ANY_LANGUAGE = "*"
 #: regenerating it through a YAML dumper would destroy those comments.
 CACHE_SUFFIX = ".llm-cache.yaml"
 
+#: Sidecar suffix for respellings the Ralph Eardrum Loop *heard* to work, per
+#: engine (see :mod:`speaker_helper.eardrum`). Separate from the LLM cache
+#: because its keys carry the engine: what chatterbox reads right, kyutai may
+#: not, and a verified result only vouches for the engine it was heard on.
+VERIFIED_SUFFIX = ".eardrum.yaml"
+
 #: ISO-639-1 → the language name the LLM prompt speaks about. Only languages
 #: this package routinely synthesises; anything else falls back to the code
 #: itself, which modern instruct models resolve fine.
@@ -100,8 +106,9 @@ class LexiconEntry:
         "derive one with the local LLM on first use".
     source : str
         ``"user"`` for hand-written entries, ``"llm"`` for a derived
-        respelling — kept so a cached derivation is distinguishable from a
-        human decision.
+        respelling, ``"builtin"`` for the packaged ones, ``"eardrum"`` for a
+        word known only from the Ralph Eardrum Loop's verified sidecar —
+        kept so a derivation is distinguishable from a human decision.
     """
 
     word: str
@@ -176,6 +183,10 @@ class Lexicon:
         # Words the LLM was asked about and could not answer, so a broken
         # Ollama setup logs one warning per word instead of one per sentence.
         self._llm_failed: set[str] = set()
+        # Respellings the Ralph Eardrum Loop verified by ear, keyed
+        # "engine:language:word" (see load_verified).
+        self.verified: dict[str, dict[str, Any]] = {}
+        self.verified_path: Path | None = None
 
     # ----- construction -----------------------------------------------------
 
@@ -348,13 +359,15 @@ class Lexicon:
 
     # ----- the respelling tier ----------------------------------------------
 
-    def respell(self, text: str, language: str) -> str:
+    def respell(self, text: str, language: str, *, engine: str | None = None) -> str:
         """Rewrite ``text`` so an engine without phoneme input says it right.
 
-        Every lexicon word found in ``text`` is replaced by its respelling —
-        the hand-written one when the entry has it, otherwise one derived once
-        by the local LLM and cached. A word whose respelling cannot be
-        obtained (no LLM available) is left exactly as written.
+        Every lexicon word found in ``text`` is replaced by its respelling, in
+        this order: the hand-written one (the human always wins), then the
+        one the Ralph Eardrum Loop verified by ear on ``engine``, then the
+        entry's own (packaged or LLM-derived), then one derived once by the
+        local LLM and cached. A word whose respelling cannot be obtained (no
+        LLM available) is left exactly as written.
 
         Parameters
         ----------
@@ -362,6 +375,9 @@ class Lexicon:
             The text about to be synthesised.
         language : str
             Language of the text.
+        engine : str or None
+            The backend about to speak (``"chatterbox"``…), to pick the
+            respelling verified on it. ``None`` ignores verified results.
 
         Returns
         -------
@@ -376,6 +392,17 @@ class Lexicon:
         out: list[str] = []
         for chunk, entry in pieces:
             if entry is None:
+                out.append(chunk)
+                continue
+            if not (entry.source == "user" and entry.respelling):
+                verified = self.verified_for(entry.word, language, engine)
+                if verified.get("respelling"):
+                    out.append(str(verified["respelling"]))
+                    continue
+            if entry.source == "eardrum":
+                # Known only from another engine's verified result: no
+                # respelling vouched for this engine, so say it as written
+                # rather than ask the LLM about a word nobody listed.
                 out.append(chunk)
                 continue
             respelling = self.ensure_respelling(entry, language)
@@ -435,6 +462,77 @@ class Lexicon:
         self._save_cache_entry(cache_key, derived)
         osh.info("lexicon: derived respelling %r -> %r (%s)", entry.word, derived, target)
         return derived
+
+    # ----- the Ralph Eardrum Loop's verified sidecar -------------------------
+
+    def verified_for(self, word: str, language: str, engine: str | None) -> dict[str, Any]:
+        """The record the Ralph Eardrum Loop verified for this word and engine.
+
+        Parameters
+        ----------
+        word : str
+            The word as matched in the text (any casing).
+        language : str
+            Language of the text.
+        engine : str or None
+            The backend about to speak; ``None`` never matches.
+
+        Returns
+        -------
+        dict
+            The verified record (``respelling`` and/or ``ipa``, ``score``…),
+            or ``{}``.
+
+        Examples
+        --------
+        >>> lex = Lexicon([])
+        >>> lex.verified["chatterbox:fr:feynman"] = {"respelling": "Faïnemane"}
+        >>> lex.verified_for("Feynman", "fr-FR", "chatterbox")["respelling"]
+        'Faïnemane'
+        >>> lex.verified_for("Feynman", "fr", "kyutai")
+        {}
+        """
+        if not engine:
+            return {}
+        key = f"{engine.lower()}:{_language_key(language)}:{word.casefold()}"
+        return self.verified.get(key, {})
+
+    def load_verified(self, path: Path) -> None:
+        """Fold in the Ralph Eardrum Loop's verified sidecar.
+
+        Words the sidecar knows and the lexicon does not (found by discovery
+        in a document) become entries of source ``"eardrum"`` so the matcher
+        sees them; they are only rewritten for the engine they were verified
+        on.
+
+        Parameters
+        ----------
+        path : Path
+            The sidecar (``<lexicon>.eardrum.yaml``). Missing is fine.
+        """
+        self.verified_path = path
+        if not path.exists():
+            return
+        try:
+            records: dict[str, Any] = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        except Exception as exc:  # noqa: BLE001 - a corrupt sidecar must not break synthesis
+            osh.warning("lexicon: unreadable eardrum sidecar %s (%s) — ignoring it", path, exc)
+            return
+        added = False
+        for key, record in records.items():
+            if not isinstance(record, dict) or key.count(":") < 2:
+                continue
+            engine, lang, word = key.split(":", 2)
+            self.verified[key] = record
+            if self.entry_for(word, lang) is None:
+                spelled = str(record.get("word") or word)
+                self._by_lang.setdefault(lang, {})[word] = LexiconEntry(
+                    word=spelled, language=lang, source="eardrum"
+                )
+                added = True
+        if added:
+            # New words change the matching pattern.
+            self._patterns.clear()
 
     # ----- the LLM sidecar cache ---------------------------------------------
 
@@ -614,6 +712,8 @@ def _validate_respelling(answer: str, word: str) -> str:
     'au-haine-u'
     >>> _validate_respelling("Sure! Here is the respelling: au-haine-u", "ONU")
     ''
+    >>> _validate_respelling("Ours.tœ.rcheur.", "Worcestershire")
+    ''
     """
     # Some reasoning models leak a <think> block even when asked not to;
     # strip it before judging the answer's shape.
@@ -628,7 +728,11 @@ def _validate_respelling(answer: str, word: str) -> str:
     # Explanatory punctuation is the signature of a chatty answer.
     if any(marker in cleaned for marker in (":", "(", ")", "=")):
         return ""
-    return cleaned
+    # A dot inside the answer is a syllable boundary or a sentence, never a
+    # spelling an engine should read ("Ours.tœ.rcheur." was proposed once).
+    if "." in cleaned.rstrip("."):
+        return ""
+    return cleaned.rstrip(".")
 
 
 # ---------------------------------------------------------------------------
@@ -641,6 +745,8 @@ def phonemise_with_lexicon(
     language: str,
     lexicon: Lexicon | None,
     phonemise: Callable[[str], str],
+    *,
+    engine: str | None = None,
 ) -> str:
     """Phonemise ``text``, splicing lexicon IPA in place of matched words.
 
@@ -660,6 +766,9 @@ def phonemise_with_lexicon(
     phonemise : callable
         ``str -> str``, the backend's own phonemiser for this language —
         passed in so this module depends on no backend.
+    engine : str or None
+        The backend phonemising (``"kokoro"``), to use IPA the Ralph Eardrum
+        Loop verified on it when the entry has none of its own.
 
     Returns
     -------
@@ -691,9 +800,13 @@ def phonemise_with_lexicon(
                 if phonemes:
                     out.append(phonemes)
             continue
+        verified = lexicon.verified_for(entry.word, language, engine)
         if entry.ipa:
             # The human stated the phonemes; they go in verbatim.
             out.append(entry.ipa)
+        elif verified.get("ipa"):
+            # Phonemes the eardrum loop heard this very engine say right.
+            out.append(str(verified["ipa"]))
         elif entry.respelling:
             # No IPA, but a respelling exists: its phonemisation is still
             # deterministic, because the respelling is a fixed string.
@@ -753,6 +866,43 @@ def builtin_entries() -> list[LexiconEntry]:
     return entries
 
 
+def lexicon_path_for(settings: Settings) -> Path:
+    """The lexicon file the settings point at (it may not exist yet).
+
+    Parameters
+    ----------
+    settings : Settings
+        The configuration (``lexicon.path``, else ``./lexicon.yaml``).
+
+    Returns
+    -------
+    Path
+        The path.
+    """
+    raw_path = str((settings.lexicon or {}).get("path") or "").strip()
+    return Path(raw_path) if raw_path else Path("lexicon.yaml")
+
+
+def verified_path_for(settings: Settings) -> Path:
+    """Where the Ralph Eardrum Loop's verified sidecar lives for these settings.
+
+    Next to the lexicon file — even when that file does not exist yet, so a
+    project with no hand-written lexicon still keeps what the loop heard.
+
+    Parameters
+    ----------
+    settings : Settings
+        The configuration.
+
+    Returns
+    -------
+    Path
+        ``<lexicon>.eardrum.yaml``.
+    """
+    path = lexicon_path_for(settings)
+    return path.with_name(path.name + VERIFIED_SUFFIX)
+
+
 def load_lexicon(settings: Settings) -> Lexicon | None:
     """Resolve and load the lexicon the settings point at, if any.
 
@@ -788,9 +938,11 @@ def load_lexicon(settings: Settings) -> Lexicon | None:
         # implicit ./lexicon.yaml simply not existing is the normal quiet case.
         if raw_path:
             osh.warning("lexicon: configured file %s does not exist — no lexicon", path)
-        if not base:
+        sidecar = verified_path_for(settings)
+        if not base and not sidecar.exists():
             return None
         lexicon = Lexicon(base, path=None, llm_enabled=bool(cfg.get("llm", True)))
+        lexicon.load_verified(sidecar)
         osh.info("lexicon: %d built-in entries, no user file", len(base))
         return lexicon
     lexicon = Lexicon.load(path)
@@ -801,6 +953,7 @@ def load_lexicon(settings: Settings) -> Lexicon | None:
         fusion = Lexicon(merged, path=lexicon.path, llm_enabled=lexicon.llm_enabled)
         fusion._cache = getattr(lexicon, "_cache", {})
         lexicon = fusion
+    lexicon.load_verified(verified_path_for(settings))
     # `llm: false` in settings wins over the file's own `llm:` key, so an
     # operator can forbid LLM calls machine-wide without editing lexicons.
     if not bool(cfg.get("llm", True)):

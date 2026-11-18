@@ -121,6 +121,19 @@ lexicon-llm = [
     "best-engine-ai-helper>=1.9",
     "ollama>=0.4",
 ]
+# The Ralph Eardrum Loop: a wav2vec2 phoneme recogniser (torch +
+# transformers) hears each word back, phonemizer + espeak-ng read the carrier
+# sentences, and the LLM tier proposes new respellings. Weights: fetched once
+# with `speaker-helper install-voice --engine eardrum`.
+eardrum = [
+    "torch>=2.0.0",
+    "torchaudio>=2.0.0",
+    "transformers>=4.40",
+    "phonemizer>=3.2",
+    "soundfile>=0.12",
+    "numpy>=1.24.0",
+    "speaker-helper[lexicon-llm]",
+]
 # Everything that speaks, without the cloning engines' torch stack.
 all = [
     "speaker-helper[kokoro,detect]",

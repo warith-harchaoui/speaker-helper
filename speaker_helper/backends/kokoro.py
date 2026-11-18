@@ -552,6 +552,7 @@ class KokoroEngine:
             # The lexicon splices around chunks; each chunk still goes through
             # this module's own phonemiser (switch markers removed and all).
             lambda chunk: _phonemise_without_switches(chunk, lang),
+            engine="kokoro",
         )
 
     def _require_known_voice(self, model: Any, voice: str) -> None:

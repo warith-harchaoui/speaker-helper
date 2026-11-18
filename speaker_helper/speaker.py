@@ -700,7 +700,9 @@ class Speaker:
             from speaker_helper.backends.kokoro import detect_language
 
             language = detect_language(text, fallback=self.settings.language)
-        return self.lexicon.respell(text, language)
+        # The backend's name picks the respellings the Ralph Eardrum Loop
+        # verified on this very engine.
+        return self.lexicon.respell(text, language, engine=self.settings.backend)
 
     def _voice_and_speed(self, voice: str | None, seg: Segment) -> dict[str, Any]:
         """The per-segment knobs, passed only to backends that accept them.

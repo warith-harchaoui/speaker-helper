@@ -21,6 +21,9 @@ around them:
 * ``route`` — choose engine + mode from measured quality↔speed evidence.
 * ``eval`` — measure the engine against a dataset and gate on versioned
   thresholds (exit ``0`` pass / ``1`` fail); see :mod:`speaker_helper.eval`.
+* ``eardrum`` — the Ralph Eardrum Loop: say every word at risk, hear it back
+  with a phoneme recogniser, rewrite its respelling until the engine says it
+  right; see :mod:`speaker_helper.eardrum`.
 * ``install-voice`` — fetch an engine's weights before anything depends on them.
 * ``health`` — report whether the configured backend can run, and exit
   non-zero when it cannot.
@@ -44,6 +47,7 @@ Usage example
     echo "Texte depuis stdin." | speaker-helper synth -o out.wav
     speaker-helper --engine kokoro voices
     speaker-helper route --condition online_realtime --language fr
+    speaker-helper --language fr eardrum chapitre.md
     speaker-helper serve --bind-host 0.0.0.0 --bind-port 8080
 
 Author
@@ -215,6 +219,47 @@ def _cmd_narrate(args: SimpleNamespace, settings: Settings) -> int:
         return 0
 
     return asyncio.run(run())
+
+
+def _cmd_eardrum(args: SimpleNamespace, settings: Settings) -> int:
+    """Handle the ``eardrum`` sub-command; return a process exit code.
+
+    ``0`` when every word checked is said right (or was fixed), ``1`` when some
+    are still wrong, ``2`` on a usage error.
+    """
+    from speaker_helper.eardrum import run_eardrum
+
+    text = None
+    if args.text_file is not None:
+        text = Path(args.text_file).read_text(encoding="utf-8")
+    words = [w.strip() for w in (args.words or "").split(",") if w.strip()]
+    if args.listen_all and text is None:
+        osh.error("--listen-all needs a TEXT_FILE to listen to")
+        return 2
+    report = run_eardrum(
+        settings,
+        text=text,
+        words=words or None,
+        include_lexicon=not args.no_lexicon,
+        listen_everything=args.listen_all,
+        max_iter=args.max_iter,
+        threshold=args.threshold,
+        web=not args.offline,
+        llm=not args.no_llm,
+        dry_run=args.dry_run,
+        out_dir=args.out,
+    )
+    for result in report.results:
+        best = result.attempts[result.best] if result.attempts and result.best >= 0 else None
+        print(
+            f"{result.verdict:>10}  {result.word}"
+            + (f"  →  {best.candidate}  ({best.score:.2f})" if best else "")
+            + ("  [saved]" if result.saved else "")
+        )
+    print(f"report: {report.html}")
+    if report.verified_path is not None:
+        print(f"verified spellings: {report.verified_path}")
+    return 1 if report.unresolved else 0
 
 
 def _cmd_install_voice(args: SimpleNamespace, settings: Settings) -> int:
@@ -567,6 +612,7 @@ _HANDLERS = {
     "serve": _cmd_serve,
     "narrate": _cmd_narrate,
     "install-voice": _cmd_install_voice,
+    "eardrum": _cmd_eardrum,
     "health": _cmd_health,
 }
 
@@ -751,8 +797,112 @@ def narrate(
     _run(ctx, "narrate", segments=segments, out=out, read_math=read_math, bitrate=bitrate)
 
 
+@cli.command(name="eardrum")
+@click.argument(
+    "text_file", required=False, default=None, type=click.Path(exists=True, path_type=Path)
+)
+@click.option("--words", default=None, help="Comma-separated words to check (e.g. Feynman,ONU).")
+@click.option(
+    "--listen-all",
+    "listen_all",
+    is_flag=True,
+    default=False,
+    help="Say the whole TEXT_FILE first; add every word heard far from its reading.",
+)
+@click.option(
+    "--no-lexicon",
+    "no_lexicon",
+    is_flag=True,
+    default=False,
+    help="Skip the lexicon's entries; check only discovered or listed words.",
+)
+@click.option(
+    "--max-iter",
+    "max_iter",
+    type=int,
+    default=4,
+    show_default=True,
+    help="Most respellings the LLM proposes per word.",
+)
+@click.option(
+    "--threshold",
+    type=float,
+    default=0.25,
+    show_default=True,
+    help="Phonetic distance at or below which a word counts as said right.",
+)
+@click.option(
+    "--offline",
+    is_flag=True,
+    default=False,
+    help="No Wiktionary / Wikipedia lookups (lexicon IPA or espeak only).",
+)
+@click.option(
+    "--no-llm",
+    "no_llm",
+    is_flag=True,
+    default=False,
+    help="Measure only: no new respellings proposed.",
+)
+@click.option(
+    "--dry-run",
+    "dry_run",
+    is_flag=True,
+    default=False,
+    help="Report, but save nothing to the verified sidecar.",
+)
+@click.option(
+    "-o",
+    "--out",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="Report directory (default: .private/eardrum-loop/<date-time>/).",
+)
+@click.pass_context
+def eardrum(
+    ctx: click.Context,
+    text_file: Path | None,
+    words: str | None,
+    listen_all: bool,
+    no_lexicon: bool,
+    max_iter: int,
+    threshold: float,
+    offline: bool,
+    no_llm: bool,
+    dry_run: bool,
+    out: Path | None,
+) -> None:
+    """The Ralph Eardrum Loop: re-listen to every word and fix its spelling.
+
+    Says each word in carrier sentences with the configured engine, hears it
+    back with a phoneme recogniser, compares it with the right pronunciation
+    (lexicon IPA, Wiktionary, Wikipedia) and lets the local LLM rewrite the
+    respelling until it comes out right. Without TEXT_FILE, checks every
+    lexicon entry of the language; with it, the lexicon words it contains and
+    the words at risk it holds (proper nouns, acronyms, foreign words).
+    """
+    _run(
+        ctx,
+        "eardrum",
+        text_file=text_file,
+        words=words,
+        listen_all=listen_all,
+        no_lexicon=no_lexicon,
+        max_iter=max_iter,
+        threshold=threshold,
+        offline=offline,
+        no_llm=no_llm,
+        dry_run=dry_run,
+        out=out,
+    )
+
+
 @cli.command(name="install-voice")
-@click.option("--engine", default="kokoro", help="Which engine to prepare.")
+@click.option(
+    "--engine",
+    default="kokoro",
+    help="Which engine to prepare (kokoro, chatterbox, openvoice, or eardrum for the ear).",
+)
 @click.option("--force", is_flag=True, default=False, help="Re-download even if present.")
 @click.pass_context
 def install_voice(ctx: click.Context, engine: str, force: bool) -> None:

@@ -26,6 +26,7 @@ script you can paste as it is.
 - [13. Pronunciation lexicon: fix how a word is said, once](#13-pronunciation-lexicon-fix-how-a-word-is-said-once)
 - [14. Long texts: chunked at discourse boundaries](#14-long-texts-chunked-at-discourse-boundaries)
 - [15. The language rules, end to end](#15-the-language-rules-end-to-end)
+- [16. The Ralph Eardrum Loop: check every word by ear](#16-the-ralph-eardrum-loop-check-every-word-by-ear)
 - [Command line](#command-line)
 - [Troubleshooting](#troubleshooting)
 
@@ -626,6 +627,52 @@ defaults can be re-decided by ear.
 Language resolution everywhere follows one rule: **stated → believed,
 unstated → detected** (`langdetect`, seeded), falling back to the configured
 `language`.
+
+---
+
+## 16. The Ralph Eardrum Loop: check every word by ear
+
+A respelling in the lexicon is a guess about how one engine reads. The loop
+checks the guess: the engine says the word, a phoneme recogniser hears it
+back, and the local LLM rewrites the respelling until what is heard matches
+the right pronunciation.
+
+```bash
+pip install "speaker-helper[eardrum,chatterbox]"
+speaker-helper install-voice --engine eardrum                 # the ear, once
+
+speaker-helper --language fr eardrum                          # the whole lexicon
+speaker-helper --language fr eardrum chapitre.md --dry-run    # a document, report only
+```
+
+```python
+from pathlib import Path
+
+from speaker_helper import Settings
+from speaker_helper.eardrum import run_eardrum
+
+report = run_eardrum(
+    Settings.from_mapping({"language": "fr"}),
+    text="Hier, Feynman citait Nietzsche.",
+    max_iter=3,
+)
+for word in report.results:
+    best = word.attempts[word.best] if word.attempts else None
+    print(f"{word.verdict:>10}  {word.word:<12} {best.candidate if best else '—'}")
+#         ok  Feynman      Faïnemane        (0.06, chatterbox, measured)
+#   improved  Nietzsche    Nitché           (0.42 as written → 0.31)
+print(report.html)  # .private/eardrum-loop/<date-time>/index.html — listen there
+```
+
+The words of the text that are not in the lexicon (here *Nietzsche*, a
+proper noun mid-sentence) are found and checked too. A winning respelling
+goes to `lexicon.yaml.eardrum.yaml` for this engine only and is applied on
+every later synthesis; a hand-written `respelling:` is never replaced — the
+report proposes, you decide.
+
+The local LLM comes from `best-engine-ai-helper`; when the model it names is
+not pulled, the report says so. `BEST_LLM_TEXT=gemma3:12b` names an installed
+one for a run.
 
 ---
 

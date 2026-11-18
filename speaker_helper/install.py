@@ -50,9 +50,27 @@ KOKORO_FILES: tuple[tuple[str, int], ...] = (
     ("voices-v1.0.bin", 28_214_398),
 )
 
+#: The Ralph Eardrum Loop's ear: the wav2vec2 espeak-phoneme recogniser, at
+#: the revision the loop was calibrated with, file by file with exact sizes —
+#: same reasoning as Kokoro's. Read from here at run time, never downloaded
+#: then (see :mod:`speaker_helper.eardrum.ear`).
+EARDRUM_RELEASE: str = (
+    "https://huggingface.co/facebook/wav2vec2-xlsr-53-espeak-cv-ft/resolve/"
+    "2c733782da5604684829819a5eb744c193fe9398"
+)
+EARDRUM_FILES: tuple[tuple[str, int], ...] = (
+    ("config.json", 1_856),
+    ("preprocessor_config.json", 212),
+    ("special_tokens_map.json", 85),
+    ("tokenizer_config.json", 412),
+    ("vocab.json", 4_637),
+    ("pytorch_model.bin", 1_263_535_127),
+)
+
 #: Engines whose weights this module can fetch, and what it would take.
 INSTALLABLE: dict[str, str] = {
     "kokoro": "~340 MB, two files, from a pinned kokoro-onnx release",
+    "eardrum": "~1.26 GB, the phoneme recogniser the Ralph Eardrum Loop listens with",
     "openvoice": "checkpoints published by MyShell; see the project's README",
     "chatterbox": "fetched by the package itself on first use",
 }
@@ -127,6 +145,42 @@ def install_kokoro(*, force: bool = False) -> int:
     return 0
 
 
+def install_eardrum(*, force: bool = False) -> int:
+    """Fetch the Ralph Eardrum Loop's phoneme recogniser into the cache.
+
+    Parameters
+    ----------
+    force : bool
+        Re-download even when a file of the right size is already there.
+
+    Returns
+    -------
+    int
+        ``0`` when every file is present and the right size afterwards.
+    """
+    # Imported here: the ear module is light, but install.py stays importable
+    # even if the eardrum package were ever split out.
+    from speaker_helper.eardrum.ear import PHONEME_CACHE
+
+    PHONEME_CACHE.mkdir(parents=True, exist_ok=True)
+    for filename, expected in EARDRUM_FILES:
+        destination = PHONEME_CACHE / filename
+        if not force and destination.is_file() and destination.stat().st_size == expected:
+            print(f"✓ {filename} already fetched")
+            continue
+        _download(f"{EARDRUM_RELEASE}/{filename}", destination)
+        actual = destination.stat().st_size
+        if actual != expected:
+            print(
+                f"✗ {filename} is {actual} bytes, expected {expected}. "
+                f"The download was cut short; run this again to repair it.",
+                file=sys.stderr,
+            )
+            return 1
+    print(f"✓ the eardrum's phoneme recogniser is ready in {PHONEME_CACHE}")
+    return 0
+
+
 def install_engine(engine: str, *, force: bool = False) -> int:
     """Fetch what ``engine`` needs, or say why this cannot.
 
@@ -138,6 +192,8 @@ def install_engine(engine: str, *, force: bool = False) -> int:
     name = (engine or "kokoro").lower()
     if name == "kokoro":
         return install_kokoro(force=force)
+    if name == "eardrum":
+        return install_eardrum(force=force)
     if name == "chatterbox":
         print(
             "Chatterbox fetches its own weights the first time it synthesises; "

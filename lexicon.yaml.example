@@ -27,6 +27,14 @@
 # first derivation everything is deterministic and fully offline. Delete a
 # cache line to force a re-derivation; move a cached value into `respelling:`
 # here to promote it to a human decision (the human always wins).
+#
+# Whether a respelling really works is checked BY EAR with the Ralph Eardrum
+# Loop (`speaker-helper eardrum`): the engine says the word, a phoneme
+# recogniser hears it back, and the respelling is rewritten until it comes out
+# right. The winners land in `lexicon.yaml.eardrum.yaml` next to this file,
+# per engine, and are applied on every synthesis by that engine — never over
+# a `respelling:` you wrote here. Give an entry an `ipa:` and the loop aims at
+# exactly that pronunciation.
 
 # OPTIONAL — allow the LLM derivation for this file (default: true). Set to
 # false on machines without Ollama, or when every entry is hand-written.

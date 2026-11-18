@@ -49,7 +49,12 @@ speaker-helper narrate post.json -o post.wav --read-math fr
 speaker-helper voices
 speaker-helper eval                     # measure, don't guess
 speaker-helper route --condition online_realtime   # which engine, in numbers
+speaker-helper --language fr eardrum doc.md         # pronunciation, checked by ear
 ```
+
+`eardrum` is command-line and library only (`speaker_helper.eardrum`): a run
+says every word several times through the real engine and can last minutes,
+which is not a request an HTTP route should hold open.
 
 ## 3. HTTP API
 
