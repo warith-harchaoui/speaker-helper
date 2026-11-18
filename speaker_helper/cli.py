@@ -229,6 +229,8 @@ def _cmd_eardrum(args: SimpleNamespace, settings: Settings) -> int:
     """
     from speaker_helper.eardrum import run_eardrum
 
+    if getattr(args, "prosody", False):
+        return _eardrum_prosody(args, settings)
     text = None
     if args.text_file is not None:
         text = Path(args.text_file).read_text(encoding="utf-8")
@@ -260,6 +262,49 @@ def _cmd_eardrum(args: SimpleNamespace, settings: Settings) -> int:
     if report.verified_path is not None:
         print(f"verified spellings: {report.verified_path}")
     return 1 if report.unresolved else 0
+
+
+def _eardrum_prosody(args: SimpleNamespace, settings: Settings) -> int:
+    """The prosody side of ``eardrum``: intonation and arousal, text against voice.
+
+    TEXT_FILE is a narration's JSON segments or a plain text (one segment per
+    sentence). Exit ``0`` when every segment agrees (or was fixed), ``1``
+    otherwise, ``2`` without a file.
+    """
+    import json
+
+    from speaker_helper.eardrum.expressive import run_prosody, segments_from_text
+
+    if args.text_file is None:
+        osh.error("--prosody needs a TEXT_FILE (narration JSON or plain text)")
+        return 2
+    raw = Path(args.text_file).read_text(encoding="utf-8")
+    if str(args.text_file).endswith(".json"):
+        from speaker_helper.narration import coerce_segments
+
+        segments = [
+            {k: v for k, v in vars(s).items() if isinstance(v, str) and v}
+            for s in coerce_segments(json.loads(raw))
+        ]
+    else:
+        segments = segments_from_text(raw)
+    report = run_prosody(
+        settings,
+        segments,
+        tune=not args.measure_only,
+        infer=not args.no_llm,
+        out_dir=args.out,
+    )
+    for result in report.results:
+        print(f"{result.verdict:>10}  {result.text}")
+    agreement = report.agreement
+    print(
+        "agreement (first take): "
+        + ", ".join(f"{k} {'—' if v is None else f'{100 * v:.0f} %'}" for k, v in agreement.items())
+    )
+    print(f"report: {report.html}")
+    print(f"tuned segments: {report.tuned}")
+    return 1 if any(r.verdict == "unresolved" for r in report.results) else 0
 
 
 def _cmd_install_voice(args: SimpleNamespace, settings: Settings) -> int:
@@ -803,6 +848,19 @@ def narrate(
 )
 @click.option("--words", default=None, help="Comma-separated words to check (e.g. Feynman,ONU).")
 @click.option(
+    "--prosody",
+    is_flag=True,
+    default=False,
+    help="Check intonation and emotion instead of pronunciation (TEXT_FILE: JSON or text).",
+)
+@click.option(
+    "--measure-only",
+    "measure_only",
+    is_flag=True,
+    default=False,
+    help="With --prosody: measure text/voice agreement, try no lever.",
+)
+@click.option(
     "--listen-all",
     "listen_all",
     is_flag=True,
@@ -863,6 +921,8 @@ def eardrum(
     ctx: click.Context,
     text_file: Path | None,
     words: str | None,
+    prosody: bool,
+    measure_only: bool,
     listen_all: bool,
     no_lexicon: bool,
     max_iter: int,
@@ -880,12 +940,20 @@ def eardrum(
     respelling until it comes out right. Without TEXT_FILE, checks every
     lexicon entry of the language; with it, the lexicon words it contains and
     the words at risk it holds (proper nouns, acronyms, foreign words).
+
+    With --prosody, the same loop for how each sentence is said: the final
+    contour its form calls for and the arousal its words (or its emotion tag)
+    express, against what the voice measurably did; the engine's dials are
+    tuned until they agree, and the winning settings are written as segments
+    `narrate` reads.
     """
     _run(
         ctx,
         "eardrum",
         text_file=text_file,
         words=words,
+        prosody=prosody,
+        measure_only=measure_only,
         listen_all=listen_all,
         no_lexicon=no_lexicon,
         max_iter=max_iter,

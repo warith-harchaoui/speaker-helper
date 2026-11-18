@@ -123,13 +123,15 @@ lexicon-llm = [
 ]
 # The Ralph Eardrum Loop: a wav2vec2 phoneme recogniser (torch +
 # transformers) hears each word back, phonemizer + espeak-ng read the carrier
-# sentences, and the LLM tier proposes new respellings. Weights: fetched once
+# sentences, librosa's pYIN tracks the pitch for the prosody checks, and the
+# LLM tier proposes new respellings. Weights: fetched once
 # with `speaker-helper install-voice --engine eardrum`.
 eardrum = [
     "torch>=2.0.0",
     "torchaudio>=2.0.0",
     "transformers>=4.40",
     "phonemizer>=3.2",
+    "librosa>=0.10",
     "soundfile>=0.12",
     "numpy>=1.24.0",
     "speaker-helper[lexicon-llm]",

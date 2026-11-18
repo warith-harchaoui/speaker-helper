@@ -240,3 +240,51 @@ def test_a_failing_eardrum_job_says_why(monkeypatch) -> None:
                 break
             status = client.get(f"/eardrum/{job_id}").json()
         assert status["status"] == "failed" and "eardrum" in status["error"]
+
+
+def test_the_prosody_check_runs_as_the_same_kind_of_job(monkeypatch, tmp_path) -> None:
+    """prosody: true runs the intonation/arousal loop and returns agreement + tuned segments."""
+    import json
+
+    from speaker_helper.eardrum.expressive import ExpressionResult, ExpressionTake, ProsodyReport
+
+    async def fake_run(settings, segments, **kwargs):  # type: ignore[no-untyped-def]
+        """One segment, fixed by marking the question."""
+        take = ExpressionTake(
+            "marked_question", "Tu viens ?!", "neutral", "", "normal", "rise", True, 0.1, True
+        )
+        result = ExpressionResult(
+            text=segments[0]["text"],
+            language="fr",
+            expected_contour={"shape": "rise", "reason": "yes/no question without marker"},
+            expected=None,
+            takes=[take],
+            best=0,
+            verdict="fixed",
+        )
+        tuned = tmp_path / "segments.tuned.json"
+        tuned.write_text(
+            json.dumps([{"text": "Tu viens ?", "say": "Tu viens ?!"}]), encoding="utf-8"
+        )
+        page = tmp_path / "index.html"
+        page.write_text("<h1>prosodie</h1>", encoding="utf-8")
+        assert kwargs["tune"] is True
+        return ProsodyReport(results=[result], html=page, tuned=tuned, meta={})
+
+    monkeypatch.setattr("speaker_helper.eardrum.expressive.run_prosody_async", fake_run)
+    with _client() as client:
+        assert (
+            client.post("/eardrum", json={"prosody": True, "include_lexicon": False}).status_code
+            == 400
+        )
+        job_id = client.post("/eardrum", json={"prosody": True, "text": "Tu viens ?"}).json()[
+            "job_id"
+        ]
+        status = client.get(f"/eardrum/{job_id}").json()
+        for _ in range(50):
+            if status["status"] != "running":
+                break
+            status = client.get(f"/eardrum/{job_id}").json()
+        assert status["status"] == "done", status
+        assert status["segments"][0]["verdict"] == "fixed"
+        assert status["tuned_segments"][0]["say"] == "Tu viens ?!"

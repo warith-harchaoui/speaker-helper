@@ -121,6 +121,65 @@ def _audio(path: str) -> str:
     return f'<audio controls preload="none" src="{html.escape(path)}"></audio>'
 
 
+#: The report's stylesheet, shared by the pronunciation and prosody pages:
+#: light and dark tokens, one card per word or segment, a grid per take.
+_CSS = """:root { --bg:#fbfbfd; --fg:#1d1d1f; --muted:#6e6e73; --card:#fff; --line:#d2d2d7;
+  --ok:#248a3d; --fix:#0071e3; --warn:#b25000; --bad:#d70015; }
+@media (prefers-color-scheme: dark) { :root { --bg:#000; --fg:#f5f5f7; --muted:#a1a1a6;
+  --card:#1c1c1e; --line:#38383a; --ok:#30d158; --fix:#0a84ff; --warn:#ff9f0a; --bad:#ff453a; } }
+body { background:var(--bg); color:var(--fg); font:15px/1.5 -apple-system, "Roboto", sans-serif;
+  margin:0 auto; max-width:960px; padding:24px 16px; }
+h1 { font-size:24px; margin:0 0 4px; } .sub { color:var(--muted); margin:0 0 24px; }
+.word { background:var(--card); border:1px solid var(--line); border-radius:12px;
+  padding:16px; margin:0 0 16px; border-left:6px solid var(--line); }
+.v-ok { border-left-color:var(--ok); } .v-fixed { border-left-color:var(--fix); }
+.v-improved, .v-proposal { border-left-color:var(--warn); }
+.v-unresolved, .v-no-target { border-left-color:var(--bad); }
+h2 { font-size:19px; margin:0 0 6px; } .verdict, .saved { font-size:12px; font-weight:600;
+  padding:2px 8px; border-radius:99px; border:1px solid var(--line); vertical-align:middle; }
+.meta, .note { color:var(--muted); margin:4px 0; }
+.mono { font-family:"Roboto Mono", ui-monospace, monospace; }
+.attempt { border-top:1px solid var(--line); padding:8px 0; }
+.attempt.best .cand b, li.best .heard b { color:var(--fix); }
+.origin { color:var(--muted); font-size:12px; }
+.score { font-variant-numeric:tabular-nums; font-weight:600; }
+.lbl { color:var(--muted); font-size:12px; }
+ul { list-style:none; padding:0; margin:4px 0; }
+li { margin:6px 0; display:grid; grid-template-columns:minmax(150px, 1fr) 2fr 2fr;
+  align-items:center; gap:8px; }
+.player { display:flex; align-items:center; gap:6px; min-width:0; }
+.lbl { width:44px; flex:none; }
+audio { height:32px; width:100%; min-width:0; }
+@media (max-width: 640px) { li { grid-template-columns:1fr; } }
+"""
+
+
+def _page(title: str, sub_html: str, body_html: str) -> str:
+    """A complete report page around a body.
+
+    Parameters
+    ----------
+    title : str
+        The page's heading (plain text).
+    sub_html : str
+        The subtitle paragraph's content (already escaped HTML).
+    body_html : str
+        The cards (already escaped HTML).
+
+    Returns
+    -------
+    str
+        The HTML document.
+    """
+    return (
+        '<!doctype html>\n<html lang="fr"><head><meta charset="utf-8">\n'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
+        f"<title>{html.escape(title)}</title>\n<style>\n{_CSS}</style></head><body>\n"
+        f'<h1>{html.escape(title)}</h1>\n<p class="sub">{sub_html}</p>\n'
+        f"{body_html}\n</body></html>\n"
+    )
+
+
 def render_html(results: list[WordResult], meta: dict[str, Any]) -> str:
     """The self-contained HTML report.
 
@@ -177,50 +236,14 @@ def render_html(results: list[WordResult], meta: dict[str, Any]) -> str:
     for r in results:
         counts[r.verdict] = counts.get(r.verdict, 0) + 1
     summary = " · ".join(f"{verdict_label(k)} : {v}" for k, v in sorted(counts.items()))
-    return f"""<!doctype html>
-<html lang="fr"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Ralph Eardrum Loop</title>
-<style>
-:root {{ --bg:#fbfbfd; --fg:#1d1d1f; --muted:#6e6e73; --card:#fff; --line:#d2d2d7;
-  --ok:#248a3d; --fix:#0071e3; --warn:#b25000; --bad:#d70015; }}
-@media (prefers-color-scheme: dark) {{ :root {{ --bg:#000; --fg:#f5f5f7; --muted:#a1a1a6;
-  --card:#1c1c1e; --line:#38383a; --ok:#30d158; --fix:#0a84ff; --warn:#ff9f0a; --bad:#ff453a; }} }}
-body {{ background:var(--bg); color:var(--fg); font:15px/1.5 -apple-system, "Roboto", sans-serif;
-  margin:0 auto; max-width:960px; padding:24px 16px; }}
-h1 {{ font-size:24px; margin:0 0 4px; }} .sub {{ color:var(--muted); margin:0 0 24px; }}
-.word {{ background:var(--card); border:1px solid var(--line); border-radius:12px;
-  padding:16px; margin:0 0 16px; border-left:6px solid var(--line); }}
-.v-ok {{ border-left-color:var(--ok); }} .v-fixed {{ border-left-color:var(--fix); }}
-.v-improved, .v-proposal {{ border-left-color:var(--warn); }}
-.v-unresolved, .v-no-target {{ border-left-color:var(--bad); }}
-h2 {{ font-size:19px; margin:0 0 6px; }} .verdict, .saved {{ font-size:12px; font-weight:600;
-  padding:2px 8px; border-radius:99px; border:1px solid var(--line); vertical-align:middle; }}
-.meta, .note {{ color:var(--muted); margin:4px 0; }}
-.mono {{ font-family:"Roboto Mono", ui-monospace, monospace; }}
-.attempt {{ border-top:1px solid var(--line); padding:8px 0; }}
-.attempt.best .cand b {{ color:var(--fix); }}
-.origin {{ color:var(--muted); font-size:12px; }}
-.score {{ font-variant-numeric:tabular-nums; font-weight:600; }}
-.lbl {{ color:var(--muted); font-size:12px; }}
-ul {{ list-style:none; padding:0; margin:4px 0; }}
-li {{ margin:6px 0; display:grid; grid-template-columns:minmax(150px, 1fr) 2fr 2fr;
-  align-items:center; gap:8px; }}
-.player {{ display:flex; align-items:center; gap:6px; min-width:0; }}
-.lbl {{ width:44px; flex:none; }}
-audio {{ height:32px; width:100%; min-width:0; }}
-@media (max-width: 640px) {{ li {{ grid-template-columns:1fr; }} }}
-</style></head><body>
-<h1>Ralph Eardrum Loop</h1>
-<p class="sub">moteur <b>{html.escape(str(meta.get("engine")))}</b>
-· langue {html.escape(str(meta.get("language")))} · seuil {meta.get("threshold")}
-· {html.escape(str(meta.get("date")))}
-<br>{html.escape(summary)}<br>score = distance phonétique du mot entendu à la cible
-(0 = parfait).
-Les chiffres orientent ; l'oreille tranche.</p>
-{"".join(rows)}
-</body></html>
-"""
+    sub = (
+        f"moteur <b>{html.escape(str(meta.get('engine')))}</b> · langue "
+        f"{html.escape(str(meta.get('language')))} · seuil {meta.get('threshold')} · "
+        f"{html.escape(str(meta.get('date')))}<br>{html.escape(summary)}<br>score = distance "
+        "phonétique du mot entendu à la cible (0 = parfait). Les chiffres orientent ; "
+        "l'oreille tranche."
+    )
+    return _page("Ralph Eardrum Loop", sub, "".join(rows))
 
 
 def render_markdown(results: list[WordResult], meta: dict[str, Any]) -> str:
@@ -285,4 +308,116 @@ def write_report(out_dir: Path, results: list[WordResult], meta: dict[str, Any])
     (out_dir / "report.md").write_text(render_markdown(results, meta), encoding="utf-8")
     index = out_dir / "index.html"
     index.write_text(render_html(results, meta), encoding="utf-8")
+    return index
+
+
+# ---------------------------------------------------------------------------
+# The prosody report
+# ---------------------------------------------------------------------------
+
+_SHAPES = {"rise": "montante", "fall": "descendante", "level": "plate", "either": "libre"}
+_AROUSAL = {"low": "calme", "neutral": "neutre", "high": "activée"}
+
+
+def _yes(flag: bool | None) -> str:
+    """A check mark, a cross, or a dash when nothing could be measured.
+
+    Parameters
+    ----------
+    flag : bool or None
+        The agreement.
+
+    Returns
+    -------
+    str
+        ``"✓"``, ``"✗"`` or ``"—"``.
+    """
+    return "—" if flag is None else ("✓" if flag else "✗")
+
+
+def render_prosody_html(results: list[Any], meta: dict[str, Any]) -> str:
+    """The prosody report: per segment, what the text asks, what the voice did.
+
+    Parameters
+    ----------
+    results : list of ExpressionResult
+        One per segment.
+    meta : dict
+        ``engine``, ``language``, ``date``, ``agreement``.
+
+    Returns
+    -------
+    str
+        A complete HTML document.
+    """
+    rows = []
+    for r in results:
+        expected = r.expected or {}
+        shape = r.expected_contour.get("shape", "")
+        takes = []
+        for i, t in enumerate(r.takes):
+            best = " best" if i == r.best else ""
+            takes.append(
+                f"<li class='{best.strip()}'><div class='heard'><b>{html.escape(t.lever)}</b> "
+                f"<span class='origin'>{html.escape(t.emotion or 'neutral')} "
+                f"{html.escape(t.intensity)} {html.escape(t.pace)}</span><br>"
+                f"fin {_SHAPES.get(t.contour or '', '—')} {_yes(t.contour_ok)} · "
+                f"activation {t.arousal_shift:+.2f} {_yes(t.arousal_ok)}</div>"
+                f"<div class='player'>{_audio(t.audio)}</div></li>"
+            )
+        rows.append(
+            f"<section class='word v-{html.escape(r.verdict)}'>"
+            f"<h2>{html.escape(r.text)} <span class='verdict'>"
+            f"{verdict_label(r.verdict)}</span></h2>"
+            f"<p class='meta'>attendu : fin {_SHAPES.get(shape, shape)} "
+            f"({html.escape(r.expected_contour.get('reason', ''))}) · activation "
+            f"{_AROUSAL.get(expected.get('arousal', 'neutral'), '')}"
+            f" ({html.escape(expected.get('source', 'défaut'))}"
+            f"{', ' + html.escape(expected['emotion']) if expected.get('emotion') else ''})"
+            f"{' · valence ' + html.escape(expected['valence']) if expected.get('valence') else ''}"
+            f"</p><ul>{''.join(takes)}</ul></section>"
+        )
+    agreement = meta.get("agreement") or {}
+
+    def pct(value: float | None) -> str:
+        """A share as a percentage, or a dash."""
+        return "—" if value is None else f"{100 * value:.0f} %"
+
+    sub = (
+        f"moteur <b>{html.escape(str(meta.get('engine')))}</b> · langue "
+        f"{html.escape(str(meta.get('language')))} · {html.escape(str(meta.get('date')))}"
+        f"<br>accord texte ↔ voix, première prise : fin de phrase "
+        f"{pct(agreement.get('contour'))} · activation {pct(agreement.get('arousal'))}. "
+        "La valence vient du texte et n'est pas jugée sur l'audio : la voix seule ne la "
+        "porte pas de façon fiable. Les chiffres orientent ; l'oreille tranche."
+    )
+    return _page("Ralph Eardrum Loop — prosodie", sub, "".join(rows))
+
+
+def write_prosody_report(out_dir: Path, results: list[Any], meta: dict[str, Any]) -> Path:
+    """Write ``index.html`` and ``report.json`` for a prosody run.
+
+    Parameters
+    ----------
+    out_dir : Path
+        The run's directory.
+    results : list of ExpressionResult
+        One per segment.
+    meta : dict
+        Run metadata (with ``agreement``).
+
+    Returns
+    -------
+    Path
+        The HTML report's path.
+    """
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "report.json").write_text(
+        json.dumps(
+            {"meta": meta, "segments": [asdict(r) for r in results]}, ensure_ascii=False, indent=2
+        ),
+        encoding="utf-8",
+    )
+    index = out_dir / "index.html"
+    index.write_text(render_prosody_html(results, meta), encoding="utf-8")
     return index

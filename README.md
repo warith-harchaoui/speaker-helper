@@ -521,6 +521,42 @@ for word in report.results:
 print(report.html)
 ```
 
+### Prosody: intonation and emotion, text against voice
+
+`speaker-helper eardrum --prosody` asks the second question: does the voice
+say each sentence **the way the text means it**? Two readers, kept apart on
+purpose:
+
+- **the text side**: the final contour the sentence's form calls for (French
+  and English rules: "Tu viens ?" rises, "Où vas-tu ?" falls, "Est-ce que tu
+  viens ?" may do either; *Delais-Roussarie et al. 2015*), and the arousal it
+  expresses (calm, neutral, activated) — from the narration's `emotion` tag,
+  otherwise from the local LLM reading the words;
+- **the audio side**: from the signal alone, never a transcript — the final
+  contour measured on the pitch track (pYIN, octave errors and the final creak
+  removed, Theil-Sen slope; a rise needs +3 semitones, a fall −2), and the
+  arousal shift against a **neutral take of the same sentence by the same
+  voice** (higher, wider, louder = more activated).
+
+Only what the voice carries reliably is judged: contour and arousal. Valence
+(positive or negative) travels mostly through the words (*Juslin & Laukka
+2003*), so it is reported from the text and never judged from the audio; and
+emotion labels from recognisers trained on acted human speech are not used as
+a verdict, because they collapse on synthetic speech (*arXiv 2603.16483*).
+
+```bash
+speaker-helper --language fr eardrum --prosody chapitre.md --measure-only  # how often do text and voice agree?
+speaker-helper --language fr eardrum --prosody segments.json               # and tune where they do not
+speaker-helper --language fr narrate .private/eardrum-loop/prosody-*/segments.tuned.json -o chapitre.wav
+```
+
+When a sentence disagrees, the loop tries the engine's levers in order —
+the emotion dial pushed to the end of its range, a slower pace (more text
+guidance on chatterbox), a question marked harder in what is *said* (`?!`),
+never in what the page shows — and keeps the best take. The report shows,
+per sentence, what was expected, what each take did, and the audio; the
+winning settings are written as segments `narrate` reads.
+
 ---
 
 ## Evaluation (no vibe checks)

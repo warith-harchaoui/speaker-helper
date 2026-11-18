@@ -125,7 +125,15 @@ per engine; hand-written respellings are never replaced. Needs
 `.private/eardrum-loop/<date-time>/index.html`. Over HTTP / MCP it is a job:
 `POST /eardrum` (tool `eardrum_start`) returns a `job_id`, then
 `GET /eardrum/{job_id}` (`eardrum_status`) until `done`, and
-`GET /eardrum/{job_id}/report` (`eardrum_report`) for the HTML. Dates, times,
+`GET /eardrum/{job_id}/report` (`eardrum_report`) for the HTML.
+
+`speaker-helper eardrum --prosody doc.md|segments.json` checks the other half:
+does each sentence's final contour match its form (a French "Tu viens ?"
+rises, "Où vas-tu ?" falls) and its arousal match the emotion of the text?
+Measured from the pitch and energy, against a neutral take of the same
+sentence; valence is never judged from audio. `--measure-only` reports the
+text/voice agreement; otherwise the engine's dials are tuned and written as
+`segments.tuned.json` for `narrate`. Over HTTP/MCP: `"prosody": true`. Dates, times,
 amounts and numbers are spelled out first (French, English), so `14/11` is
 read as a date and not guessed at; the cues keep the digits.
 

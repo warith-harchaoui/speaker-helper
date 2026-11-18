@@ -55,6 +55,7 @@ before the sub-command.
 | Check the backend can actually run | `speaker-helper health` | `available_backends()` | `GET /health` |
 | Fetch the weights an engine needs | `speaker-helper install-voice --engine kokoro` | — | — |
 | Check pronunciation by ear and fix respellings (Ralph Eardrum Loop) | `speaker-helper eardrum [doc.md] [--words A,B] [--listen-all]` | `speaker_helper.eardrum.run_eardrum(...)` | `POST /eardrum` → `GET /eardrum/{job_id}` (MCP: `eardrum_start`, `eardrum_status`, `eardrum_report`) |
+| Check intonation and emotion, text against voice, and tune the dials | `speaker-helper eardrum --prosody doc.md\|segments.json [--measure-only]` | `speaker_helper.eardrum.expressive.run_prosody(...)` | `POST /eardrum` with `"prosody": true` |
 | Fetch the eardrum loop's phoneme recogniser | `speaker-helper install-voice --engine eardrum` | — | — |
 | Re-voice audio from a source | `speaker-helper speak-from --source youtube --url URL` | — | — |
 | Score the engine against a dataset | `speaker-helper eval --dataset cases.jsonl` | — | — |
@@ -114,6 +115,10 @@ before the sub-command.
   document will be mispronounced?", "find the names missing from the lexicon"
 - "réécoute chaque mot", "vérifie la prononciation à l'oreille", "ce nom est
   mal prononcé", "écris-le phonétiquement pour qu'il soit bien dit"
+- "does the question rise?", "the intonation is wrong", "it sounds flat",
+  "does the voice match the emotion of the text?", "check the prosody",
+  "la question ne monte pas", "l'émotion du texte et de la voix sont-elles en
+  accord ?", "l'intonation est fausse"
 
 **Operational**
 - "is TTS working here?", "why is there no audio?", "download the voice weights"
@@ -197,8 +202,13 @@ block landed.
   likeliest word and would hide the very mispronunciation being looked for.
   Targets come from the entry's `ipa:`, else Wiktionary / Wikipedia (paced,
   cached), else espeak (flagged weak). A hand-written respelling is never
-  replaced, only challenged in the report. Prosody (emotion, intonation) is
-  not judged yet.
+  replaced, only challenged in the report.
+- **`eardrum --prosody` judges only what a voice carries reliably**: the final
+  contour (from the pitch track) and the arousal against a neutral take of
+  the same sentence. Valence is read from the text and reported, never judged
+  from the audio. On kokoro, French questions do not rise at all (measured);
+  on chatterbox, "Tu viens ?" is raised as a whole rather than rising at the
+  end.
 - **Nothing is uploaded** unless you name `--backend elevenlabs`: every other
   engine runs on this machine, and only the first use downloads weights.
   ElevenLabs needs `ELEVENLABS_API_KEY`; `health` says so without spending a

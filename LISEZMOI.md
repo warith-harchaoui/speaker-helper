@@ -540,6 +540,46 @@ for word in report.results:
 print(report.html)
 ```
 
+### Prosodie : intonation et émotion, le texte face à la voix
+
+`speaker-helper eardrum --prosody` pose la deuxième question : la voix
+dit-elle chaque phrase **comme le texte l'entend** ? Deux lecteurs, tenus
+séparés exprès :
+
+- **côté texte** : la fin de phrase qu'appelle la forme de la phrase (règles
+  françaises et anglaises : « Tu viens ? » monte, « Où vas-tu ? » descend,
+  « Est-ce que tu viens ? » peut faire l'un ou l'autre ; *Delais-Roussarie et
+  al. 2015*), et l'activation qu'elle exprime (calme, neutre, activée) : par
+  la balise `emotion` de la narration, sinon par le LLM local qui lit les
+  mots ;
+- **côté audio** : depuis le signal seul, jamais une transcription — la fin
+  de phrase mesurée sur la courbe de hauteur (pYIN, erreurs d'octave et
+  craquement final écartés, pente de Theil-Sen ; une montée demande +3
+  demi-tons, une descente −2), et l'écart d'activation face à **une prise
+  neutre de la même phrase par la même voix** (plus haut, plus étendu, plus
+  fort = plus activé).
+
+On ne juge que ce que la voix porte de façon fiable : la fin de phrase et
+l'activation. La valence (positif ou négatif) passe surtout par les mots
+(*Juslin & Laukka 2003*) : elle est rapportée depuis le texte, jamais jugée
+sur l'audio. Et les étiquettes d'émotion des reconnaisseurs entraînés sur de
+la parole humaine jouée ne servent pas de verdict : elles s'effondrent sur la
+parole de synthèse (*arXiv 2603.16483*).
+
+```bash
+speaker-helper --language fr eardrum --prosody chapitre.md --measure-only  # texte et voix s'accordent-ils ?
+speaker-helper --language fr eardrum --prosody segments.json               # et corriger là où non
+speaker-helper --language fr narrate .private/eardrum-loop/prosody-*/segments.tuned.json -o chapitre.wav
+```
+
+Quand une phrase est en désaccord, la boucle essaie les leviers du moteur
+dans l'ordre (le cadran d'émotion poussé au bout, un débit plus lent, donc
+plus de guidage par le texte chez chatterbox, une question marquée plus fort
+dans ce qui est *dit* avec `?!`, jamais dans ce que la page montre) et garde
+la meilleure prise. Le rapport montre, phrase par phrase, l'attendu, ce
+qu'a fait chaque prise, et l'audio ; les réglages gagnants sont écrits en
+segments que `narrate` relit.
+
 ---
 
 ## Évaluation (pas de « vibe checks »)

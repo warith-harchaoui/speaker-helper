@@ -71,7 +71,7 @@ speaker-helper serve --bind-host 0.0.0.0 --bind-port 8080
 | `POST /narrate` | blocks in; audio **and cues** out, as JSON |
 | `POST /clone` | a reference recording in, a voice id out |
 | `POST /route` | the engine choice, with the numbers behind it |
-| `POST /eardrum` | start the Ralph Eardrum Loop on a text and/or words; `202` and a `job_id` at once |
+| `POST /eardrum` | start the Ralph Eardrum Loop on a text and/or words (or, with `"prosody": true`, on sentences or narration segments); `202` and a `job_id` at once |
 | `GET /eardrum/{job_id}` | the job: `running`, `done` (each word's verdict, best spelling, score, what was heard) or `failed` |
 | `GET /eardrum/{job_id}/report` | the HTML report with every take to listen to |
 | `GET /` | a dependency-free single-page GUI over all of the above |

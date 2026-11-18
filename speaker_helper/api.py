@@ -150,9 +150,20 @@ class EardrumRequest(BaseModel):
         Let the local LLM propose respellings.
     dry_run : bool
         Report, but save nothing to the verified sidecar.
+    prosody : bool
+        Check intonation and arousal (text against voice) instead of
+        pronunciation; ``segments`` or ``text`` give the sentences.
+    segments : list or None
+        Narration segments (``text``, ``say``, ``emotion``, ``intensity``,
+        ``pace``) for the prosody check.
+    measure_only : bool
+        With ``prosody``: measure the agreement, try no lever.
     """
 
     text: str | None = Field(None, description="A document to check.")
+    prosody: bool = Field(False, description="Check intonation and emotion instead.")
+    segments: list | None = Field(None, description="Narration segments (prosody).")
+    measure_only: bool = Field(False, description="Prosody: measure only, no tuning.")
     words: list[str] = Field(default_factory=list, description="Explicit words to check.")
     language: str | None = Field(None, description="Override target language.")
     include_lexicon: bool = Field(True, description="Also check lexicon entries.")
@@ -422,6 +433,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         import dataclasses
         import uuid
 
+        if req.prosody and not (req.text or req.segments):
+            raise HTTPException(status_code=400, detail="prosody needs text or segments")
         if not req.text and not req.words and not req.include_lexicon:
             raise HTTPException(status_code=400, detail="nothing to check: give text or words")
         if req.listen_all and not req.text:
@@ -439,6 +452,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             """Run the loop, then store its summary (or its error) on the job."""
             from speaker_helper.eardrum import run_eardrum_async
 
+            if req.prosody:
+                await run_prosody_job()
+                return
             try:
                 report = await run_eardrum_async(
                     job_settings,
@@ -461,6 +477,45 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 verified_path=str(report.verified_path) if report.verified_path else None,
                 meta=report.meta,
                 words=[_eardrum_summary(r) for r in report.results],
+            )
+
+        async def run_prosody_job() -> None:
+            """The prosody variant: per segment, expected against measured."""
+            from speaker_helper.eardrum.expressive import run_prosody_async, segments_from_text
+            from speaker_helper.narration import coerce_segments
+
+            try:
+                segments = (
+                    [
+                        {k: v for k, v in vars(b).items() if isinstance(v, str) and v}
+                        for b in coerce_segments(req.segments)
+                    ]
+                    if req.segments
+                    else segments_from_text(req.text or "")
+                )
+                report = await run_prosody_async(
+                    job_settings, segments, tune=not req.measure_only, infer=req.llm
+                )
+            except Exception as exc:  # noqa: BLE001 - reported on the job, not raised
+                job.update(status="failed", error=f"{type(exc).__name__}: {exc}")
+                return
+            job.update(
+                status="done",
+                report=str(report.html) if report.html else None,
+                tuned_segments=json.loads(report.tuned.read_text(encoding="utf-8")),
+                agreement=report.agreement,
+                meta=report.meta,
+                segments=[
+                    {
+                        "text": r.text,
+                        "verdict": r.verdict,
+                        "expected_contour": r.expected_contour,
+                        "expected": r.expected,
+                        "takes": [dataclasses.asdict(t) for t in r.takes],
+                        "best": r.best,
+                    }
+                    for r in report.results
+                ],
             )
 
         # Keep a reference so the task is not garbage-collected mid-run.

@@ -8,6 +8,20 @@ to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **`eardrum --prosody`: intonation and emotion, text against voice**
+  (`speaker_helper.eardrum.expressive`, `.prosody`, `.intonation`). Per
+  sentence, the text side gives the final contour its form calls for (French
+  and English rules) and the arousal it expresses (narration `emotion` tag,
+  else the local LLM reading the words); the audio side measures, from the
+  signal alone, the final contour (pYIN, octave errors and final creak
+  removed, Theil-Sen slope; rise ≥ +3 st, fall ≤ −2 st) and the arousal shift
+  against a neutral take of the same sentence. Valence is reported from the
+  text, never judged from audio. `--measure-only` reports the text/voice
+  agreement; otherwise the levers are tried in order (emotion dial to the end
+  of its range, slower pace = more text guidance, `?!` in what is said) and
+  the winning dials are written as `segments.tuned.json` for `narrate`. Also
+  over HTTP/MCP (`"prosody": true`). `librosa` joins the `eardrum` extra.
+
 - **The Ralph Eardrum Loop** (`speaker-helper eardrum`,
   `speaker_helper.eardrum`): the engine says each word at risk in two carrier
   sentences, a phoneme recogniser (`wav2vec2-xlsr-53-espeak-cv-ft`) hears it
