@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-11-19
+
 ### Added
 
 - **`narrate --select N`: each take chosen by ear, while narrating**
