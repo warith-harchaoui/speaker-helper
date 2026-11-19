@@ -438,8 +438,8 @@ Les sources sont des extras optionnels : `youtube` (`youtube-helper`), `podcast`
 ## La Ralph Eardrum Loop (la prononciation, à l'oreille)
 
 Une graphie phonétique est un pari sur la façon dont un moteur lit.
-« Faïnemane » fait dire *Feynman* correctement à une voix française, ou pas :
-cela dépend du moteur, et la seule façon de le savoir est d'écouter. La Ralph
+« Faïnemane » fait dire *Feynman* correctement à une voix française. Ou pas :
+cela dépend du moteur ; la seule façon de le savoir est d'écouter. La Ralph
 Eardrum Loop écoute à votre place, comme la Ralph Eyeball Loop regarde une
 figure : **le dire, l'entendre, corriger la source, le redire**.
 
@@ -494,7 +494,7 @@ Ce qu'elle fait, mot par mot :
    « fènman » fautif 0,39).
 5. **La réécriture.** Le LLM local (résolu via `best-engine-ai-helper`, servi
    par Ollama ; `BEST_LLM_TEXT` en désigne un autre déjà installé) voit la
-   cible, une table son → graphie pour la langue, et chaque essai avec ce qui
+   cible, une table son → graphie pour la langue puis chaque essai avec ce qui
    a été entendu et, phonème par phonème, ce qui n'allait pas (« /ɛ/ dit à la
    place de /ə/ », « /ʁ/ en trop à la fin »). Il propose une autre graphie, au
    plus `--max-iter` fois. On garde le meilleur essai, pas le dernier ; une
@@ -510,7 +510,7 @@ Ce qu'elle fait, mot par mot :
 
 Chaque prise est gardée. `.private/eardrum-loop/<date-heure>/index.html`
 montre, pour chaque mot, la cible, chaque essai avec son score et ce qui a été
-entendu, et l'audio : la phrase entière et le mot découpé dedans. Les chiffres
+entendu, enfin l'audio : la phrase entière et le mot découpé dedans. Les chiffres
 orientent ; votre oreille tranche. `--dry-run` rapporte sans enregistrer,
 `--offline` se passe du web, `--no-llm` ne fait que mesurer. La commande sort
 en `1` tant qu'un mot reste faux, elle peut donc garder une narration en CI.
@@ -549,13 +549,13 @@ séparés exprès :
 - **côté texte** : la fin de phrase qu'appelle la forme de la phrase (règles
   françaises et anglaises : « Tu viens ? » monte, « Où vas-tu ? » descend,
   « Est-ce que tu viens ? » peut faire l'un ou l'autre ; *Delais-Roussarie et
-  al. 2015*), et l'activation qu'elle exprime (calme, neutre, activée) : par
+  al. 2015*) ; puis l'activation qu'elle exprime (calme, neutre, activée) : par
   la balise `emotion` de la narration, sinon par le LLM local qui lit les
   mots ;
 - **côté audio** : depuis le signal seul, jamais une transcription — la fin
   de phrase mesurée sur la courbe de hauteur (pYIN, erreurs d'octave et
   craquement final écartés, pente de Theil-Sen ; une montée demande +3
-  demi-tons, une descente −2), et l'écart d'activation face à **une prise
+  demi-tons, une descente −2) ; puis l'écart d'activation face à **une prise
   neutre de la même phrase par la même voix** (plus haut, plus étendu, plus
   fort = plus activé).
 
@@ -573,7 +573,7 @@ speaker-helper --language fr narrate segments.json --select 4 -o chapitre.wav  #
 ```
 
 Quand une phrase est en désaccord, la boucle essaie des leviers dans un
-ordre **mesuré** sur chatterbox (français, 2026-11-18), et garde la meilleure
+ordre **mesuré** sur chatterbox (français, 2026-11-18) puis garde la meilleure
 prise :
 
 1. **un nouveau tirage avec les mêmes réglages** : chatterbox échantillonne,
@@ -588,9 +588,9 @@ prise :
    resemble-ai/chatterbox), donc gardé en dernier, pour les moteurs où il
    agit.
 
-La référence neutre est la moyenne de deux prises neutres, et une prise doit
+La référence neutre est la moyenne de deux prises neutres ; une prise doit
 déplacer l'activation de 1,0 pour compter comme activée ou calmée : des
-prises neutres répétées d'une même phrase diffèrent déjà jusqu'à 1,4, et tout
+prises neutres répétées d'une même phrase diffèrent déjà jusqu'à 1,4 : tout
 écart plus petit relève du hasard.
 
 Comme la correction la plus efficace sur un moteur qui échantillonne est un
@@ -604,7 +604,7 @@ toute fin et qui ne porte pas d'émotion coûte un tirage ; l'activation n'est
 jugée que pour les blocs marqués calmes ou activés, face à deux tirages
 neutres. Les changements de réglage trouvés par la boucle (`?!`, débit,
 émotion) vont toujours dans `segments.tuned.json`. Le rapport montre, phrase par phrase, l'attendu, ce
-qu'a fait chaque prise, et l'audio ; les réglages gagnants sont écrits en
+qu'a fait chaque prise, enfin l'audio ; les réglages gagnants sont écrits en
 segments que `narrate` relit.
 
 ---

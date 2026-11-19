@@ -659,7 +659,7 @@ configurée en dernier recours.
 
 Une graphie du lexique est un pari sur la façon dont un moteur lit. La
 boucle vérifie le pari : le moteur dit le mot, un reconnaisseur de phonèmes
-le réécoute, et le LLM local réécrit la graphie jusqu'à ce que ce qui est
+le réécoute, puis le LLM local réécrit la graphie jusqu'à ce que ce qui est
 entendu corresponde à la bonne prononciation.
 
 ```bash
